@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="覆盖主动权益、指数增强、纯债、一级债基/二级债基与转债基金的分类研究看板。" />
+    <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; upgrade-insecure-requests" />
+    <title>财富产品部-基金研究系统看板</title>
+    <link rel="preconnect" href="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" crossorigin />
+    <link rel="dns-prefetch" href="//fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" />
+    <link rel="stylesheet" href="styles.css?v=20260813a" />
+  </head>
+  <body class="compact-home">
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="返回首页">
+        <span class="brand-mark">研</span>
+        <span>
+          <strong>财富产品部-基金研究系统看板</strong>
+          <small>Fund Research Dashboard</small>
+        </span>
+      </a>
+      <nav aria-label="主导航">
+        <a href="#fund-categories">基金分类</a>
+        <a href="#samples">基金列表</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero section-shell">
+        <div class="hero-copy">
+          <p class="eyebrow">FUND RESEARCH</p>
+          <h1>搜索基金，查看研究。</h1>
+          <p class="hero-text">
+            按基金类别快速筛选，进入单基金页面查看业绩、持仓、调仓、相关性与归因分析。
+          </p>
+          <div class="hero-actions"><a class="button button-primary" href="#fund-categories">开始查找</a></div>
+        </div>
+        <div class="hero-panel" aria-label="研究进度摘要">
+          <div class="panel-topline">
+            <span>研究系统概况</span>
+            <span class="live-dot">持续建设</span>
+          </div>
+          <div class="metric-grid">
+            <div class="metric-card">
+              <span>已接入基金</span>
+              <strong id="fund-count">3</strong>
+              <small>研究样本</small>
+            </div>
+            <div class="metric-card">
+              <span>基金分类</span>
+              <strong>5</strong>
+              <small>独立框架</small>
+            </div>
+            <div class="metric-card">
+              <span>全量目录</span>
+              <strong id="completed-category-label">五类目录</strong>
+              <small id="completed-category-note">8,589个基金主体</small>
+            </div>
+            <div class="metric-card accent">
+              <span>数据边界</span>
+              <strong>本地</strong>
+              <small>原始数据不公开</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-shell research-strip" aria-label="研究原则">
+        <span>时点可得</span>
+        <span>口径统一</span>
+        <span>结果可解释</span>
+        <span>过程可复现</span>
+      </section>
+
+      <section id="fund-categories" class="section-shell section-block category-hub">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">FUND CATEGORY NAVIGATION</p>
+            <h2>基金分类研究导航</h2>
+          </div>
+          <p>不同类别使用不同评价目标、风险口径和归因模型，避免用一套权益指标评价所有产品。</p>
+        </div>
+        <div class="search-box home-search-box">
+          <label class="sr-only" for="fund-search">搜索基金</label>
+          <input
+            id="fund-search"
+            type="search"
+            placeholder="搜索基金名称、代码或基金经理..."
+            autocomplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-haspopup="listbox"
+            aria-controls="fund-search-suggestions"
+            aria-expanded="false"
+          />
+          <div id="fund-search-suggestions" class="fund-search-suggestions" role="listbox" aria-label="基金联想结果" hidden></div>
+        </div>
+        <div class="category-tabs" role="tablist" aria-label="基金分类">
+          <button class="active" data-category="all" role="tab" aria-selected="true">全部</button>
+          <button data-category="active-equity" role="tab" aria-selected="false">主动权益基金</button>
+          <button data-category="index-enhanced" role="tab" aria-selected="false">指数增强基金</button>
+          <button data-category="pure-bond" role="tab" aria-selected="false">纯债基金</button>
+          <button data-category="hybrid-bond" role="tab" aria-selected="false">一级债基/二级债基</button>
+          <button data-category="convertible-bond" role="tab" aria-selected="false">转债基金</button>
+        </div>
+      </section>
+
+      <section id="comparison" class="section-shell section-block comparison-section" data-active-equity-section>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">CROSS-FUND VIEW</p>
+            <h2>三种调仓模式</h2>
+          </div>
+          <p>名单变化需要与前十大集中度一起看：换得多不一定影响大，换得少也不一定无关紧要。</p>
+        </div>
+        <div class="comparison-grid">
+          <article>
+            <span class="comparison-index">01</span>
+            <h3>长期价值集中型</h3>
+            <strong>易方达蓝筹精选混合</strong>
+            <p>张坤自成立以来持续管理，长期集中持有A股与港股优质企业，核心风格稳定。</p>
+          </article>
+          <article>
+            <span class="comparison-index">02</span>
+            <h3>核心持仓型</h3>
+            <strong>大成高鑫股票A</strong>
+            <p>前十大覆盖一半以上净值，名单与仓位稳定，少量调整也具有组合意义。</p>
+          </article>
+          <article>
+            <span class="comparison-index">03</span>
+            <h3>风格迁移型</h3>
+            <strong>华夏成长混合</strong>
+            <p>中等集中、方向性调仓，从军工材料逐步迁移至半导体与算力。</p>
+          </article>
+        </div>
+        <div class="insight-callout">
+          <span>联合观察结论</span>
+          <p>易方达蓝筹精选前十大覆盖约85%，核心名单稳定；大成高鑫前十大覆盖约56%，同样偏低频持有；华夏成长集中度较低但方向迁移更快。三只基金现在均为主观主动权益，差异主要来自集中度、能力圈和调仓方式。</p>
+        </div>
+      </section>
+
+      <section id="samples" class="section-shell section-block">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">FIRST RESEARCH COHORT</p>
+            <h2 id="fund-list-title">全部基金全量列表</h2>
+          </div>
+          <p id="fund-list-description">按基金主体合并份额，点击基金进入对应研究模块。</p>
+        </div>
+
+        <div class="toolbar list-toolbar">
+          <select id="fund-filter" aria-label="按产品名称类型筛选" hidden>
+            <option value="all">全部子类</option>
+          </select>
+          <div id="fund-subtype-tabs" class="period-switch subtype-switch" aria-label="基金子类切换" hidden></div>
+          <div class="period-switch" aria-label="收益回撤时间维度">
+            <button class="active" data-list-period="short">短期</button>
+            <button data-list-period="long">长期</button>
+          </div>
+        </div>
+
+        <p id="search-result-count" class="search-result-count" aria-live="polite"></p>
+
+        <p id="fund-list-methodology" class="method-note home-classification-note">净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。</p>
+
+        <div class="fund-list-wrap" aria-live="polite">
+          <table class="fund-list-table">
+            <thead id="fund-list-head"></thead>
+            <tbody id="fund-grid"></tbody>
+          </table>
+        </div>
+        <nav id="fund-pagination" class="fund-pagination" aria-label="基金列表分页"></nav>
+      </section>
+
+      <section id="framework" class="section-shell section-block" data-active-equity-section>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">RESEARCH FRAMEWORK</p>
+            <h2>八维基金画像</h2>
+          </div>
+          <p>不急于给单一总分，先把收益来源、风险和投资方法拆开呈现。</p>
+        </div>
+        <div class="framework-grid">
+          <article><span>01</span><h3>产品定位</h3><p>类型、投资范围、基准、费率、规模与开放状态。</p></article>
+          <article><span>02</span><h3>收益能力</h3><p>绝对收益、同类超额、基准超额与滚动Alpha。</p></article>
+          <article><span>03</span><h3>风险特征</h3><p>波动、最大回撤、下行风险与回撤修复。</p></article>
+          <article><span>04</span><h3>风格画像</h3><p>市值、价值成长、质量、动量与行业暴露。</p></article>
+          <article><span>05</span><h3>持仓操作</h3><p>集中度、换手率、重仓稳定度与主动权重。</p></article>
+          <article><span>06</span><h3>经理能力</h3><p>任职区间、跨产品一致性与规模扩张影响。</p></article>
+          <article><span>07</span><h3>环境适应</h3><p>牛熊、价值成长、大小盘等市场状态表现。</p></article>
+          <article><span>08</span><h3>可投资性</h3><p>容量、申赎限制、费用、拥挤与组合适配。</p></article>
+        </div>
+      </section>
+
+    </main>
+
+    <footer>
+      <p>财富产品部-基金研究系统看板 · 分类研究框架</p>
+      <p>更新日期：<span id="update-date">2026-07-21</span></p>
+    </footer>
+
+    <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_catalog.js" defer></script>
+    <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_classification_summary.js" defer></script>
+    <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/index_enhanced_metrics.js" defer></script>
+    <script src="app.js?v=20260813a" defer></script>
+  </body>
+</html>
