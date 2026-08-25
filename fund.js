@@ -2400,7 +2400,7 @@ function renderFund(fund, summaryData, detailData, analysisData, analysis, fundD
 
 const GENERIC_TABS = {
   "active-equity": [["performance", "业绩表现"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
-  "index-enhanced": [["performance", "业绩表现"], ["industries", "行业分析（相比基准）"], ["holdings", "持股分析（相比基准）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "Barra归因"], ["documents", "公告原文"]],
+  "index-enhanced": [["performance", "业绩表现"], ["industries", "行业分析（相比基准）"], ["holdings", "持股分析（相比基准）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["documents", "公告原文"]],
   "pure-bond": [["performance", "业绩表现"], ["assets", "资产配置"], ["bonds", "券种结构"], ["correlation", "相关性分析"], ["attribution", "Campisi归因"], ["documents", "公告原文"]],
   "hybrid-bond": [["performance", "业绩表现"], ["evaluation", "五维评价"], ["assets", "资产配置"], ["bonds", "券种结构"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "convertible-bond": [["performance", "业绩表现"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股与转债分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
@@ -3131,7 +3131,7 @@ function genericPerformancePanel(fund, detail, brinson) {
     <article class="subpanel"><div class="subpanel-heading"><div><h3>月度收益、年度回撤与修复</h3><span>红色为上涨、绿色为下跌；当年合计按已有月份复合</span></div></div>${renderMonthlyReturnHeatmap(monthlyReturnsFromNav(navPoints), navPoints)}</article>
     ${activeMetrics ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>超额与风险调整指标</h3><span>近五年月度收益 · 统一以中证800为横向研究代理</span></div></div><section class="research-metric-grid metric-six">${metric("年化超额", pct(activeMetrics.annualizedExcess, 1, true))}${metric("跟踪误差", pct(activeMetrics.trackingError, 1))}${metric("信息比率", num(activeMetrics.informationRatio, 2))}${metric("月度超额胜率", pct(activeMetrics.winRate, 1))}${metric("上涨捕获", pct(activeMetrics.upCapture, 1))}${metric("下跌捕获", pct(activeMetrics.downCapture, 1))}${metric("年化波动率", pct(activeMetrics.volatility, 1))}${metric("下行波动率", pct(activeMetrics.downside, 1))}${metric("Sharpe", num(activeMetrics.sharpe, 2))}${metric("Sortino", num(activeMetrics.sortino, 2))}</section>${renderTable(["情景", "样本", "基金月均", "基准月均", "超额胜率"], activeMetrics.scenarios)}</article><p class="method-note">横向研究基准不替代基金合同业绩比较基准；上涨/下跌捕获以基准正负收益月份的平均收益比计算。</p>` : ""}
     ${["pure-bond", "hybrid-bond"].includes(fund.category) ? genericPureBondIndexComparison(fund, detail) : ""}
-    ${relative ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>相对跟踪指数表现</h3><span>${escapeHTML(fund.tracking_index || "待确认")} · 对齐日收益</span></div></div><section class="research-metric-grid metric-four">${metric("跟踪误差", pct(relativeMetrics.tracking_error, 2), "近1年日频年化")}${metric("信息比率", Number.isFinite(Number(relativeMetrics.information_ratio)) ? num(relativeMetrics.information_ratio, 2) : "—")}${metric("共同样本", relativeMetrics.observations || "—")}${metric("数据状态", relativeMetrics.status || "待补")}</section>${renderTable(["区间", "基金收益", "指数收益", "超额收益", "超额最大回撤"], relativeRows)}${excessCalendarRows.length ? `<div class="subpanel-heading relative-calendar-heading"><div><h3>自然年度超额风险</h3><span>基金/跟踪指数相对财富曲线</span></div></div>${renderTable(["年度", "超额收益", "年化超额", "相对波动", "超额最大回撤"], excessCalendarRows)}` : ""}</article><p class="method-note">超额收益为基金区间收益减跟踪指数区间收益；超额回撤为基金/指数相对财富曲线最大回撤。Barra仍等待正式因子风险模型，不以本表替代。</p>` : ""}`;
+    ${relative ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>相对跟踪指数表现</h3><span>${escapeHTML(fund.tracking_index || "待确认")} · 对齐日收益</span></div></div><section class="research-metric-grid metric-four">${metric("跟踪误差", pct(relativeMetrics.tracking_error, 2), "近1年日频年化")}${metric("信息比率", Number.isFinite(Number(relativeMetrics.information_ratio)) ? num(relativeMetrics.information_ratio, 2) : "—")}${metric("共同样本", relativeMetrics.observations || "—")}${metric("数据状态", relativeMetrics.status || "待补")}</section>${renderTable(["区间", "基金收益", "指数收益", "超额收益", "超额最大回撤"], relativeRows)}${excessCalendarRows.length ? `<div class="subpanel-heading relative-calendar-heading"><div><h3>自然年度超额风险</h3><span>基金/跟踪指数相对财富曲线</span></div></div>${renderTable(["年度", "超额收益", "年化超额", "相对波动", "超额最大回撤"], excessCalendarRows)}` : ""}</article><p class="method-note">超额收益为基金区间收益减跟踪指数区间收益；超额回撤为基金/指数相对财富曲线最大回撤。</p>` : ""}`;
 }
 
 function bindGenericPerformanceChart(points, fundName, benchmarkName, performancePoints = points) {
@@ -3889,9 +3889,7 @@ function genericAttributionPanel(fund, brinson, multiAssetAttribution) {
   if (fund.category === "active-equity") {
     return `<div class="panel-intro"><div><p class="eyebrow">BRINSON-FACHLER</p><h2>业绩归因</h2></div><p>该基金目前没有可连续计算的完整持仓区间。</p></div><article class="subpanel"><p class="empty-copy">通常是现任管理团队成立后尚未披露半年报/年报完整持仓，或对应A股持仓缺少可定价区间；不使用季度前十大替代完整持仓归因。</p></article>`;
   }
-  if (fund.category === "index-enhanced") {
-    return `<div class="panel-intro"><div><p class="eyebrow">BARRA</p><h2>Barra归因</h2></div><p>正式因子风险模型尚未接入。</p></div><article class="subpanel"><p class="empty-copy">缺少可复现的 Barra 因子暴露、因子收益与特异收益数据，因此按原要求保留空白，不用 Brinson 替代。</p></article>`;
-  }
+  if (fund.category === "index-enhanced") return "";
   return genericMultiAssetAttributionPanel(multiAssetAttribution);
 }
 
