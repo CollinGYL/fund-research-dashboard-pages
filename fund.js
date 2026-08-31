@@ -5,17 +5,19 @@ const rawFundCode = String(query.get("code") || "").toUpperCase();
 const fundId = /^[A-Za-z0-9_-]{1,64}$/.test(String(rawFundId || "")) ? rawFundId : null;
 const fundCode = /^\d{6}\.(?:OF|SH|SZ)$/.test(rawFundCode) ? rawFundCode : null;
 const DEEP_SAMPLE_CODES = new Set(["005827.OF", "000628.OF", "000001.OF"]);
-let correlationMetricsPromise = null;
+const correlationMetricsPromises = new Map();
+const CORRELATION_SHARD_COUNT = 256;
 const dashboardAssetPromises = new Map();
 
 const DASHBOARD_GLOBAL_ASSETS = {
   "stock_classification.js": "FUND_STOCK_CLASSIFICATION",
   "bond_holdings.js": "FUND_BOND_HOLDINGS",
   "bond_characteristics.js": "FUND_BOND_CHARACTERISTICS",
-  "index_enhanced_metrics.js": "INDEX_ENHANCED_METRICS",
   "convertible_characteristics.js": "FUND_CONVERTIBLE_CHARACTERISTICS",
   "index_constituents.js": "FUND_INDEX_CONSTITUENTS",
   "index_industry_history.js": "FUND_INDEX_INDUSTRY_HISTORY",
+  "fund_catalog.js": "FUND_DASHBOARD_CATALOG",
+  "common_benchmarks.js": "FUND_COMMON_BENCHMARKS",
 };
 
 function loadDashboardAsset(filename) {
@@ -41,7 +43,7 @@ function loadDashboardAsset(filename) {
 
 function loadCategoryAssets(category) {
   const files = {
-    "index-enhanced": ["index_enhanced_metrics.js", "index_constituents.js", "index_industry_history.js"],
+    "index-enhanced": ["index_constituents.js", "index_industry_history.js"],
     "pure-bond": ["bond_holdings.js", "bond_characteristics.js"],
     "hybrid-bond": ["bond_holdings.js", "bond_characteristics.js"],
     "convertible-bond": ["bond_holdings.js", "bond_characteristics.js", "convertible_characteristics.js"],
@@ -3634,7 +3636,7 @@ function genericRebalancingPanel(fund, detail, holdingHistory, multiIndexAnalysi
 
 function genericStyleCorrelationContent(fund) {
   const correlation = window.FUND_CORRELATION_METRICS?.funds?.[fund.code];
-  if (!window.FUND_CORRELATION_METRICS) return '<p class="empty-copy">打开“调仓跟踪”后自动加载风格相关性。</p>';
+  if (!correlation) return '<p class="empty-copy">打开“调仓跟踪”后自动加载风格相关性。</p>';
   const styleRows = ["399370.SZ", "399371.SZ"].map((code) => {
     const find = (key) => correlation?.windows?.[key]?.indices?.find((item) => item.code === code);
     const item = find("5y") || find("3y") || find("1y") || correlation?.indices?.find((value) => value.code === code);
@@ -3650,13 +3652,11 @@ function genericCorrelationSide(fund, data, key, type) {
   const source = windowData[type] || (key === "5y" ? data?.[type] : []) || [];
   const sampleUnit = windowData.frequency === "daily_return" ? "日" : "月";
   if (type === "peers") {
-    const catalog = new Map((window.FUND_DASHBOARD_CATALOG?.funds || []).map((item) => [item.code, item]));
     const rows = source.map((item) => {
-      const peer = catalog.get(item.code);
       return [
         escapeHTML(item.code),
         `<a href="fund.html?code=${encodeURIComponent(item.code)}"><strong>${escapeHTML(item.name)}</strong></a>`,
-        escapeHTML((peer?.manager || []).join("、") || peer?.fund_company || "—"),
+        escapeHTML((item.manager || []).join("、") || item.fund_company || "—"),
         `<strong>${num(item.correlation, 3)}</strong>`,
         `${item.observations || "—"}${sampleUnit}`,
       ];
@@ -3713,42 +3713,42 @@ function genericCorrelationLoadingPanel(message = "切换到本页签后再加�
   return `<div class="panel-intro"><div><p class="eyebrow">CORRELATION</p><h2>同类基金与代表指数相关性</h2></div><p>${escapeHTML(message)}</p></div><article class="subpanel"><p class="empty-copy" id="generic-correlation-load-state">等待按需加载。</p></article>`;
 }
 
-function loadCorrelationMetrics() {
-  if (window.FUND_CORRELATION_METRICS) return Promise.resolve(window.FUND_CORRELATION_METRICS);
-  if (correlationMetricsPromise) return correlationMetricsPromise;
-  correlationMetricsPromise = new Promise((resolve, reject) => {
+function loadCorrelationMetrics(code) {
+  if (window.FUND_CORRELATION_METRICS?.funds?.[code]) return Promise.resolve(window.FUND_CORRELATION_METRICS);
+  let hash = 2166136261;
+  for (let index = 0; index < code.length; index += 1) {
+    hash = Math.imul(hash ^ code.charCodeAt(index), 16777619) >>> 0;
+  }
+  const shardName = `shard-${String(hash % CORRELATION_SHARD_COUNT).padStart(3, "0")}`;
+  if (correlationMetricsPromises.has(shardName)) return correlationMetricsPromises.get(shardName);
+  const promise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/correlation_metrics.js";
-    script.onload = () => window.FUND_CORRELATION_METRICS
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/correlations/${shardName}.js`;
+    script.onload = () => window.FUND_CORRELATION_METRICS?.funds?.[code]
       ? resolve(window.FUND_CORRELATION_METRICS)
       : reject(new Error("相关性数据脚本未生成有效内容"));
     script.onerror = () => reject(new Error("相关性数据加载失败，请检查网络后重试"));
     document.head.appendChild(script);
   }).catch((error) => {
-    correlationMetricsPromise = null;
+    correlationMetricsPromises.delete(shardName);
     throw error;
   });
-  return correlationMetricsPromise;
+  correlationMetricsPromises.set(shardName, promise);
+  return promise;
 }
 
 function bindLazyCorrelation(fund) {
-  let loaded = Boolean(window.FUND_CORRELATION_METRICS);
+  let loaded = Boolean(window.FUND_CORRELATION_METRICS?.funds?.[fund.code]);
   let loading = false;
   return async (target) => {
     if (!["correlation", "rebalancing"].includes(target) || loading) return;
-    const needsStyleClassification = target === "rebalancing"
-      && ["active-equity", "index-enhanced"].includes(fund.category)
-      && !window.FUND_STOCK_CLASSIFICATION;
-    if (loaded && !needsStyleClassification) return;
+    if (loaded) return;
     loading = true;
     const correlationPanel = document.querySelector('[data-panel="correlation"]');
     const state = correlationPanel?.querySelector("#generic-correlation-load-state");
     if (state) state.textContent = "正在加载全市场相关性数据…";
     try {
-      await Promise.all([
-        loaded ? Promise.resolve() : loadCorrelationMetrics(),
-        needsStyleClassification ? loadDashboardAsset("stock_classification.js") : Promise.resolve(),
-      ]);
+      await loadCorrelationMetrics(fund.code);
       loaded = true;
       if (correlationPanel) {
         correlationPanel.innerHTML = genericCorrelationPanel(fund);
@@ -4049,36 +4049,180 @@ function genericDocumentsPanel(fund, fundDocuments) {
     <article class="subpanel"><div class="subpanel-heading"><div><h3>最近定期报告</h3><span>${documents.length ? `已索引 ${documents.length} 份` : "等待增量索引"}</span></div></div>${rows.length ? renderTable(["披露日期", "报告", "原文"], rows, "holdings-table-wrap") : '<p class="empty-copy">该基金的定期报告尚未进入本地增量索引。</p>'}<p class="method-note">元数据来自公开基金公告聚合接口，链接指向公开PDF原文；本地不批量复制PDF。若链接失效，应回到基金管理人网站或证监会基金电子披露平台核验。</p></article>`;
 }
 
-function renderGenericFund(fund, catalogData, detail, holdingHistory, bondHistory, fundDocuments, campisi, brinson, multiAssetAttribution, heavyStockTrends) {
+function genericTabLoadingPanel(label) {
+  return `<div class="panel-intro"><div><p class="eyebrow">ON-DEMAND DATA</p><h2>${escapeHTML(label)}</h2></div><p>切换到本页签后加载对应数据，减少详情页首次打开时间。</p></div><article class="subpanel"><p class="empty-copy">等待按需加载。</p></article>`;
+}
+
+function bindGenericPerformancePanel(fund, detail) {
+  const chartPoints = genericNavChartPoints(fund, detail);
+  const benchmark = genericBenchmark(fund, detail);
+  bindGenericPerformanceChart(chartPoints, fund.name, benchmark.name, genericFundNavPoints(detail));
+  if (["pure-bond", "hybrid-bond"].includes(fund.category)) bindPureBondIndexComparison(fund, detail);
+}
+
+function createGenericTabLoader(fund, detail) {
+  const resourcePromises = new Map();
+  const loadedTabs = new Set(["performance"]);
+  const once = (key, loader) => {
+    if (!resourcePromises.has(key)) {
+      const promise = Promise.resolve().then(loader).catch((error) => {
+        resourcePromises.delete(key);
+        throw error;
+      });
+      resourcePromises.set(key, promise);
+    }
+    return resourcePromises.get(key);
+  };
+  const holdings = () => once("holdings", () => loadGenericHoldingHistory(fund.code));
+  const bondHistory = () => once("bond-history", () => loadGenericBondHistory(fund.code));
+  const documents = () => once("documents", () => loadGenericDocuments(fund.code));
+  const campisi = () => once("campisi", () => loadGenericCampisi(fund.code));
+  const brinson = () => once("brinson", () => loadGenericBrinson(fund.code));
+  const multiAsset = () => once("multi-asset", () => loadGenericMultiAssetAttribution(fund.code));
+  const heavyStock = () => once("heavy-stock", () => loadGenericHeavyStockTrends(fund.code, detail));
+  const correlation = () => once("correlation", () => loadCorrelationMetrics(fund.code));
+  const commonBenchmarks = () => once("common-benchmarks", () => loadDashboardAsset("common_benchmarks.js"));
+  const indexRelativeAssets = () => once("index-relative-assets", () => Promise.all([
+    loadDashboardAsset("index_constituents.js"),
+    loadDashboardAsset("index_industry_history.js"),
+  ]));
+  const bondAssets = () => once("bond-assets", () => loadCategoryAssets(fund.category));
+  const equityCategory = ["active-equity", "index-enhanced", "hybrid-bond", "convertible-bond"].includes(fund.category);
+
+  const renderTab = async (id) => {
+    const target = document.querySelector(`[data-panel="${id}"]`);
+    if (!target) return;
+    if (id === "evaluation") {
+      const [, holdingHistory] = await Promise.all([commonBenchmarks(), holdings()]);
+      target.innerHTML = genericHybridBondEvaluationPanel(fund, detail, holdingHistory);
+      bindHybridBondEvaluation(fund, detail, holdingHistory);
+      return;
+    }
+    if (id === "assets") {
+      const [, holdingHistory] = await Promise.all([
+        fund.category === "pure-bond" ? commonBenchmarks() : Promise.resolve(),
+        ["active-equity", "hybrid-bond"].includes(fund.category) ? holdings() : Promise.resolve(null),
+      ]);
+      target.innerHTML = genericAssetPanel(fund, detail, holdingHistory);
+      const assetHistory = (detail?.asset_history || []).map((item) => ({ report_date: item.date, stock_to_nav: item.stock, bond_to_nav: item.bond, cash_to_nav: item.cash }));
+      if (assetHistory.length) bindAssetAllocationChart(assetHistory);
+      bindPureBondTripleAxisCharts();
+      bindMiniLineCharts();
+      return;
+    }
+    if (id === "bonds") {
+      const [, history] = await Promise.all([bondAssets(), bondHistory()]);
+      target.innerHTML = genericBondPanel(fund, history, detail);
+      bindGenericBondHistory(history, fund.category === "pure-bond");
+      bindMiniLineCharts();
+      return;
+    }
+    if (id === "industries") {
+      const holdingHistory = equityCategory ? await holdings() : null;
+      if (fund.category === "index-enhanced") await indexRelativeAssets();
+      if (!holdingHistory?.quarterly?.length && !holdingHistory?.full?.length) await loadDashboardAsset("stock_classification.js");
+      target.innerHTML = genericIndustryPanel(fund, holdingHistory);
+      if (holdingHistory?.quarterly?.length || holdingHistory?.full?.length) {
+        bindIndustryAnalysis({ industry_history: holdingHistory });
+        bindGenericRelativeIndustry(fund, holdingHistory);
+      } else {
+        bindGenericIndustry(fund);
+      }
+      return;
+    }
+    if (id === "holdings") {
+      const holdingHistory = equityCategory ? await holdings() : null;
+      if (fund.category === "index-enhanced") await indexRelativeAssets();
+      if (!holdingHistory?.quarterly?.length && !holdingHistory?.full?.length) await loadDashboardAsset("stock_classification.js");
+      const [heavyStockTrends, history] = await Promise.all([
+        fund.category === "active-equity" ? heavyStock() : Promise.resolve(null),
+        fund.category === "convertible-bond" ? Promise.all([bondAssets(), bondHistory()]).then((values) => values[1]) : Promise.resolve(null),
+      ]);
+      target.innerHTML = genericHoldingsPanel(fund, holdingHistory, heavyStockTrends)
+        + (fund.category === "convertible-bond" ? genericBondPanel(fund, history, detail) : "");
+      if (holdingHistory?.quarterly?.length || holdingHistory?.full?.length) {
+        bindHoldingAnalysis({ holding_analysis_history: holdingHistory });
+      }
+      if (heavyStockTrends?.stocks?.length) bindHeavyStockTrend({ heavy_stock_trends: heavyStockTrends });
+      if (history) bindGenericBondHistory(history, false);
+      bindMiniLineCharts();
+      return;
+    }
+    if (id === "rebalancing") {
+      const [holdingHistory] = await Promise.all([
+        equityCategory ? holdings() : Promise.resolve(null),
+        fund.category === "active-equity" ? correlation() : Promise.resolve(null),
+        commonBenchmarks(),
+      ]);
+      const multiIndexAnalysis = genericMultiIndexAnalysis(fund, detail);
+      target.innerHTML = genericRebalancingPanel(fund, detail, holdingHistory, multiIndexAnalysis);
+      if (multiIndexAnalysis) bindMultiIndexChart(multiIndexAnalysis, fund.name);
+      bindMiniLineCharts();
+      return;
+    }
+    if (id === "correlation") {
+      await correlation();
+      target.innerHTML = genericCorrelationPanel(fund);
+      bindGenericCorrelation(fund);
+      return;
+    }
+    if (id === "attribution") {
+      if (fund.category === "pure-bond") {
+        const data = await campisi();
+        target.innerHTML = genericCampisiPanel(fund, data);
+        bindGenericCampisi(data);
+      } else {
+        const [brinsonData, multiAssetData] = await Promise.all([
+          fund.category === "active-equity" ? brinson() : Promise.resolve(null),
+          ["hybrid-bond", "convertible-bond"].includes(fund.category) ? multiAsset() : Promise.resolve(null),
+        ]);
+        target.innerHTML = genericAttributionPanel(fund, brinsonData, multiAssetData);
+        bindGenericBrinson(brinsonData);
+        bindGenericMultiAssetAttribution(multiAssetData);
+      }
+      return;
+    }
+    if (id === "documents") {
+      target.innerHTML = genericDocumentsPanel(fund, await documents());
+    }
+  };
+
+  return async (id) => {
+    if (loadedTabs.has(id)) return;
+    const target = document.querySelector(`[data-panel="${id}"]`);
+    if (!target || target.dataset.loading === "true") return;
+    target.dataset.loading = "true";
+    target.setAttribute("aria-busy", "true");
+    const state = target.querySelector(".empty-copy");
+    if (state) state.textContent = "正在加载本页签数据…";
+    try {
+      await renderTab(id);
+      loadedTabs.add(id);
+    } catch (error) {
+      target.innerHTML = genericTabLoadingPanel(`${error.message}。再次切换本页签可重试`);
+    } finally {
+      delete target.dataset.loading;
+      target.removeAttribute("aria-busy");
+    }
+  };
+}
+
+function renderGenericFund(fund, detail) {
   document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
   const tabs = GENERIC_TABS[fund.category] || GENERIC_TABS["active-equity"];
-  const multiIndexAnalysis = genericMultiIndexAnalysis(fund, detail);
-  const content = {
-    performance: genericPerformancePanel(fund, detail, brinson),
-    evaluation: fund.category === "hybrid-bond" ? genericHybridBondEvaluationPanel(fund, detail, holdingHistory) : "",
-    assets: genericAssetPanel(fund, detail, holdingHistory),
-    bonds: genericBondPanel(fund, bondHistory, detail),
-    industries: genericIndustryPanel(fund, holdingHistory),
-    holdings: genericHoldingsPanel(fund, holdingHistory, heavyStockTrends)
-      + (fund.category === "convertible-bond" ? genericBondPanel(fund, bondHistory, detail) : ""),
-    rebalancing: genericRebalancingPanel(fund, detail, holdingHistory, multiIndexAnalysis),
-    correlation: genericCorrelationLoadingPanel(),
-    attribution: fund.category === "pure-bond" ? genericCampisiPanel(fund, campisi) : genericAttributionPanel(fund, brinson, multiAssetAttribution),
-    documents: genericDocumentsPanel(fund, fundDocuments),
-  };
-  const latestQuarter = holdingHistory?.quarterly?.at(-1);
-  const top10Weight = latestQuarter?.holdings?.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
+  const tabLabels = Object.fromEntries(tabs);
+  const content = Object.fromEntries(tabs.map(([id, label]) => [
+    id,
+    id === "performance" ? genericPerformancePanel(fund, detail, null) : genericTabLoadingPanel(label),
+  ]));
   const relativeMetrics = window.INDEX_ENHANCED_METRICS?.funds?.[fund.code] || fund.relative_metrics || {};
   const overviewMetrics = (() => {
     if (fund.category === "index-enhanced") return `${metric("近1年超额", pct(relativeMetrics.excess_returns?.["1y"], 1, true))}${metric("近3年超额", pct(relativeMetrics.excess_returns?.["3y"], 1, true))}${metric("近1年超额回撤", pct(relativeMetrics.excess_drawdowns?.["1y"], 1))}${metric("跟踪误差", pct(relativeMetrics.tracking_error, 1))}${metric("信息比率", num(relativeMetrics.information_ratio, 2))}`;
     if (fund.category === "pure-bond") return `${metric("近1年收益", pct(fund.performance?.returns?.["1y"], 1, true))}${metric("近3年收益", pct(fund.performance?.returns?.["3y"], 1, true))}${metric("近1年最大回撤", pct(fund.performance?.drawdowns?.["1y"], 1))}${metric("最新杠杆", Number.isFinite(Number(fund.asset?.leverage)) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", Number.isFinite(Number(fund.duration?.value)) ? `${num(fund.duration.value, 2)}年` : "—")}`;
     if (["hybrid-bond", "convertible-bond"].includes(fund.category)) return `${metric("近1年收益", pct(fund.performance?.returns?.["1y"], 1, true))}${metric("近3年收益", pct(fund.performance?.returns?.["3y"], 1, true))}${metric("近1年最大回撤", pct(fund.performance?.drawdowns?.["1y"], 1))}${metric("最新股票仓位", pct(fund.asset?.stock_weight, 1))}${metric("最新转债仓位", pct(fund.asset?.convertible_bond_weight, 1))}`;
-    return `${metric("近1年收益", pct(fund.performance?.returns?.["1y"], 1, true))}${metric("近3年收益", pct(fund.performance?.returns?.["3y"], 1, true))}${metric("近1年最大回撤", pct(fund.performance?.drawdowns?.["1y"], 1))}${metric("最新股票仓位", pct(fund.asset?.stock_weight, 1))}${metric("最新前十大集中度", Number.isFinite(top10Weight) ? pct(top10Weight, 1) : "—")}`;
+    return `${metric("近1年收益", pct(fund.performance?.returns?.["1y"], 1, true))}${metric("近3年收益", pct(fund.performance?.returns?.["3y"], 1, true))}${metric("近1年最大回撤", pct(fund.performance?.drawdowns?.["1y"], 1))}${metric("最新股票仓位", pct(fund.asset?.stock_weight, 1))}${metric("持仓分析", "按需加载", tabLabels.holdings || "持股分析")}`;
   })();
-  const sourceType = String(catalogData.source?.type || "");
-  const navSource = sourceType.includes("choice_increment")
-    ? `基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充；全站最新日期为 ${escapeHTML(catalogData.source?.nav_latest || "—")}`
-    : `基金净值数据最新到 ${escapeHTML(catalogData.source?.nav_latest || "—")}`;
+  const navSource = "基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充";
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
     <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span><span class="tag">份额已合并</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
@@ -4086,29 +4230,16 @@ function renderGenericFund(fund, catalogData, detail, holdingHistory, bondHistor
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
     <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
     <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>${navSource}；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>披露持仓是报告期快照，不代表实时持仓；研究结果不构成投资建议。</li></ul></section>`;
-  bindTabs(bindLazyCorrelation(fund));
-  if (holdingHistory?.quarterly?.length || holdingHistory?.full?.length) {
-    bindIndustryAnalysis({ industry_history: holdingHistory });
-    bindHoldingAnalysis({ holding_analysis_history: holdingHistory });
-    bindGenericRelativeIndustry(fund, holdingHistory);
-  } else {
-    bindGenericIndustry(fund);
+  bindTabs(createGenericTabLoader(fund, detail));
+  bindGenericPerformancePanel(fund, detail);
+  if (!detail?.benchmark?.length) {
+    loadDashboardAsset("common_benchmarks.js").then(() => {
+      const performancePanel = document.querySelector('[data-panel="performance"]');
+      if (!performancePanel) return;
+      performancePanel.innerHTML = genericPerformancePanel(fund, detail, null);
+      bindGenericPerformancePanel(fund, detail);
+    }).catch(() => {});
   }
-  bindGenericBondHistory(bondHistory, fund.category === "pure-bond");
-  bindGenericCampisi(campisi);
-  bindGenericBrinson(brinson);
-  bindGenericMultiAssetAttribution(multiAssetAttribution);
-  if (fund.category === "hybrid-bond") bindHybridBondEvaluation(fund, detail, holdingHistory);
-  if (heavyStockTrends?.stocks?.length) bindHeavyStockTrend({ heavy_stock_trends: heavyStockTrends });
-  const chartPoints = genericNavChartPoints(fund, detail);
-  const benchmark = genericBenchmark(fund, detail);
-  bindGenericPerformanceChart(chartPoints, fund.name, benchmark.name, genericFundNavPoints(detail));
-  if (["pure-bond", "hybrid-bond"].includes(fund.category)) bindPureBondIndexComparison(fund, detail);
-  const assetHistory = (detail?.asset_history || []).map((item) => ({ report_date: item.date, stock_to_nav: item.stock, bond_to_nav: item.bond, cash_to_nav: item.cash }));
-  if (assetHistory.length) bindAssetAllocationChart(assetHistory);
-  bindPureBondTripleAxisCharts();
-  if (multiIndexAnalysis) bindMultiIndexChart(multiIndexAnalysis, fund.name);
-  bindMiniLineCharts();
 }
 
 function normalizeGenericHoldingHistory(raw) {
@@ -4415,13 +4546,20 @@ if (!fundId && !fundCode) {
 } else {
   const loadCatalogData = async () => {
     if (window.FUND_DASHBOARD_CATALOG) return window.FUND_DASHBOARD_CATALOG;
-    const response = await fetch("https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_catalog.json");
-    if (!response.ok) throw new Error(`全量基金目录加载失败：${response.status}`);
-    return response.json();
+    await loadDashboardAsset("fund_catalog.js");
+    return window.FUND_DASHBOARD_CATALOG;
   };
-  loadCatalogData()
-    .then(async (catalogData) => {
-      const normalizedCode = String(fundCode || "").toUpperCase();
+  Promise.resolve()
+    .then(async () => {
+      let normalizedCode = String(fundCode || "").toUpperCase();
+      let catalogData = null;
+      let fallbackFund = null;
+      if (!normalizedCode) {
+        catalogData = await loadCatalogData();
+        fallbackFund = (catalogData.funds || []).find((item) => item.id === fundId || item.code.split(".")[0] === fundId);
+        normalizedCode = String(fallbackFund?.code || "").toUpperCase();
+      }
+      if (!normalizedCode) throw new Error("没有找到该基金的研究数据");
       if (DEEP_SAMPLE_CODES.has(normalizedCode)) {
         const deepSampleData = await loadDeepSampleData();
         const summaryData = deepSampleData.summary;
@@ -4446,25 +4584,17 @@ if (!fundId && !fundCode) {
         renderFund(fund, summaryData, detailData, analysisData, analysis, fundDocuments);
         return;
       }
-      const catalogFund = (catalogData.funds || []).find((item) =>
-        item.code === normalizedCode || item.id === fundId || item.code.split(".")[0] === fundId
-      );
-      if (!catalogFund) throw new Error("没有找到该基金的研究数据");
-      await loadCategoryAssets(catalogFund.category);
-      const genericDetail = await loadGenericDetail(catalogFund.code);
-      const [holdingHistory, bondHistory, fundDocuments, campisi, brinson, multiAssetAttribution, heavyStockTrends] = await Promise.all([
-        ["active-equity", "index-enhanced", "hybrid-bond", "convertible-bond"].includes(catalogFund.category) ? loadGenericHoldingHistory(catalogFund.code) : Promise.resolve(null),
-        ["pure-bond", "hybrid-bond", "convertible-bond"].includes(catalogFund.category) ? loadGenericBondHistory(catalogFund.code) : Promise.resolve(null),
-        loadGenericDocuments(catalogFund.code),
-        catalogFund.category === "pure-bond" ? loadGenericCampisi(catalogFund.code) : Promise.resolve(null),
-        catalogFund.category === "active-equity" ? loadGenericBrinson(catalogFund.code) : Promise.resolve(null),
-        ["hybrid-bond", "convertible-bond"].includes(catalogFund.category) ? loadGenericMultiAssetAttribution(catalogFund.code) : Promise.resolve(null),
-        catalogFund.category === "active-equity" ? loadGenericHeavyStockTrends(catalogFund.code, genericDetail) : Promise.resolve(null),
-      ]);
-      if (!holdingHistory && ["active-equity", "index-enhanced", "hybrid-bond", "convertible-bond"].includes(catalogFund.category)) {
-        await loadDashboardAsset("stock_classification.js");
+      const genericDetail = await loadGenericDetail(normalizedCode);
+      let catalogFund = genericDetail?.fund || fallbackFund;
+      if (!catalogFund) {
+        catalogData = catalogData || await loadCatalogData();
+        catalogFund = (catalogData.funds || []).find((item) =>
+          item.code === normalizedCode || item.id === fundId || item.code.split(".")[0] === fundId
+        );
       }
-      renderGenericFund(catalogFund, catalogData, genericDetail, holdingHistory, bondHistory, fundDocuments, campisi, brinson, multiAssetAttribution, heavyStockTrends);
+      if (!catalogFund) throw new Error("没有找到该基金的研究数据");
+      if (!genericDetail) throw new Error("该基金的净值详情尚未生成");
+      renderGenericFund(catalogFund, genericDetail);
     })
     .catch((error) => showError(error.message));
 }
