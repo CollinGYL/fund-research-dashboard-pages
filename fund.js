@@ -7,6 +7,8 @@ const fundCode = /^\d{6}\.(?:OF|SH|SZ)$/.test(rawFundCode) ? rawFundCode : null;
 const DEEP_SAMPLE_CODES = new Set(["005827.OF", "000628.OF", "000001.OF"]);
 const correlationMetricsPromises = new Map();
 const CORRELATION_SHARD_COUNT = 256;
+const stockPriceUpdatePromises = new Map();
+const STOCK_PRICE_UPDATE_SHARD_COUNT = 64;
 const dashboardAssetPromises = new Map();
 
 const DASHBOARD_GLOBAL_ASSETS = {
@@ -4374,13 +4376,50 @@ function loadGenericStockPrice(code) {
   const normalize = (value) => (value?.prices || []).map((item) => (
     Array.isArray(item) ? { date: item[0], value: item[1] } : item
   ));
-  if (window.FUND_STOCK_PRICE_SERIES?.[code]) return Promise.resolve(normalize(window.FUND_STOCK_PRICE_SERIES[code]));
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js`;
-    script.onload = () => resolve(normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
-    script.onerror = () => resolve([]);
-    document.head.appendChild(script);
+  const loadBase = () => {
+    if (window.FUND_STOCK_PRICE_SERIES?.[code]) {
+      return Promise.resolve(normalize(window.FUND_STOCK_PRICE_SERIES[code]));
+    }
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js`;
+      script.onload = () => resolve(normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
+      script.onerror = () => resolve([]);
+      document.head.appendChild(script);
+    });
+  };
+  let hash = 2166136261;
+  for (let index = 0; index < code.length; index += 1) {
+    hash = Math.imul(hash ^ code.charCodeAt(index), 16777619) >>> 0;
+  }
+  const shardName = `shard-${String(hash % STOCK_PRICE_UPDATE_SHARD_COUNT).padStart(3, "0")}`;
+  const loadedShard = window.FUND_STOCK_PRICE_UPDATES?.[shardName];
+  let updatePromise;
+  if (loadedShard) {
+    updatePromise = Promise.resolve(normalize({ prices: loadedShard.prices?.[code] || [] }));
+  } else if (stockPriceUpdatePromises.has(shardName)) {
+    updatePromise = stockPriceUpdatePromises.get(shardName).then((payload) => (
+      normalize({ prices: payload?.prices?.[code] || [] })
+    ));
+  } else {
+    const shardPromise = new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_price_updates/${shardName}.js`;
+      script.onload = () => resolve(window.FUND_STOCK_PRICE_UPDATES?.[shardName] || null);
+      script.onerror = () => resolve(null);
+      document.head.appendChild(script);
+    });
+    stockPriceUpdatePromises.set(shardName, shardPromise);
+    updatePromise = shardPromise.then((payload) => (
+      normalize({ prices: payload?.prices?.[code] || [] })
+    ));
+  }
+  return Promise.all([loadBase(), updatePromise]).then(([base, updates]) => {
+    const merged = new Map();
+    [...base, ...updates].forEach((item) => {
+      if (item?.date && Number.isFinite(Number(item.value))) merged.set(item.date, item);
+    });
+    return [...merged.values()].sort((left, right) => left.date.localeCompare(right.date));
   });
 }
 
