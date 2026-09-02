@@ -12,12 +12,23 @@ const methodologyNote = document.querySelector("#fund-list-methodology");
 
 const CATEGORY_LABELS = {
   all: "全部基金",
-  "active-equity": "主动权益基金",
+  "active-equity": "主观权益基金",
   "index-enhanced": "指数增强基金",
   "pure-bond": "纯债基金",
   "hybrid-bond": "一级债基/二级债基",
   "convertible-bond": "转债基金",
 };
+
+const HIDDEN_WEBSITE_CATEGORIES = new Set(["index-enhanced"]);
+const QUANTITATIVE_FUND_NAME_PATTERN = /量化|多因子|数据挖掘|智选|智胜|智航|智投|对冲|阿尔法/;
+
+function isVisibleWebsiteFund(fund) {
+  if (HIDDEN_WEBSITE_CATEGORIES.has(fund.category)) return false;
+  return !(
+    fund.category === "active-equity"
+    && QUANTITATIVE_FUND_NAME_PATTERN.test(String(fund.name || ""))
+  );
+}
 
 const PERIOD_SETS = {
   short: [["1m", "近1月"], ["3m", "近3月"], ["6m", "近6月"], ["1y", "近1年"]],
@@ -480,9 +491,13 @@ function updateSubtypeFilter() {
 function updateListCopy() {
   const label = CATEGORY_LABELS[activeCategory];
   if (listTitle) listTitle.textContent = `${label}全量列表`;
-  if (listDescription) listDescription.textContent = `按基金主体合并份额，当前分类共 ${categoryFunds().length.toLocaleString("zh-CN")} 只；点击基金进入对应研究模块。`;
+  if (listDescription) listDescription.textContent = activeCategory === "active-equity"
+    ? `按基金主体合并份额，当前主观权益范围共 ${categoryFunds().length.toLocaleString("zh-CN")} 只；已移除量化策略产品。`
+    : `按基金主体合并份额，当前分类共 ${categoryFunds().length.toLocaleString("zh-CN")} 只；点击基金进入对应研究模块。`;
   if (methodologyNote) methodologyNote.textContent = activeCategory === "index-enhanced"
     ? "指数增强相对指标必须与基金当前跟踪指数日收益对齐；指数行情缓存未完成的产品明确显示待补。"
+    : activeCategory === "active-equity"
+      ? "主观权益口径排除指数增强，以及名称含量化、多因子、数据挖掘、智选、智胜、智航、智投、对冲或阿尔法的产品；底层数据仍保留。"
     : activeCategory === "pure-bond"
       ? "券种结构使用资产配置官方汇总字段；重仓债券只代表披露重仓，不代替完整结构。久期展示报告日期。"
       : "净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。";
@@ -659,7 +674,7 @@ Promise.all([
   loadCatalog(),
 ]).then(([catalogData]) => {
   catalog = catalogData;
-  funds = catalogData.funds || [];
+  funds = (catalogData.funds || []).filter(isVisibleWebsiteFund);
   searchTextByCode.clear();
   funds.forEach((fund) => { searchableText(fund); });
   classificationNameCache = {};
@@ -668,9 +683,9 @@ Promise.all([
   document.querySelector("#fund-count").textContent = funds.length.toLocaleString("zh-CN");
   document.querySelector("#update-date").textContent = catalogData.generated_at?.slice(0, 10) || catalogData.as_of;
   const completion = document.querySelector("#completed-category-label");
-  if (completion) completion.textContent = "五类目录";
+  if (completion) completion.textContent = "四类目录";
   const completionNote = document.querySelector("#completed-category-note");
-  if (completionNote) completionNote.textContent = "8,589个基金主体";
+  if (completionNote) completionNote.textContent = `${funds.length.toLocaleString("zh-CN")}个基金主体`;
   document.querySelectorAll("[data-active-equity-section]").forEach((section) => { section.hidden = true; });
   updateSubtypeFilter();
   updateClassificationRankControl();
