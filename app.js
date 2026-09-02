@@ -30,6 +30,12 @@ function isVisibleWebsiteFund(fund) {
   );
 }
 
+function displayCategoryLabel(fund) {
+  return fund.category === "active-equity"
+    ? "主观权益基金"
+    : fund.category_label;
+}
+
 const PERIOD_SETS = {
   short: [["1m", "近1月"], ["3m", "近3月"], ["6m", "近6月"], ["1y", "近1年"]],
   long: [["1y", "近1年"], ["3y", "近3年"], ["5y", "近5年"]],
@@ -107,7 +113,7 @@ function searchableText(fund) {
   const value = [
     fund.name,
     fund.code,
-    fund.category_label,
+    displayCategoryLabel(fund),
     fund.subtype,
     fund.broad_type,
     fund.fund_company,
@@ -304,7 +310,7 @@ function fundRow(fund) {
       <td><strong>${formatMoney(fund.asset?.net_asset)}</strong><small>${escapeHtml(fund.asset?.report_date || "无配置披露")}</small></td>
       ${periods.map(([key]) => periodCell(fund, key)).join("")}
       <td class="period-cell"><strong class="${Number(annual?.return) < 0 ? "negative" : "positive"}">${formatPercent(annual?.return, 1, true)}</strong><small>年度回撤 ${formatPercent(annual?.drawdown)}</small></td>
-      <td><strong>${escapeHtml(fund.category_label)}</strong><small>${escapeHtml(fund.subtype)}</small></td>
+      <td><strong>${escapeHtml(displayCategoryLabel(fund))}</strong><small>${escapeHtml(fund.subtype)}</small></td>
       <td class="all-fund-core-cell"><div class="all-fund-core-grid">${allFundCoreCell(fund)}</div></td>
       <td class="benchmark-cell">${escapeHtml(fund.benchmark || "—")}</td>
       <td><strong>${fund.performance?.latest_date || "—"}</strong><small>净值截止日</small></td></tr>`;
@@ -352,7 +358,7 @@ function fundRow(fund) {
       <td><strong>${escapeHtml(classification.sector)}</strong><small>${escapeHtml(classification.date || "完整持仓")}</small></td>
       <td><strong>${escapeHtml(classification.industry)}</strong><small>中信一级</small></td>`;
   } else {
-    extras = `<td><strong>${escapeHtml(fund.category_label)}</strong><small>${escapeHtml(fund.subtype)}</small></td><td><strong>${fund.performance?.latest_date || "—"}</strong></td>`;
+    extras = `<td><strong>${escapeHtml(displayCategoryLabel(fund))}</strong><small>${escapeHtml(fund.subtype)}</small></td><td><strong>${fund.performance?.latest_date || "—"}</strong></td>`;
   }
   return `<tr data-fund-code="${escapeHtml(fund.code)}">${commonCells(fund)}${periods.map(([key]) => periodCell(fund, key, relative)).join("")}<td class="period-cell"><strong class="${Number(annual?.return) < 0 ? "negative" : "positive"}">${formatPercent(annual?.return, 1, true)}</strong><small>年度回撤 ${formatPercent(annual?.drawdown)}</small></td>${extras}</tr>`;
 }
@@ -516,7 +522,7 @@ function renderSuggestions() {
   if (!keyword) return closeSuggestions();
   suggestedFunds = funds.filter((fund) => searchableText(fund).includes(keyword)).slice(0, 10);
   if (!suggestedFunds.length) return closeSuggestions();
-  suggestionList.innerHTML = suggestedFunds.map((fund, index) => `<a id="fund-search-suggestion-${index}" class="fund-search-suggestion" href="${fundHref(fund)}" role="option" aria-selected="false"><span class="fund-search-suggestion-main"><strong>${escapeHtml(fund.name)}</strong><small>${escapeHtml(fund.code)} · ${escapeHtml(fund.category_label)} · ${escapeHtml(fund.subtype)}</small></span><span class="fund-search-suggestion-meta">${escapeHtml((fund.manager || []).join("、") || fund.fund_company || "")}</span></a>`).join("");
+  suggestionList.innerHTML = suggestedFunds.map((fund, index) => `<a id="fund-search-suggestion-${index}" class="fund-search-suggestion" href="${fundHref(fund)}" role="option" aria-selected="false"><span class="fund-search-suggestion-main"><strong>${escapeHtml(fund.name)}</strong><small>${escapeHtml(fund.code)} · ${escapeHtml(displayCategoryLabel(fund))} · ${escapeHtml(fund.subtype)}</small></span><span class="fund-search-suggestion-meta">${escapeHtml((fund.manager || []).join("、") || fund.fund_company || "")}</span></a>`).join("");
   suggestionList.hidden = false;
   search.setAttribute("aria-expanded", "true");
 }
