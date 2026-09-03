@@ -553,6 +553,13 @@ select { width: 190px; padding: 0 14px; color: #435568; }
 .campisi-percentile-labels span:last-child { text-align: right; }
 .correlation-window-select { display: block; margin-bottom: 14px; }
 .correlation-window-select select { width: 100%; background: white; }
+.correlation-index-group + .correlation-index-group { margin-top: 18px; }
+.correlation-index-group h4 {
+  margin: 0 0 9px;
+  color: var(--ink);
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+}
 .pure-bond-correlation-table .research-table { min-width: 620px; }
 .pure-bond-yield-context { grid-column: 1 / -1; }
 .pure-bond-index-select { display: block; margin-bottom: 12px; }

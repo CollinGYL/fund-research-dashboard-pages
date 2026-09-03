@@ -3790,14 +3790,35 @@ function genericCorrelationSide(fund, data, key, type) {
     });
     return rows.length ? renderTable(["代码", "名称", "管理人", "相关系数", "共同样本"], rows, "pure-bond-correlation-table") : '<p class="empty-copy">该窗口共同样本不足。</p>';
   }
-  const rows = source.map((item) => [
-    escapeHTML(item.code),
-    `<strong>${escapeHTML(item.name)}</strong>`,
-    fund.category === "pure-bond" ? "财富" : "价格",
-    `<strong>${num(item.correlation, 3)}</strong>`,
-    `${item.observations || "—"}${sampleUnit}`,
-  ]);
-  return rows.length ? renderTable(["代码", "名称", "口径", "相关系数", "共同样本"], rows, "pure-bond-correlation-table") : '<p class="empty-copy">该窗口共同样本不足。</p>';
+  const fallbackGroup = fund.category === "pure-bond" ? "bond" : "broad_style";
+  const groupOrder = fund.category === "pure-bond"
+    ? ["bond"]
+    : fund.category === "hybrid-bond"
+      ? ["bond", "broad_style", "industry"]
+      : ["broad_style", "industry", "bond"];
+  const groupLabels = {
+    bond: "债券财富指数",
+    broad_style: "宽基与风格指数",
+    industry: "Choice东财一级行业指数",
+  };
+  const scopeLabels = { bond: "财富", broad_style: "价格", industry: "价格" };
+  const groups = new Map();
+  source.forEach((item) => {
+    const group = item.group || fallbackGroup;
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push(item);
+  });
+  const sections = groupOrder.filter((group) => groups.has(group)).map((group) => {
+    const rows = groups.get(group).map((item) => [
+      escapeHTML(item.code),
+      `<strong>${escapeHTML(item.name)}</strong>`,
+      scopeLabels[group] || "价格",
+      `<strong>${num(item.correlation, 3)}</strong>`,
+      `${item.observations || "—"}${sampleUnit}`,
+    ]);
+    return `<section class="correlation-index-group"><h4>${groupLabels[group] || "其他指数"}</h4>${renderTable(["代码", "名称", "口径", "相关系数", "共同样本"], rows, "pure-bond-correlation-table")}</section>`;
+  });
+  return sections.length ? sections.join("") : '<p class="empty-copy">该窗口共同样本不足。</p>';
 }
 
 function genericCorrelationPanel(fund) {
@@ -3809,13 +3830,13 @@ function genericCorrelationPanel(fund) {
     const selected = available.includes("ytd") ? "ytd" : available.includes("3y") ? "3y" : available.includes("5y") ? "5y" : available[0];
     const options = available.map((key) => `<option value="${key}"${key === selected ? " selected" : ""}>${windowLabels[key]}</option>`).join("");
     return `
-      <div class="panel-intro"><div><p class="eyebrow">CORRELATION</p><h2>同类基金与代表指数相关性</h2></div><p>近1/3/6月和今年以来按日收益，近1/3/5年按月收益；左右卡片可独立切换。${fund.category === "pure-bond" ? "纯债指数仅保留含票息再投资的财富口径。" : fund.category === "hybrid-bond" ? "一级/二级债基同时覆盖债券财富指数与权益指数。" : "主动权益覆盖宽基、大小盘及成长价值指数。"}</p></div>
+      <div class="panel-intro"><div><p class="eyebrow">CORRELATION</p><h2>同类基金与代表指数相关性</h2></div><p>近1/3/6月和今年以来按日收益，近1/3/5年按月收益；左右卡片可独立切换。${fund.category === "pure-bond" ? "纯债指数仅保留含票息再投资的财富口径。" : fund.category === "hybrid-bond" ? "一级/二级债基同时覆盖债券财富指数、权益宽基/风格及一级行业指数。" : "主动权益同时覆盖宽基、大小盘、成长价值及一级行业指数。"}</p></div>
       <div class="research-grid two-column-grid pure-bond-correlation-grid">
         <article class="subpanel"><div class="subpanel-heading"><div><h3>与其他基金相关性</h3><span>按所选窗口频率 · 正相关TOP</span></div></div><label class="correlation-window-select"><span class="sr-only">其他基金相关性窗口</span><select id="generic-peer-correlation-window">${options}</select></label><div id="generic-peer-correlation-output">${genericCorrelationSide(fund, data, selected, "peers")}</div></article>
-        <article class="subpanel"><div class="subpanel-heading"><div><h3>与其他指数相关性</h3><span>${fund.category === "pure-bond" ? "vs 各类中债财富指数" : fund.category === "hybrid-bond" ? "vs 债券财富与权益指数" : "vs 宽基与风格指数"} · 正相关TOP</span></div></div><label class="correlation-window-select"><span class="sr-only">其他指数相关性窗口</span><select id="generic-index-correlation-window">${options}</select></label><div id="generic-index-correlation-output">${genericCorrelationSide(fund, data, selected, "indices")}</div></article>
+        <article class="subpanel"><div class="subpanel-heading"><div><h3>与其他指数相关性</h3><span>${fund.category === "pure-bond" ? "vs 各类中债财富指数" : fund.category === "hybrid-bond" ? "vs 债券财富、权益与行业指数" : "vs 宽基、风格与行业指数"} · 分组正相关TOP</span></div></div><label class="correlation-window-select"><span class="sr-only">其他指数相关性窗口</span><select id="generic-index-correlation-window">${options}</select></label><div id="generic-index-correlation-output">${genericCorrelationSide(fund, data, selected, "indices")}</div></article>
       </div>
       <div class="calibration-note"><strong>用于替换研究</strong><p>同类基金表先回答“净值行为最像谁”，指数表回答“更接近哪类市场风格”。真正用于经理更换或风格漂移后的替换，还应叠加行业集中度、历史行业稳定性、波动回撤和经理任期过滤；仅凭相关系数不直接给出替代结论。</p></div>
-      <p class="method-note">相关性描述历史共同波动，不代表持仓相似度、因果关系或未来表现。短窗口至少12/35/70个共同交易日，长期窗口使用月收益。</p>`;
+      <p class="method-note">相关性描述历史共同波动，不代表持仓相似度、因果关系或未来表现。短窗口至少12/35/70个共同交易日，长期窗口使用月收益；行业相关性采用Choice东财一级行业价格指数，持仓行业分析仍采用中信行业分类，两套分类不可直接逐项等同。</p>`;
   }
   const peerRows = (data.peers || []).map((item) => [
     `<a href="fund.html?code=${encodeURIComponent(item.code)}"><strong>${escapeHTML(item.name)}</strong></a><small>${escapeHTML(item.code)}</small>`,
