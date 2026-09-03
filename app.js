@@ -66,6 +66,8 @@ let classificationNameCache = {};
 let suggestedFunds = [];
 let activeSuggestionIndex = -1;
 let stockClassificationPromise = null;
+let activeEquityProfilesPromise = null;
+let activeEquityProfileFilter = "all";
 const searchTextByCode = new Map();
 
 function escapeHtml(value) {
@@ -207,6 +209,59 @@ function classificationHeader(kind) {
   return `<th class="table-filter-heading industry-filter-heading${selectedName ? " is-active" : ""}"><span>行业权重</span><div class="table-header-filter-row"><select id="header-industry-level" class="table-header-select table-header-level-select" aria-label="选择行业层级"><option value="level1"${industryLevel === "level1" ? " selected" : ""}>中信一级</option><option value="level2"${industryLevel === "level2" ? " selected" : ""}>中信二级</option><option value="level3"${industryLevel === "level3" ? " selected" : ""}>中信三级</option></select><select id="header-industry-name" class="table-header-select table-header-name-select" aria-label="选择行业，按权重排序">${options}</select>${classificationDirectionButton(industryLevel)}</div></th>`;
 }
 
+function activeEquityProfile(fund) {
+  return window.FUND_ACTIVE_EQUITY_PROFILES?.funds?.[fund.code] || null;
+}
+
+function profilePercentile(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `P${Math.round(number * 100)}` : "—";
+}
+
+function activeEquityProfileCell(fund) {
+  const profile = activeEquityProfile(fund);
+  if (!window.FUND_ACTIVE_EQUITY_PROFILES) {
+    return '<td class="fund-profile-cell pending-cell"><strong>画像加载中</strong><small>正在读取低频画像数据</small></td>';
+  }
+  if (!profile) return '<td class="fund-profile-cell pending-cell"><strong>冷启动</strong><small>当前管理结构尚未形成可用画像</small></td>';
+  const groups = profile.groups || {};
+  const percentiles = profile.percentiles || {};
+  const status = profile.status === "mature_3plus" ? "成熟画像" : profile.status === "usable_2" ? "可用画像" : "冷启动";
+  if (profile.status === "cold_start") {
+    return `<td class="fund-profile-cell pending-cell"><strong>${status}</strong><small>${profile.completed_transition_count || 0}个合格转移区间</small></td>`;
+  }
+  return `<td class="fund-profile-cell"><div class="fund-profile-chip-grid">
+    <span title="调仓活跃度同类分位 ${profilePercentile(percentiles.turnover_activity)}"><b>调仓</b>${escapeHtml(groups.turnover_activity || "—")}</span>
+    <span title="持仓集中度同类分位 ${profilePercentile(percentiles.concentration)}"><b>集中</b>${escapeHtml(groups.concentration || "—")}</span>
+    <span title="持股延续性同类分位 ${profilePercentile(percentiles.holding_persistence)}"><b>延续</b>${escapeHtml(groups.holding_persistence || "—")}</span>
+    <span title="二级行业稳定性同类分位 ${profilePercentile(percentiles.industry_stability)}"><b>行业</b>${escapeHtml(groups.industry_stability || "—")}</span>
+  </div><small>${status} · ${profilePercentile(percentiles.turnover_activity)}调仓</small></td>`;
+}
+
+function activeEquityProfileHeader() {
+  const options = [
+    ["all", "全部画像"],
+    ["turnover:低调仓", "低调仓组"],
+    ["turnover:中等调仓", "中等调仓组"],
+    ["turnover:高调仓", "高调仓组"],
+    ["concentration:高集中", "高集中组"],
+    ["persistence:高延续", "高延续组"],
+    ["industry:高稳定", "行业高稳定组"],
+    ["status:cold_start", "冷启动"],
+  ].map(([value, label]) => `<option value="${value}"${activeEquityProfileFilter === value ? " selected" : ""}>${label}</option>`).join("");
+  return `<th class="table-filter-heading profile-filter-heading"><span>基金画像</span><select id="header-profile-group" class="table-header-select" aria-label="按基金画像分组筛选">${options}</select></th>`;
+}
+
+function matchesActiveEquityProfile(fund) {
+  if (activeCategory !== "active-equity" || activeEquityProfileFilter === "all") return true;
+  const profile = activeEquityProfile(fund);
+  if (activeEquityProfileFilter === "status:cold_start") return !profile || profile.status === "cold_start";
+  if (!profile) return false;
+  const [dimension, label] = activeEquityProfileFilter.split(":");
+  const keys = { turnover: "turnover_activity", concentration: "concentration", persistence: "holding_persistence", industry: "industry_stability" };
+  return profile.groups?.[keys[dimension]] === label;
+}
+
 function fundHref(fund) {
   return `fund.html?code=${encodeURIComponent(fund.code)}&id=${encodeURIComponent(fund.code.split(".")[0])}`;
 }
@@ -327,6 +382,7 @@ function fundRow(fund) {
     const industryDisplay = selectedName && selectedLevel !== "sector" ? `${selectedName} ${selectedWeightText}` : classification.industry;
     extras = `
       <td><strong>${formatPercent(fund.asset?.stock_weight)}</strong><small>${escapeHtml(fund.asset?.report_date || "—")}</small></td>
+      ${activeEquityProfileCell(fund)}
       <td><strong>${escapeHtml(sectorDisplay)}</strong><small>${selectedName && selectedLevel === "sector" ? "所选板块" : escapeHtml(classification.date || "完整持仓")}</small></td>
       <td><strong>${escapeHtml(industryDisplay)}</strong><small>${selectedName && selectedLevel !== "sector" ? ({ level1: "中信一级", level2: "中信二级", level3: "中信三级" })[selectedLevel] : "中信一级"}</small></td>`;
   } else if (activeCategory === "index-enhanced") {
@@ -364,7 +420,7 @@ function fundRow(fund) {
 }
 
 function extraHeaders() {
-  if (activeCategory === "active-equity") return `<th>股票仓位</th>${classificationHeader("sector")}${classificationHeader("industry")}`;
+  if (activeCategory === "active-equity") return `<th>股票仓位</th>${activeEquityProfileHeader()}${classificationHeader("sector")}${classificationHeader("industry")}`;
   if (activeCategory === "index-enhanced") return "<th>跟踪指数</th><th>跟踪误差</th><th>信息比率</th>";
   if (activeCategory === "pure-bond") return "<th>杠杆</th><th>久期</th><th>券种结构</th>";
   if (activeCategory === "hybrid-bond") return "<th>杠杆</th><th>久期</th><th>券种结构</th><th>股票仓位</th><th>转债仓位</th><th>板块权重</th><th>行业权重</th>";
@@ -390,7 +446,7 @@ function filteredFunds() {
   const visible = categoryFunds().filter((fund) => {
     const matchesKeyword = !keyword || searchableText(fund).includes(keyword);
     const matchesSubtype = subtype === "all" || fund.internal_category === subtype;
-    return matchesKeyword && matchesSubtype && matchesFundSize(fund);
+    return matchesKeyword && matchesSubtype && matchesFundSize(fund) && matchesActiveEquityProfile(fund);
   });
   if (activeCategory === "active-equity" && classificationRankState.name) {
     return [...visible].sort((left, right) => {
@@ -445,6 +501,7 @@ function prepareMobileFundCards() {
   const primaryLabels = listPeriodMode === "long"
     ? ["基金规模", "近1年", "近3年", "近5年"]
     : ["基金规模", "近1月", "近1年", "今年以来"];
+  if (activeCategory === "active-equity") primaryLabels.push("基金画像");
   grid.querySelectorAll("tr[data-fund-code]").forEach((row) => {
     const cells = [...row.children];
     cells.forEach((cell, index) => {
@@ -503,7 +560,7 @@ function updateListCopy() {
   if (methodologyNote) methodologyNote.textContent = activeCategory === "index-enhanced"
     ? "指数增强相对指标必须与基金当前跟踪指数日收益对齐；指数行情缓存未完成的产品明确显示待补。"
     : activeCategory === "active-equity"
-      ? "主观权益口径排除指数增强，以及名称含量化、多因子、数据挖掘、智选、智胜、智航、智投、对冲或阿尔法的产品；底层数据仍保留。"
+      ? "主观权益口径排除指数增强和名称含量化策略的产品。画像按当前稳定管理结构独立累积，分位是同类相对位置，不是评级或综合得分。"
     : activeCategory === "pure-bond"
       ? "券种结构使用资产配置官方汇总字段；重仓债券只代表披露重仓，不代替完整结构。久期展示报告日期。"
       : "净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。";
@@ -603,6 +660,8 @@ listHead.addEventListener("change", (event) => {
       classificationRankState.name = target.value;
     }
     sortState = { key: null, metric: "return", direction: "desc" };
+  } else if (target.id === "header-profile-group") {
+    activeEquityProfileFilter = target.value;
   } else {
     return;
   }
@@ -636,8 +695,27 @@ function ensureStockClassification() {
   return stockClassificationPromise;
 }
 
+function ensureActiveEquityProfiles() {
+  if (window.FUND_ACTIVE_EQUITY_PROFILES) return Promise.resolve(window.FUND_ACTIVE_EQUITY_PROFILES);
+  if (activeEquityProfilesPromise) return activeEquityProfilesPromise;
+  activeEquityProfilesPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/active_equity_profiles.js";
+    script.onload = () => window.FUND_ACTIVE_EQUITY_PROFILES
+      ? resolve(window.FUND_ACTIVE_EQUITY_PROFILES)
+      : reject(new Error("基金画像数据未生成有效内容"));
+    script.onerror = () => reject(new Error("基金画像数据加载失败"));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    activeEquityProfilesPromise = null;
+    throw error;
+  });
+  return activeEquityProfilesPromise;
+}
+
 document.querySelectorAll("[data-category]").forEach((button) => button.addEventListener("click", () => {
   activeCategory = button.dataset.category;
+  activeEquityProfileFilter = "all";
   currentPage = 1;
   search.value = "";
   document.querySelectorAll("[data-category]").forEach((item) => {
@@ -650,12 +728,12 @@ document.querySelectorAll("[data-category]").forEach((button) => button.addEvent
   updateClassificationRankControl(true);
   updateListCopy();
   renderFunds();
-  if (activeCategory === "active-equity" && !window.FUND_STOCK_CLASSIFICATION) {
-    ensureStockClassification().then(() => {
+  if (activeCategory === "active-equity") {
+    Promise.all([ensureStockClassification(), ensureActiveEquityProfiles()]).then(() => {
       classificationNameCache = {};
       if (activeCategory === "active-equity") renderFunds();
     }).catch((error) => {
-      if (activeCategory === "active-equity") resultCount.textContent = `行业排序数据暂未加载：${error.message}`;
+      if (activeCategory === "active-equity") resultCount.textContent = `主观权益扩展数据暂未加载：${error.message}`;
     });
   }
 }));

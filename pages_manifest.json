@@ -1,28 +1,28 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-02T11:31:06+08:00",
+  "generatedAt": "2026-09-03T16:55:33+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "index.html": {
       "size": 10671,
-      "sha256": "6f3e59096fc4df93eadd9301eaed0e9cc1724cbf945ce70c1cd73ec48711a98b"
+      "sha256": "0c3b333656f08cd4a0d60f9061c41caab2e1902140014616f729af80e239bcce"
     },
     "fund.html": {
       "size": 2142,
-      "sha256": "4cdee5c3d276ef6ac714a3accb98035bcaa45d0d81abaf0c8a970342e13e502f"
+      "sha256": "8ac8060923adc5eb0817ac1ce2b5def7804ef5e9b783b1d78872e02795604e7e"
     },
     "styles.css": {
-      "size": 89775,
-      "sha256": "d2da3a8205b6a172e54e15161dd0df0d35da9a1240e93a6e631cb6329b8a9490"
+      "size": 91864,
+      "sha256": "9785b065c1c748f368f3a06e348f599b67745c946fab1c8942141c6742b01511"
     },
     "app.js": {
-      "size": 39715,
-      "sha256": "0e1a762d47e99ed532ae15d75277229e14d5fc9011fa9b3c2bdee4b0e2b1fe89"
+      "size": 44375,
+      "sha256": "c1ce88420f39f51b00d7e7ba2d6c4870bdfe43a04ee33ebdee5e85fd5d12a36e"
     },
     "fund.js": {
-      "size": 339134,
-      "sha256": "8483ac22b9e252d46397f5ed8ea3925c96dfb89cac96835c4aeed61636b49782"
+      "size": 350978,
+      "sha256": "d636d5091b7729207b99102aa2ff333d5ce197d3d1bb2b405bed0f8261ee02cd"
     },
     "robots.txt": {
       "size": 26,
@@ -32,7 +32,7 @@
   "pathReplacements": {
     "index.html": 2,
     "fund.html": 0,
-    "app.js": 2,
-    "fund.js": 14
+    "app.js": 3,
+    "fund.js": 15
   }
 }
