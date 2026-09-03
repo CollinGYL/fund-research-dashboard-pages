@@ -631,6 +631,14 @@ select { width: 190px; padding: 0 14px; color: #435568; }
 .pure-bond-heavy-table .research-table { min-width: 520px; }
 .pure-bond-heavy-panel #generic-bond-history-output { display: flex; flex: 1; flex-direction: column; }
 .pure-bond-heavy-panel .method-note { margin-top: auto; }
+.pure-bond-profile-overview .tag-row { margin-top: 14px; }
+.pure-bond-flow-chart-wrap { overflow-x: auto; }
+.pure-bond-flow-chart { display: block; width: 100%; min-width: 620px; height: auto; }
+.pure-bond-flow-bar.positive { fill: #4f948a; }
+.pure-bond-flow-bar.negative { fill: #a66f69; }
+.pure-bond-flow-table { max-height: 430px; overflow: auto; }
+.pure-bond-deep-campisi { margin-top: 22px; }
+.pure-bond-research-boundary { margin: 18px 0 0; }
 .industry-distribution-list { display: grid; gap: 7px; }
 .industry-distribution-row { display: grid; grid-template-columns: minmax(130px, 220px) minmax(90px, 1fr) 58px; gap: 12px; align-items: center; width: 100%; padding: 8px 10px; color: #425869; border: 1px solid transparent; border-radius: 8px; background: transparent; cursor: pointer; text-align: left; }
 .industry-distribution-row:hover, .industry-distribution-row.active { border-color: #c9dfda; background: #f1f8f6; }

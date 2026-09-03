@@ -9,6 +9,8 @@ const correlationMetricsPromises = new Map();
 const CORRELATION_SHARD_COUNT = 256;
 const stockPriceUpdatePromises = new Map();
 const STOCK_PRICE_UPDATE_SHARD_COUNT = 64;
+const pureBondResearchPromises = new Map();
+const PURE_BOND_RESEARCH_SHARD_COUNT = 16;
 const dashboardAssetPromises = new Map();
 
 const DASHBOARD_GLOBAL_ASSETS = {
@@ -2454,7 +2456,7 @@ function renderFund(fund, summaryData, detailData, analysisData, analysis, fundD
 const GENERIC_TABS = {
   "active-equity": [["performance", "业绩表现"], ["profile", "基金画像"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "index-enhanced": [["performance", "业绩表现"], ["industries", "行业分析（相比基准）"], ["holdings", "持股分析（相比基准）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["documents", "公告原文"]],
-  "pure-bond": [["performance", "业绩表现"], ["assets", "资产配置"], ["bonds", "券种结构"], ["correlation", "相关性分析"], ["attribution", "Campisi归因"], ["documents", "公告原文"]],
+  "pure-bond": [["performance", "业绩表现"], ["research", "深度研究"], ["assets", "资产配置"], ["bonds", "券种结构"], ["correlation", "相关性分析"], ["attribution", "Campisi归因"], ["documents", "公告原文"]],
   "hybrid-bond": [["performance", "业绩表现"], ["evaluation", "五维评价"], ["assets", "资产配置"], ["bonds", "券种结构"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "convertible-bond": [["performance", "业绩表现"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股与转债分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
 };
@@ -3205,6 +3207,140 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
     ${recentPairs.length ? `<div class="subpanel-heading pure-bond-kalman-compare-heading"><div><h3>与披露反推久期对照</h3><span>报告期当日或之前最近交易日</span></div></div>${renderTable(["报告期", "披露反推", "模型估计", "偏差"], recentPairs)}` : '<p class="method-note">当前没有落在模型区间内的有效披露久期可供对照。</p>'}
     <p class="method-note"><strong>口径边界：</strong>模型每天只使用截至当日的基金复权净值与14条债券指数收益，不把半年报/年报久期输入滤波；披露久期仅用于事后对照。输入两侧均做3日移动平均，预热120个有效交易日，Q=${Number.isFinite(Number(meta.q)) ? meta.q : "3e-4"}。${meta.factor_variant ? `<strong>因子版本：</strong>${escapeHTML(meta.factor_variant)}。` : ""}这是收益法估计，不等同于逐券组合真实久期，也不用于填补披露值。</p>
   </article>`;
+}
+
+function pureBondPeerPositionRow(label, item, formatter, note) {
+  const percentile = Number(item?.percentile);
+  if (!Number.isFinite(percentile)) {
+    return `<div class="campisi-percentile-row"><div class="campisi-percentile-heading"><strong>${escapeHTML(label)}</strong><span>样本不足</span></div><p class="method-note">${escapeHTML(note)}</p></div>`;
+  }
+  const clipped = Math.max(0, Math.min(1, percentile));
+  return `<div class="campisi-percentile-row">
+    <div class="campisi-percentile-heading"><strong>${escapeHTML(label)} · ${escapeHTML(formatter(item.value))}</strong><span>同类第${Math.round(clipped * 100)}百分位 · ${Number(item.n || 0).toLocaleString()}只</span></div>
+    <div class="campisi-percentile-track"><i style="left:${(clipped * 100).toFixed(2)}%"></i><b class="p25"></b><b class="p50"></b><b class="p75"></b></div>
+    <div class="campisi-percentile-labels"><span>P25 ${escapeHTML(formatter(item.p25))}</span><span>P50 ${escapeHTML(formatter(item.p50))}</span><span>P75 ${escapeHTML(formatter(item.p75))}</span></div>
+    <p class="method-note">${escapeHTML(note)}</p>
+  </div>`;
+}
+
+function renderSignedBarChart(series, ariaLabel) {
+  const rows = (series || []).filter((item) => Number.isFinite(Number(item.net_rate)));
+  if (rows.length < 2) return '<p class="empty-copy">连续申赎数据不足。</p>';
+  const width = 900;
+  const height = 245;
+  const margin = { top: 25, right: 24, bottom: 42, left: 55 };
+  const maximum = Math.max(...rows.map((item) => Math.abs(Number(item.net_rate))), 0.01) * 1.12;
+  const xStep = (width - margin.left - margin.right) / rows.length;
+  const barWidth = Math.max(4, Math.min(28, xStep * 0.62));
+  const y = (value) => margin.top + (maximum - Number(value)) / (2 * maximum) * (height - margin.top - margin.bottom);
+  const zero = y(0);
+  const dateIndexes = chartTickIndexes(rows.length, 7);
+  return `<div class="nav-chart-wrap pure-bond-flow-chart-wrap"><svg class="nav-chart pure-bond-flow-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(ariaLabel)}">
+    ${[-maximum, 0, maximum].map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 9}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${pct(tick, 0, true)}</text>`).join("")}
+    ${rows.map((item, index) => { const value = Number(item.net_rate); const top = Math.min(zero, y(value)); const barHeight = Math.max(2, Math.abs(y(value) - zero)); return `<g><title>${escapeHTML(item.report_date)}：${pct(value, 2, true)}</title><rect x="${(margin.left + xStep * (index + 0.5) - barWidth / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" rx="2" class="pure-bond-flow-bar ${value >= 0 ? "positive" : "negative"}"/></g>`; }).join("")}
+    ${dateIndexes.map((index) => `<text x="${(margin.left + xStep * (index + 0.5)).toFixed(1)}" y="${height - 13}" class="chart-axis-label chart-axis-date" text-anchor="${index === 0 ? "start" : index === rows.length - 1 ? "end" : "middle"}">${escapeHTML(rows[index].report_date.slice(0, 7))}</text>`).join("")}
+  </svg></div>`;
+}
+
+function pureBondResearchProfileTags(research) {
+  const peer = research?.current_peer || {};
+  const tags = [];
+  const add = (key, low, high, lowLabel, highLabel) => {
+    const value = Number(peer[key]?.percentile);
+    if (!Number.isFinite(value)) return;
+    if (value <= low) tags.push([lowLabel, "stable"]);
+    else if (value >= high) tags.push([highLabel, "current"]);
+  };
+  add("duration", 0.25, 0.75, "短久期", "长久期");
+  add("leverage", 0.25, 0.75, "低杠杆", "高杠杆");
+  add("financial_bond", 0.25, 0.75, "低金融债", "偏金融债");
+  add("corporate_bond", 0.25, 0.75, "低企业债", "偏企业债");
+  add("drawdown_1y", 0.25, 0.75, "近一年回撤靠后", "近一年低回撤");
+  return tags;
+}
+
+function genericPureBondDeepResearchPanel(fund, detail, research, campisi, kalmanDuration) {
+  if (!research) {
+    return `<div class="panel-intro"><div><p class="eyebrow">PURE BOND DEEP RESEARCH</p><h2>纯债深度研究</h2></div><p>全量深度研究分片尚未生成；业绩、资产、券种和Campisi等既有页签仍可正常使用。</p></div>`;
+  }
+  const pit = (research.pit_performance || []).filter((item) => item.return && item.sharpe && item.drawdown);
+  const latestPit = pit.at(-1);
+  const pitSeries = pit.map((item) => ({
+    report_date: item.report_date,
+    return_percentile: item.return.percentile,
+    sharpe_percentile: item.sharpe.percentile,
+    drawdown_percentile: item.drawdown.percentile,
+  }));
+  const peer = research.current_peer || {};
+  const tags = pureBondResearchProfileTags(research);
+  const flows = research.flows || [];
+  const latestFlow = flows.at(-1);
+  const recentFlow = flows.slice(-4);
+  const rollingFlow = recentFlow.reduce((sum, item) => sum + (Number(item.net) || 0), 0);
+  const scaleSeries = (detail?.asset_history || []).filter((item) => Number.isFinite(Number(item.net_asset))).map((item) => ({ report_date: item.date, scale: Number(item.net_asset) / 1e8 }));
+  const latestScale = scaleSeries.at(-1)?.scale;
+  const priorScale = scaleSeries.length > 4 ? scaleSeries.at(-5)?.scale : scaleSeries[0]?.scale;
+  const scaleChange = Number.isFinite(latestScale) && Number.isFinite(priorScale) && priorScale !== 0 ? latestScale / priorScale - 1 : null;
+  const shareRows = (research.share_classes || []).map((item) => [
+    `<strong>${escapeHTML(item.name || item.code)}</strong><small>${escapeHTML(item.code)}</small>`,
+    pct(item.management_fee, 3), pct(item.custodian_fee, 3), pct(item.sales_service_fee, 3),
+  ]);
+  const managerRows = (research.manager_history || []).slice().reverse().map((item) => [
+    escapeHTML(item.name), escapeHTML(item.start), escapeHTML(item.end || "至今"), escapeHTML(item.announcement_date || "—"),
+  ]);
+  const flowRows = flows.slice(-12).reverse().map((item) => [
+    escapeHTML(item.report_date), `${num(item.purchase, 2)}亿份`, `${num(item.redemption, 2)}亿份`, `${item.net >= 0 ? "+" : ""}${num(item.net, 2)}亿份`, pct(item.net_rate, 2, true),
+  ]);
+  const kalmanValues = (kalmanDuration?.duration || []).map(Number).filter(Number.isFinite);
+  const latestKalman = kalmanValues.at(-1);
+  const kalman20 = kalmanValues.length > 20 ? latestKalman - kalmanValues.at(-21) : null;
+  const kalman60 = kalmanValues.length > 60 ? latestKalman - kalmanValues.at(-61) : null;
+  const campisiWindow = campisi?.windows?.all || campisi?.windows?.["5y"] || campisi?.windows?.["3y"] || campisi?.windows?.["1y"] || null;
+  return `<div class="panel-intro"><div><p class="eyebrow">PURE BOND DEEP RESEARCH</p><h2>纯债基金深度研究</h2></div><p>将样板页的PIT同类池、经营演变和截面定位推广到全部纯债基金，并与现有Campisi五因子和仅观测净值的日频久期Kalman统一展示。</p></div>
+    <article class="subpanel pure-bond-profile-overview">
+      <div class="subpanel-heading"><div><h3>当前研究画像</h3><span>${escapeHTML(fund.subtype)} · 数据截至 ${escapeHTML(research.as_of || "—")}</span></div></div>
+      <div class="tag-row">${tags.length ? tags.map(([label, cls]) => `<span class="profile-tag ${cls}">${escapeHTML(label)}</span>`).join("") : '<span class="profile-tag stable">同类位置居中</span>'}</div>
+      <section class="research-metric-grid metric-six">
+        ${metric("近1年收益分位", latestPit?.return ? `P${Math.round(latestPit.return.percentile * 100)}` : "—", latestPit ? `${pct(latestPit.return.value, 2, true)} · ${latestPit.n}只` : "PIT样本不足")}
+        ${metric("近1年Sharpe分位", latestPit?.sharpe ? `P${Math.round(latestPit.sharpe.percentile * 100)}` : "—")}
+        ${metric("低回撤分位", latestPit?.drawdown ? `P${Math.round(latestPit.drawdown.percentile * 100)}` : "—")}
+        ${metric("最新日频久期", Number.isFinite(latestKalman) ? `${num(latestKalman, 2)}年` : "—", kalmanDuration?.meta?.end || "卡尔曼暂无结果")}
+        ${metric("最新季度净申赎", latestFlow ? `${latestFlow.net >= 0 ? "+" : ""}${num(latestFlow.net, 2)}亿份` : "—", latestFlow?.report_date || "")}
+        ${metric("最新规模", Number.isFinite(latestScale) ? `${num(latestScale, 2)}亿元` : "—", Number.isFinite(scaleChange) ? `近四期 ${pct(scaleChange, 1, true)}` : "")}
+      </section>
+    </article>
+    <div class="research-grid two-column-grid pure-bond-deep-grid">
+      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>PIT同类业绩分位</h3><span>逐季重建当时同类池 · 防幸存者偏差</span></div></div>${pitSeries.length > 1 ? renderMiniLineChart(pitSeries, [
+        { key: "return_percentile", label: "收益分位", color: "#0a7c78", width: 2.8 },
+        { key: "sharpe_percentile", label: "Sharpe分位", color: "#315f91", width: 2.4 },
+        { key: "drawdown_percentile", label: "低回撤分位", color: "#8e6a9a", width: 2.4 },
+      ], `${fund.name}PIT同类业绩分位`) : '<p class="empty-copy">历史PIT同类样本不足。</p>'}<p class="method-note">每个时点只使用当时属于同一长/短期纯债子类且近一年净值不少于100个观察的产品；A/C/D/E只由初始份额代表一票。</p></article>
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>当前同类截面定位</h3><span>同一长/短期纯债子类</span></div></div>
+        ${pureBondPeerPositionRow("近1年收益", peer.return_1y, (value) => pct(value, 2, true), "分位越高表示近一年累计收益在同类中越高。")}
+        ${pureBondPeerPositionRow("近1年低回撤", peer.drawdown_1y, (value) => pct(value, 2), "直接按最大回撤数值排序；越接近0，分位越高。")}
+        ${pureBondPeerPositionRow("久期", peer.duration, (value) => `${num(value, 2)}年`, "披露久期反映报告期利率敏感性，不用日频估计替代披露。")}
+        ${pureBondPeerPositionRow("杠杆", peer.leverage, (value) => `${num(value, 2)}x`, "杠杆按总资产/净资产；高分位只代表水平较高，不代表优劣。")}
+      </article>
+      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>规模演变</h3><span>基金主体口径，不重复加总份额</span></div></div>${scaleSeries.length > 1 ? renderMiniLineChart(scaleSeries, [{ key: "scale", label: "基金规模", color: "#102c45", width: 3, format: "number" }], `${fund.name}规模演变`) : '<p class="empty-copy">规模历史不足。</p>'}<p class="method-note">纵轴单位为亿元；资产配置表中的净资产已是基金主体合计口径。</p></article>
+      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>申赎压力</h3><span>季度净申购率 · 各存续份额合计</span></div></div>${renderSignedBarChart(flows, `${fund.name}季度净申购率`)}<section class="research-metric-grid metric-two">${metric("近四期净流量", `${rollingFlow >= 0 ? "+" : ""}${num(rollingFlow, 2)}亿份`)}${metric("最新净申购率", latestFlow ? pct(latestFlow.net_rate, 2, true) : "—")}</section>${flowRows.length ? renderTable(["报告期", "申购", "赎回", "净流量", "净申购率"], flowRows, "pure-bond-flow-table") : ""}<p class="method-note">只保留跨度不超过100天的季度记录；正值为净申购、负值为净赎回。份额流量不是资金流金额。</p></article>
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>券种结构同类定位</h3><span>最新报告期截面</span></div></div>
+        ${pureBondPeerPositionRow("金融债仓位", peer.financial_bond, (value) => pct(value, 1), "按占基金净资产比例比较。")}
+        ${pureBondPeerPositionRow("企业债仓位", peer.corporate_bond, (value) => pct(value, 1), "按占基金净资产比例比较；不能直接等同信用评级下沉。")}
+        ${pureBondPeerPositionRow("国债及政府债仓位", peer.government_bond, (value) => pct(value, 1), "按资产配置表官方汇总字段比较。")}
+        ${pureBondPeerPositionRow("基金规模", peer.net_asset, (value) => money(value), "同类规模分位只描述产品体量。")}
+      </article>
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>模型与披露的联合诊断</h3><span>Campisi五因子 + 日频久期Kalman</span></div></div><section class="research-metric-grid metric-four">
+        ${metric("Kalman最新久期", Number.isFinite(latestKalman) ? `${num(latestKalman, 2)}年` : "—")}
+        ${metric("近20日久期变化", Number.isFinite(kalman20) ? `${kalman20 >= 0 ? "+" : ""}${num(kalman20, 2)}年` : "—")}
+        ${metric("近60日久期变化", Number.isFinite(kalman60) ? `${kalman60 >= 0 ? "+" : ""}${num(kalman60, 2)}年` : "—")}
+        ${metric("五因子R²", campisiWindow ? num(campisiWindow.r2, 3) : "—", campisiWindow ? `${campisiWindow.start}至${campisiWindow.end}` : "")}
+      </section>${campisiWindow && campisi ? `<div class="pure-bond-deep-campisi">${renderCampisiPeerPosition(campisi, campisiWindow)}</div>` : '<p class="empty-copy">五因子共同样本不足。</p>'}<p class="method-note">Kalman只使用截至当日净值和债券指数，是在线估计；Campisi是收益法因子归因。二者都不能替代逐券真实持仓或披露久期。</p></article>
+    </div>
+    <div class="research-grid two-column-grid pure-bond-deep-grid">
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>历任基金经理</h3><span>按代表份额披露记录</span></div></div>${managerRows.length ? renderTable(["基金经理", "任职开始", "任职结束", "公告日"], managerRows) : '<p class="empty-copy">经理任期记录不足。</p>'}<p class="method-note">同一日期多人任职表示共管，不拆分个人对组合的贡献。</p></article>
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>份额与费率</h3><span>当前存续份额 · 年费率</span></div></div>${shareRows.length ? renderTable(["份额", "管理费", "托管费", "销售服务费"], shareRows) : '<p class="empty-copy">当前存续份额费率不足。</p>'}<p class="method-note">净值已内嵌日常计提费用；本表不包含按渠道和持有期变化的申购、赎回阶梯费率。</p></article>
+    </div>
+    <section class="data-boundary pure-bond-research-boundary"><div><p class="eyebrow">METHOD & SOURCE</p><h2>方法与数据边界</h2></div><ul><li>复权净值使用WDS历史基线，并由Choice增量覆盖层续接最新日期。</li><li>PIT同类池使用基金分类历史进入/退出区间，不用当前存续名单回看历史。</li><li>资产配置、申赎、费率和经理记录来自本机WDS派生结果；付费原始表不上传网页。</li><li>该页迁移自“纯债基金-单基金详细分析-因子正交化版”和“纯债基金-久期高频拟合-卡尔曼-仅观测净值”的可推广方法，不复制样板基金硬编码。</li></ul></section>`;
 }
 
 function genericNavChartPoints(fund, detail) {
@@ -4230,6 +4366,7 @@ function createGenericTabLoader(fund, detail) {
   const heavyStock = () => once("heavy-stock", () => loadGenericHeavyStockTrends(fund.code, detail));
   const correlation = () => once("correlation", () => loadCorrelationMetrics(fund.code));
   const pureBondDuration = () => once("pure-bond-duration", () => loadPureBondKalmanDuration(fund.code));
+  const pureBondResearch = () => once("pure-bond-research", () => loadPureBondResearch(fund.code));
   const commonBenchmarks = () => once("common-benchmarks", () => loadDashboardAsset("common_benchmarks.js"));
   const indexRelativeAssets = () => once("index-relative-assets", () => Promise.all([
     loadDashboardAsset("index_constituents.js"),
@@ -4250,6 +4387,14 @@ function createGenericTabLoader(fund, detail) {
       const [, holdingHistory] = await Promise.all([commonBenchmarks(), holdings()]);
       target.innerHTML = genericHybridBondEvaluationPanel(fund, detail, holdingHistory);
       bindHybridBondEvaluation(fund, detail, holdingHistory);
+      return;
+    }
+    if (id === "research") {
+      const [research, campisiData, kalmanDuration] = await Promise.all([
+        pureBondResearch(), campisi(), pureBondDuration(),
+      ]);
+      target.innerHTML = genericPureBondDeepResearchPanel(fund, detail, research, campisiData, kalmanDuration);
+      bindMiniLineCharts();
       return;
     }
     if (id === "assets") {
@@ -4674,6 +4819,26 @@ function loadPureBondKalmanDuration(code) {
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
   });
+}
+
+function loadPureBondResearch(code) {
+  const numericCode = Number(String(code || "").split(".")[0]);
+  if (!Number.isInteger(numericCode)) return Promise.resolve(null);
+  const shard = (numericCode % PURE_BOND_RESEARCH_SHARD_COUNT).toString(16);
+  const existing = window.FUND_PURE_BOND_RESEARCH?.[shard]?.[code];
+  if (existing) return Promise.resolve(existing);
+  if (pureBondResearchPromises.has(shard)) {
+    return pureBondResearchPromises.get(shard).then(() => window.FUND_PURE_BOND_RESEARCH?.[shard]?.[code] || null);
+  }
+  const promise = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js`;
+    script.onload = () => resolve(window.FUND_PURE_BOND_RESEARCH?.[shard] || null);
+    script.onerror = () => resolve(null);
+    document.head.appendChild(script);
+  });
+  pureBondResearchPromises.set(shard, promise);
+  return promise.then(() => window.FUND_PURE_BOND_RESEARCH?.[shard]?.[code] || null);
 }
 
 function loadGenericDocuments(code) {
