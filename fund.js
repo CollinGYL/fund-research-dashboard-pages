@@ -11,6 +11,7 @@ const stockPriceUpdatePromises = new Map();
 const STOCK_PRICE_UPDATE_SHARD_COUNT = 64;
 const pureBondResearchPromises = new Map();
 const PURE_BOND_RESEARCH_SHARD_COUNT = 64;
+const pureBondReferenceAssetPromises = new Map();
 const dashboardAssetPromises = new Map();
 const DASHBOARD_DATA_VERSION = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }).replaceAll("-", "");
 
@@ -45,6 +46,44 @@ function loadDashboardAsset(filename) {
   });
   dashboardAssetPromises.set(filename, promise);
   return promise;
+}
+
+function loadPureBondReferenceAsset(relativePath, ready) {
+  if (!/^pb_(?:shared|funds|corr|durkf)\/[A-Za-z0-9_.-]+\.js$/.test(relativePath)) {
+    return Promise.reject(new Error(`不允许加载未知纯债参考资源：${relativePath}`));
+  }
+  if (ready()) return Promise.resolve();
+  if (pureBondReferenceAssetPromises.has(relativePath)) return pureBondReferenceAssetPromises.get(relativePath);
+  const promise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${relativePath}?v=${DASHBOARD_DATA_VERSION}`;
+    script.onload = () => ready() ? resolve() : reject(new Error(`${relativePath} 未生成有效内容`));
+    script.onerror = () => reject(new Error(`${relativePath} 加载失败`));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    pureBondReferenceAssetPromises.delete(relativePath);
+    throw error;
+  });
+  pureBondReferenceAssetPromises.set(relativePath, promise);
+  return promise;
+}
+
+async function loadPureBondReferenceBundle(code) {
+  const shared = [
+    ["pb_shared/bond_index_lib.js", () => Boolean(window.BOND_INDEX_LIB)],
+    ["pb_shared/yield_curve_lib.js", () => Boolean(window.YIELD_CURVE_LIB)],
+    ["pb_shared/rank_snapshot.js", () => Boolean(window.RANK_SNAP)],
+    ["pb_shared/peer_dist_2001010301000000.js", () => Boolean(window.PEER_DIST?.["2001010301000000"])],
+    ["pb_shared/peer_dist_2001010302000000.js", () => Boolean(window.PEER_DIST?.["2001010302000000"])],
+    ["pb_shared/pb_durkf_missing.js", () => Boolean(window.DURKF_MISS)],
+  ];
+  await Promise.all(shared.map(([path, ready]) => loadPureBondReferenceAsset(path, ready)));
+  await loadPureBondReferenceAsset(`pb_funds/${code}.js`, () => Boolean(window.FUND_STORE?.[code]));
+  await Promise.all([
+    loadPureBondReferenceAsset(`pb_corr/${code}.js`, () => Boolean(window.CORR_SNAP?.[code])).catch(() => null),
+    loadPureBondReferenceAsset(`pb_durkf/${code}.js`, () => Boolean(window.DURKF_STORE?.[code])).catch(() => null),
+  ]);
+  return window.FUND_STORE?.[code] || null;
 }
 
 function loadCategoryAssets(category) {
@@ -2457,7 +2496,7 @@ function renderFund(fund, summaryData, detailData, analysisData, analysis, fundD
 const GENERIC_TABS = {
   "active-equity": [["performance", "业绩表现"], ["profile", "基金画像"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "index-enhanced": [["performance", "业绩表现"], ["industries", "行业分析（相比基准）"], ["holdings", "持股分析（相比基准）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["documents", "公告原文"]],
-  "pure-bond": [["performance", "业绩表现"], ["research", "深度研究"], ["assets", "资产配置"], ["bonds", "券种结构"], ["correlation", "相关性分析"], ["attribution", "Campisi归因"], ["documents", "公告原文"]],
+  "pure-bond": [["perf", "业绩表现"], ["alloc", "资产配置"], ["bond", "券种结构"], ["corr", "相关性分析"], ["campisi", "Campisi归因"], ["documents", "公告原文"]],
   "hybrid-bond": [["performance", "业绩表现"], ["evaluation", "五维评价"], ["assets", "资产配置"], ["bonds", "券种结构"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "convertible-bond": [["performance", "业绩表现"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股与转债分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
 };
@@ -4842,9 +4881,106 @@ function createGenericTabLoader(fund, detail) {
   };
 }
 
-function renderGenericFund(fund, detail) {
+function renderPureBondReferenceFund(fund) {
+  const reference = window.FUND_STORE?.[fund.code];
+  if (!reference || !window.__PB) return false;
   document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
-  document.body.classList.toggle("pure-bond-reference-page", fund.category === "pure-bond");
+  document.body.classList.remove("pure-bond-reference-page");
+  window.__PB.setCurrent(reference);
+  const tabs = GENERIC_TABS["pure-bond"];
+  const wrap = (html) => `<div class="pb-scope">${html}</div>`;
+  const content = {
+    perf: wrap(window.__PB.renderPerf(reference)),
+    alloc: wrap(window.__PB.renderAlloc(reference)),
+    bond: wrap(window.__PB.renderBondStruct(reference)),
+    corr: wrap(window.__PB.renderCorr(reference)),
+    campisi: wrap(window.__PB.renderCampisi(reference)),
+    documents: genericTabLoadingPanel("公告原文"),
+  };
+  const overviewMetrics = `${metric("近1年收益", pct(fund.performance?.returns?.["1y"], 1, true))}${metric("近3年收益", pct(fund.performance?.returns?.["3y"], 1, true))}${metric("近1年最大回撤", pct(fund.performance?.drawdowns?.["1y"], 1))}${metric("最新杠杆", Number.isFinite(Number(fund.asset?.leverage)) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", Number.isFinite(Number(fund.duration?.value)) ? `${num(fund.duration.value, 2)}年` : "—")}`;
+  page.innerHTML = `
+    <a class="back-link" href="index.html#samples">← 返回基金列表</a>
+    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span><span class="tag">份额已合并</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
+    <section class="fund-page-metrics">${overviewMetrics}</section>
+    <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
+    <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
+    <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>披露持仓是报告期快照，不代表实时持仓；研究结果不构成投资建议。</li></ul></section>`;
+  const loadedTabs = new Set(["perf", "alloc", "bond", "corr", "campisi"]);
+  bindTabs(async (id) => {
+    if (id !== "documents" || loadedTabs.has(id)) return;
+    const target = document.querySelector('[data-panel="documents"]');
+    if (!target) return;
+    target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
+    loadedTabs.add(id);
+  });
+  bindPureBondReferenceInteractions();
+  window.__PB.ensureDurKF(reference.code, () => {
+    try { window.__PB.refreshDurKF(); } catch (_error) {}
+  });
+  return true;
+}
+
+function bindPureBondReferenceInteractions() {
+  const runClick = (action) => {
+    let match = action.match(/^setNavRange\('([^']*)','([^']*)','([^']*)'\)$/);
+    if (match) return window.setNavRange(match[1], match[2], match[3]);
+    match = action.match(/^togglePeerPctlFac\('([^']*)'\)$/);
+    if (match) return window.togglePeerPctlFac(match[1]);
+    match = action.match(/^switchTab\('([^']*)'\)$/);
+    if (match) return window.switchTab(match[1]);
+    const actions = {
+      "resetNavZoom()": window.resetNavZoom,
+      "resetIdxZoom()": window.resetIdxZoom,
+      "doCompare()": window.doCompare,
+      "clearCompare()": window.clearCompare,
+    };
+    return actions[action]?.();
+  };
+  page.addEventListener("click", (event) => {
+    const control = event.target.closest("[data-pb-onclick]");
+    if (!control || !page.contains(control)) return;
+    runClick(control.dataset.pbOnclick || "");
+  });
+  page.addEventListener("change", (event) => {
+    const control = event.target.closest("[data-pb-onchange]");
+    if (!control || !page.contains(control)) return;
+    const action = control.dataset.pbOnchange || "";
+    const value = control.value;
+    const simple = {
+      "switchBondPeriod(this.value)": window.switchBondPeriod,
+      "switchCorrWin(this.value)": window.switchCorrWin,
+      "switchFacWin(this.value)": window.switchFacWin,
+      "switchIndexBucket(this.value)": window.switchIndexBucket,
+      "switchIndexCorrWin(this.value)": window.switchIndexCorrWin,
+      "switchPeerFac(this.value)": window.switchPeerFac,
+    };
+    if (simple[action]) return simple[action](value);
+    if (action.startsWith("if(this.value)")) {
+      const input = document.getElementById("cmpBox");
+      if (value && input) {
+        input.value = value;
+        window.doCompare();
+      }
+      return;
+    }
+    if (action === "cmpWin=this.value;renderCompare()") {
+      window.__PB.setCompareWindow(value);
+    } else if (action === "cmpFac=this.value;renderCompare()") {
+      window.__PB.setCompareFactor(value);
+    }
+  });
+  page.addEventListener("focusin", (event) => {
+    if (event.target.closest("[data-pb-onfocus]")) window.fillCmpOptions();
+  });
+  page.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target.closest("[data-pb-onkeydown]")) window.doCompare();
+  });
+}
+
+function renderGenericFund(fund, detail) {
+  if (fund.category === "pure-bond" && renderPureBondReferenceFund(fund)) return;
+  document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
+  document.body.classList.remove("pure-bond-reference-page");
   const tabs = fund.category === "pure-bond"
     ? [["research", "纯债研究报告"], ["documents", "公告原文"]]
     : (GENERIC_TABS[fund.category] || GENERIC_TABS["active-equity"]);
@@ -5304,6 +5440,7 @@ if (!fundId && !fundCode) {
       if (!catalogFund) throw new Error("没有找到该基金的研究数据");
       if (!genericDetail) throw new Error("该基金的净值详情尚未生成");
       if (catalogFund.category === "active-equity") await loadDashboardAsset("active_equity_profiles.js");
+      if (catalogFund.category === "pure-bond") await loadPureBondReferenceBundle(catalogFund.code).catch(() => null);
       renderGenericFund(catalogFund, genericDetail);
     })
     .catch((error) => showError(error.message));
