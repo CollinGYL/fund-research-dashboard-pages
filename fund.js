@@ -5014,6 +5014,7 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
       ...previous,
       dates: currentDuration.dates,
       dur: currentDuration.duration,
+      truth: durationHistory.map((item) => ({ dt: item.dt, dur: item.dur })),
       meta: {
         ...(previous.meta || {}),
         q: currentDuration.meta?.q,

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-04T13:52:53+08:00",
+  "generatedAt": "2026-09-04T15:23:00+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -10,7 +10,7 @@
     },
     "fund.html": {
       "size": 2349,
-      "sha256": "73ff731b79eff8854dd74784e4c483631277f16eb8ebd5368e804bd05fff8da1"
+      "sha256": "f015c6c979975a6e7e114e0b5743d70116775f290bba9997db389c31d0501342"
     },
     "styles.css": {
       "size": 112150,
@@ -29,8 +29,8 @@
       "sha256": "cf0a76d3b58a2b85413fb0b4a229c0babe94f11e7dcbe446738843815aed7eec"
     },
     "fund.js": {
-      "size": 423236,
-      "sha256": "58844c05a84c5b660c0700dca2f6b60728231faaa86d1dd714fdfadf100077a0"
+      "size": 423314,
+      "sha256": "0f74d2e6382aea61a3d5bcb53ce27cf537e8006a3aeb6ea03e34a3d370289fb8"
     },
     "robots.txt": {
       "size": 26,
