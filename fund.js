@@ -12,6 +12,7 @@ const STOCK_PRICE_UPDATE_SHARD_COUNT = 64;
 const pureBondResearchPromises = new Map();
 const PURE_BOND_RESEARCH_SHARD_COUNT = 64;
 const dashboardAssetPromises = new Map();
+const DASHBOARD_DATA_VERSION = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }).replaceAll("-", "");
 
 const DASHBOARD_GLOBAL_ASSETS = {
   "stock_classification.js": "FUND_STOCK_CLASSIFICATION",
@@ -32,7 +33,7 @@ function loadDashboardAsset(filename) {
   if (dashboardAssetPromises.has(filename)) return dashboardAssetPromises.get(filename);
   const promise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${filename}`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${filename}?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => window[globalName]
       ? resolve(window[globalName])
       : reject(new Error(`${filename} 未生成有效内容`));
@@ -334,7 +335,7 @@ function renderNavChart(points, fundName, benchmarkName) {
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   const padding = Math.max((rawMax - rawMin) * 0.1, 0.03);
-  const min = Math.max(0, rawMin - padding);
+  const min = rawMin >= 0 ? Math.max(0, rawMin - padding) : rawMin - padding;
   const max = rawMax + padding;
   const x = (index) => margin.left + (index / (points.length - 1)) * (width - margin.left - margin.right);
   const y = (value) => margin.top + ((max - value) / Math.max(max - min, 0.01)) * (height - margin.top - margin.bottom);
@@ -713,7 +714,7 @@ function renderMiniLineChart(series, lines, ariaLabel) {
     <div class="mini-chart-legend">${lines.map((line) => `<span style="--line-color:${line.color}">${escapeHTML(line.label)}</span>`).join("")}</div>
     <div class="nav-chart-wrap mini-line-chart-wrap"><svg class="nav-chart mini-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(ariaLabel)}" data-min="${min}" data-max="${max}" data-labels="${escapeHTML(lines.map((line) => line.label).join("|"))}">
       ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 9}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${miniLineValue(tick, formats[0])}</text>`).join("")}
-      ${lines.map((line) => `<polyline points="${series.map((item, index) => `${x(index).toFixed(1)},${y(Number(item[line.key])).toFixed(1)}`).join(" ")}" class="chart-line" style="stroke:${line.color};stroke-width:${line.width || 2.5}"/>`).join("")}
+      ${lines.map((line) => `<polyline points="${series.map((item, index) => [index, Number(item[line.key])]).filter(([, value]) => Number.isFinite(value)).map(([index, value]) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(" ")}" class="chart-line" style="stroke:${line.color};stroke-width:${line.width || 2.5}"/>`).join("")}
       ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label chart-axis-date" text-anchor="${index === 0 ? "start" : index === series.length - 1 ? "end" : "middle"}">${escapeHTML(series[index].report_date.slice(0, 7))}</text>`).join("")}
       ${series.map((item, index) => `<g class="mini-line-data" data-date="${escapeHTML(item.report_date)}" data-values="${lines.map((line) => Number(item[line.key])).join("|")}" data-x="${x(index).toFixed(2)}"></g>`).join("")}
       <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="mini-line-crosshair" hidden/>
@@ -3329,7 +3330,7 @@ function bindPureBondResearchNavigation() {
   });
 }
 
-function genericPureBondDeepResearchPanel(fund, detail, research, campisi, kalmanDuration) {
+function genericPureBondDeepResearchPanelLegacy(fund, detail, research, campisi, kalmanDuration) {
   if (!research) {
     return `<div class="panel-intro"><div><p class="eyebrow">PURE BOND DEEP RESEARCH</p><h2>纯债深度研究</h2></div><p>全量深度研究分片尚未生成；业绩、资产、券种和Campisi等既有页签仍可正常使用。</p></div>`;
   }
@@ -3450,6 +3451,228 @@ function genericPureBondDeepResearchPanel(fund, detail, research, campisi, kalma
     ${pureBondResearchGroup("05", "收益来源与产品费率", "会计利润来源与份额费用分开解释", "半年报 / 年报", accountingSection)}
     ${pureBondResearchGroup("06", "管理结构与机构持有", "经理任期解释策略断点，FOF持有提供机构视角", "公告 / 季报", managerSection)}
     <section class="data-boundary pure-bond-research-boundary"><div><p class="eyebrow">METHOD & SOURCE</p><h2>方法与数据边界</h2></div><ul><li>复权净值使用WDS历史基线，并由Choice增量覆盖层续接最新日期。</li><li>PIT同类池使用基金分类历史进入/退出区间，不用当前存续名单回看历史。</li><li>资产配置、申赎、财务报表、FOF持有、费率和经理记录来自本机WDS派生结果；付费原始表不上传网页。</li><li>日频久期Kalman只观测截至当日的净值和债券指数；披露久期只做事后对照。</li><li>经理季报文字情感在同事样板中依赖手工标签，未伪装成可自动更新模块；后续如接入会单独标注文本模型与复核状态。</li><li>本页迁移两套参考项目中可推广的方法，不复制样板基金硬编码。</li></ul></section>`;
+}
+
+function pureBondReferenceCard(number, title, frequency, body, source, options = {}) {
+  return `<article class="pb-report-card${options.wide ? " is-wide" : ""}${options.compact ? " is-compact" : ""}">
+    <header class="pb-report-card-head"><span>${escapeHTML(number)}</span><div><h3>${escapeHTML(title)}</h3>${options.subtitle ? `<p>${escapeHTML(options.subtitle)}</p>` : ""}</div><b>${escapeHTML(frequency)}</b></header>
+    <div class="pb-report-card-body">${body}</div>
+    <footer><strong>数据来源</strong><span>${escapeHTML(source)}</span></footer>
+  </article>`;
+}
+
+function pureBondReferenceSection(index, title, subtitle, cards) {
+  return `<section class="pb-report-section" id="pb-report-section-${escapeHTML(index)}">
+    <header class="pb-report-section-head"><span>${escapeHTML(index)}</span><div><h2>${escapeHTML(title)}</h2><p>${escapeHTML(subtitle)}</p></div></header>
+    <div class="pb-report-card-grid">${cards.join("")}</div>
+  </section>`;
+}
+
+function pureBondRollingSeries(navPoints, window = 63, step = 21) {
+  const result = [];
+  for (let index = window; index < navPoints.length; index += step) {
+    const slice = navPoints.slice(index - window, index + 1);
+    const levels = slice.map((item) => Number(item.fund));
+    const daily = levels.slice(1).map((value, offset) => value / levels[offset] - 1);
+    const mean = daily.reduce((sum, value) => sum + value, 0) / Math.max(daily.length, 1);
+    const variance = daily.length > 1 ? daily.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (daily.length - 1) : 0;
+    result.push({
+      report_date: navPoints[index].date,
+      rolling_return: levels.at(-1) / levels[0] - 1,
+      rolling_volatility: Math.sqrt(variance) * Math.sqrt(252),
+    });
+  }
+  return result;
+}
+
+function pureBondNavAndDrawdownSeries(navPoints) {
+  if (!navPoints.length) return [];
+  const first = Number(navPoints[0].fund);
+  let peak = first;
+  return navPoints.filter((_, index) => index % 5 === 0 || index === navPoints.length - 1).map((item) => {
+    const value = Number(item.fund);
+    peak = Math.max(peak, value);
+    return { report_date: item.date, normalized_nav: value / first, drawdown_depth: 1 - value / peak };
+  });
+}
+
+function pureBondNormalizedBenchmarkSeries(navPoints, code) {
+  const benchmark = window.FUND_COMMON_BENCHMARKS?.benchmarks?.[code];
+  if (!benchmark?.series?.length || !navPoints.length) return [];
+  const navMap = new Map(navPoints.map((item) => [item.date, Number(item.fund)]));
+  const common = benchmark.series.filter(([date, value]) => navMap.has(date) && Number.isFinite(Number(value)) && Number(value) > 0);
+  if (common.length < 2) return [];
+  const fundStart = navMap.get(common[0][0]);
+  const indexStart = Number(common[0][1]);
+  return common.filter((_, index) => index % 5 === 0 || index === common.length - 1).map(([date, value]) => ({
+    report_date: date,
+    fund_level: navMap.get(date) / fundStart,
+    index_level: Number(value) / indexStart,
+  }));
+}
+
+function projectSimplex(values) {
+  const sorted = [...values].sort((left, right) => right - left);
+  let cumulative = 0;
+  let rho = 0;
+  sorted.forEach((value, index) => {
+    cumulative += value;
+    if (value - (cumulative - 1) / (index + 1) > 0) rho = index + 1;
+  });
+  const theta = (sorted.slice(0, rho).reduce((sum, value) => sum + value, 0) - 1) / Math.max(rho, 1);
+  return values.map((value) => Math.max(0, value - theta));
+}
+
+function pureBondRbsaDuration(navPoints) {
+  const specifications = [
+    ["CBA00621.CS", 1.85], ["CBA00631.CS", 3.73], ["CBA00641.CS", 5.41],
+    ["CBA00651.CS", 7.56], ["CBA00661.CS", 17.60],
+  ];
+  const benchmarks = window.FUND_COMMON_BENCHMARKS?.benchmarks || {};
+  if (specifications.some(([code]) => !benchmarks[code]?.series?.length)) return [];
+  const seriesMaps = specifications.map(([code]) => new Map(benchmarks[code].series.map(([date, value]) => [date, Number(value)])));
+  const rows = [];
+  for (let index = 1; index < navPoints.length; index += 1) {
+    const current = navPoints[index];
+    const previous = navPoints[index - 1];
+    const factorReturns = seriesMaps.map((map) => {
+      const now = map.get(current.date);
+      const prior = map.get(previous.date);
+      return Number.isFinite(now) && Number.isFinite(prior) && prior > 0 ? now / prior - 1 : null;
+    });
+    if (factorReturns.every(Number.isFinite)) rows.push({ date: current.date, y: Number(current.fund) / Number(previous.fund) - 1, x: [0, ...factorReturns] });
+  }
+  const byMonth = new Map();
+  rows.forEach((row) => { const key = row.date.slice(0, 7); if (!byMonth.has(key)) byMonth.set(key, []); byMonth.get(key).push(row); });
+  return [...byMonth.entries()].slice(-72).map(([month, observations]) => {
+    if (observations.length < 12) return null;
+    let weights = Array(6).fill(1 / 6);
+    let maximumNorm = 0;
+    observations.forEach((row) => { maximumNorm = Math.max(maximumNorm, row.x.reduce((sum, value) => sum + value * value, 0)); });
+    const step = 0.45 / Math.max(maximumNorm * observations.length, 1e-8);
+    for (let iteration = 0; iteration < 500; iteration += 1) {
+      const gradient = Array(6).fill(0);
+      observations.forEach((row) => {
+        const residual = row.x.reduce((sum, value, index) => sum + value * weights[index], 0) - row.y;
+        row.x.forEach((value, index) => { gradient[index] += 2 * value * residual; });
+      });
+      weights = projectSimplex(weights.map((value, index) => value - step * gradient[index]));
+    }
+    const duration = weights.slice(1).reduce((sum, value, index) => sum + value * specifications[index][1], 0);
+    return { report_date: `${month}-28`, duration, observations: observations.length };
+  }).filter(Boolean);
+}
+
+function pureBondManagerFingerprintRows(research, detail) {
+  const nav = genericFundNavPoints(detail);
+  const assets = detail?.asset_history || [];
+  const duration = detail?.duration_history || [];
+  return (research?.manager_history || []).slice().reverse().map((manager) => {
+    const end = manager.end || research.as_of || nav.at(-1)?.date;
+    const selected = nav.filter((item) => item.date >= manager.start && (!end || item.date <= end));
+    const stats = performanceStats(selected);
+    const assetRows = assets.filter((item) => item.date >= manager.start && (!end || item.date <= end));
+    const durationRows = duration.filter((item) => item.date >= manager.start && (!end || item.date <= end));
+    const average = (rows, key) => { const values = rows.map((item) => Number(item[key])).filter(Number.isFinite); return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null; };
+    return [
+      `<strong>${escapeHTML(manager.name)}</strong><small>${escapeHTML(manager.start)}—${escapeHTML(manager.end || "至今")}</small>`,
+      stats ? pct(stats.annualizedReturn, 2, true) : "—",
+      stats ? pct(stats.maxDrawdown, 2) : "—",
+      Number.isFinite(average(durationRows, "duration")) ? `${num(average(durationRows, "duration"), 2)}年` : "—",
+      Number.isFinite(average(assetRows, "leverage")) ? `${num(average(assetRows, "leverage"), 2)}x` : "—",
+      Number.isFinite(average(assetRows, "financial_bond")) ? pct(average(assetRows, "financial_bond"), 1) : "—",
+    ];
+  });
+}
+
+function pureBondReferenceReportPanel(fund, detail, research, campisi, kalmanDuration, bondHistory) {
+  if (!research) return genericPureBondDeepResearchPanelLegacy(fund, detail, research, campisi, kalmanDuration);
+  const nav = genericFundNavPoints(detail);
+  const stats = performanceStats(nav);
+  const riskRows = genericRiskStatsRows(nav);
+  const navDrawdown = pureBondNavAndDrawdownSeries(nav);
+  const rolling = pureBondRollingSeries(nav);
+  const pit = (research.pit_performance || []).filter((item) => item.return && item.sharpe && item.drawdown);
+  const pitSeries = pit.map((item) => ({ report_date: item.report_date, return_percentile: item.return.percentile, sharpe_percentile: item.sharpe.percentile, drawdown_percentile: item.drawdown.percentile }));
+  const assetHistory = (detail?.asset_history || []).map((item) => ({ report_date: item.date, bond: item.bond, financial: item.financial_bond, corporate: item.corporate_bond, government: item.government_bond, cash: item.cash, leverage: item.leverage, scale: Number(item.net_asset) / 1e8 }));
+  const durationHistory = (detail?.duration_history || []).map((item) => ({ report_date: item.date, duration: item.duration }));
+  const flows = research.flows || [];
+  const repo = research.repo_financing || [];
+  const income = research.income_structure || [];
+  const fof = research.fof_holdings || [];
+  const feePeer = research.fee_peer || {};
+  const sharePerformance = research.share_class_performance;
+  const currentPeer = research.current_peer || {};
+  const campisiWindow = campisi?.windows?.all || campisi?.windows?.["5y"] || campisi?.windows?.["3y"] || campisi?.windows?.["1y"];
+  const campisiRolling = (campisi?.rolling || []).map((row) => ({ report_date: row[0], level: row[1], slope: row[2], curve: row[3], credit: row[4], default: row[5], r2: row[6] }));
+  const rbsa = pureBondRbsaDuration(nav);
+  const kalmanSeries = (kalmanDuration?.dates || []).map((date, index) => ({ report_date: date, duration: Number(kalmanDuration.duration?.[index]) })).filter((item) => Number.isFinite(item.duration));
+  const contract = pureBondNormalizedBenchmarkSeries(nav, "CBA00203.CS");
+  const feeRows = (research.share_classes || []).map((item) => [
+    `<strong>${escapeHTML(item.name || item.code)}</strong><small>${escapeHTML(item.code)}</small>`,
+    pct(item.management_fee, 3), feePeer.management_fee ? pct(feePeer.management_fee.average, 3) : "—",
+    pct(item.custodian_fee, 3), pct(item.sales_service_fee, 3),
+  ]);
+  const shareRows = (sharePerformance?.years || []).slice().reverse().map((item) => [String(item.year), pct(item.a_return, 2, true), pct(item.c_return, 2, true), pct(item.gap, 2, true)]);
+  const latestBond = bondHistory?.at(-1);
+  const gapItems = [
+    ["净值", nav.length > 1, `${nav.length}个交易日`], ["资产配置", assetHistory.length > 0, `${assetHistory.length}个报告期`],
+    ["逐券披露", Boolean(latestBond), `${bondHistory?.length || 0}个报告期`], ["披露久期", durationHistory.length > 0, `${durationHistory.length}个报告期`],
+    ["日频Kalman", kalmanSeries.length > 1, kalmanSeries.length ? `${kalmanSeries[0].report_date}—${kalmanSeries.at(-1).report_date}` : "无结果"],
+    ["Campisi", Boolean(campisiWindow), campisiWindow ? `${campisiWindow.n}个共同样本` : "共同样本不足"], ["经理评述", Boolean(research.commentary?.length), `${research.commentary?.length || 0}份`],
+  ];
+  const cards = [];
+  cards.push(pureBondReferenceCard("基础知识", "风险等级与 A/C 费用模式", "静态知识", `<div class="pb-knowledge-grid"><p><b>R1</b>低风险</p><p><b>R2</b>中低风险</p><p><b>R3</b>中风险</p><p><b>R4</b>中高风险</p><p><b>R5</b>高风险</p></div><div class="pb-explain"><strong>A类</strong>通常收取申购费、不收销售服务费，较适合长期持有。<strong>C/E类</strong>通常不收申购费、按日计提销售服务费，短期持有成本可能更低；具体仍以产品合同为准。</div>`, "基金合同通行口径；具体费率以基金公告为准", { wide: true }));
+  cards.push(pureBondReferenceCard("费率清单", "本基金 vs 同类平均", "最新存续份额", feeRows.length ? renderTable(["份额", "管理费", "同类平均", "托管费", "销售服务费"], feeRows) : '<p class="empty-copy">当前存续份额费率不足。</p>', "WDS基金基本资料；同类按长/短期纯债初始份额去重", { wide: true }));
+  cards.push(pureBondReferenceCard("①", "业绩与风险", "日频", `${riskRows.length ? renderTable(["区间", "累计收益", "年化收益", "年化波动", "最大回撤", "Sharpe", "Calmar"], riskRows) : '<p class="empty-copy">净值样本不足。</p>'}<p class="pb-key-reading">成立以来年化收益 ${stats ? pct(stats.annualizedReturn, 2, true) : "—"}；最大回撤 ${stats ? pct(stats.maxDrawdown, 2) : "—"}，发生于 ${stats?.drawdownStart || "—"} 至 ${stats?.drawdownEnd || "—"}。</p>`, "WDS复权净值 + Choice增量净值", { wide: true }));
+  cards.push(pureBondReferenceCard("②", "净值走势 & 回撤", "日频", navDrawdown.length > 1 ? `${renderMiniLineChart(navDrawdown, [{ key: "normalized_nav", label: "复权净值（起点=1）", color: "#0a6fb0", width: 3 }], `${fund.name}净值走势`)}${renderMiniLineChart(navDrawdown, [{ key: "drawdown_depth", label: "回撤深度", color: "#c20000", width: 2.5 }], `${fund.name}回撤深度`)}` : '<p class="empty-copy">净值样本不足。</p>', "WDS复权净值 + Choice增量净值", { wide: true }));
+  cards.push(pureBondReferenceCard("③", "滚动业绩稳定性", "63交易日滚动", rolling.length > 1 ? renderMiniLineChart(rolling, [{ key: "rolling_return", label: "滚动收益", color: "#0a6fb0", width: 2.8 }, { key: "rolling_volatility", label: "滚动年化波动", color: "#c20000", width: 2.2 }], `${fund.name}滚动业绩稳定性`) : '<p class="empty-copy">历史长度不足。</p>', "复权净值；63交易日窗口、21交易日步长", { wide: true }));
+  cards.push(pureBondReferenceCard("④", "同类业绩分位（PIT · 防幸存者偏差）", "逐季", pitSeries.length > 1 ? `${renderMiniLineChart(pitSeries, [{ key: "return_percentile", label: "收益分位", color: "#0a6fb0", width: 2.8 }, { key: "sharpe_percentile", label: "Sharpe分位", color: "#122844", width: 2.3 }, { key: "drawdown_percentile", label: "低回撤分位", color: "#c20000", width: 2.3 }], `${fund.name}PIT同类分位`)}<p class="method-note">分位越高表示当时同类中的相对位置越靠前；历史同类池按当时分类进入/退出区间重建。</p>` : '<p class="empty-copy">PIT同类样本不足。</p>', "WDS历史行业分类区间 + 复权净值", { wide: true }));
+  cards.push(pureBondReferenceCard("⑤", "A/C 份额对比 · 费率差", "日频净值 / 年度汇总", shareRows.length ? `${renderTable(["年度", sharePerformance.a.name || "A类", sharePerformance.c.name || "C类", "A-C收益差"], shareRows)}<p class="pb-key-reading">历史年度平均收益差：${pct(sharePerformance.average_gap, 3, true)}。份额净值差主要来自费率，不代表底层组合不同。</p>` : '<p class="empty-copy">缺少可比的A/C类份额或共同净值历史。</p>', "WDS复权净值与基金费率资料", { wide: true }));
+  cards.push(pureBondReferenceCard("⑥", "vs 业绩比较基准", "日频", contract.length > 1 ? `${renderMiniLineChart(contract, [{ key: "fund_level", label: fund.name, color: "#c20000", width: 3 }, { key: "index_level", label: "中债综合全价(总值)指数", color: "#0a6fb0", width: 2.5 }], `${fund.name}与合同字面基准对照`)}<div class="pb-benchmark-warning"><strong>口径提醒</strong>合同常写“中债综合全价”，不含票息再投资；基金复权净值包含分红再投资。长期超额会被这一口径差异机械放大，研究对照应同时查看财富指数。</div>` : '<p class="empty-copy">合同字面基准共同数据不足。</p>', "基金复权净值；中债综合全价(总值)指数 CBA00203", { wide: true }));
+
+  cards.push(pureBondReferenceCard("⑦", "风格漂移 · 券种占比逐季演变", "季报/半年报", assetHistory.length > 1 ? renderMiniLineChart(assetHistory, [{ key: "financial", label: "金融债", color: "#0a6fb0", width: 2.8 }, { key: "corporate", label: "企业债", color: "#c20000", width: 2.4 }, { key: "government", label: "政府债", color: "#122844", width: 2.4 }, { key: "cash", label: "现金", color: "#999", width: 2 }], `${fund.name}券种占比演变`) : '<p class="empty-copy">券种历史不足。</p>', "基金定期报告资产配置；占净值比例", { wide: true }));
+  cards.push(pureBondReferenceCard("⑧", "杠杆演变", "季报/半年报", assetHistory.length > 1 ? `${renderMiniLineChart(assetHistory, [{ key: "leverage", label: "总资产/净资产", color: "#c20000", width: 3, format: "number" }], `${fund.name}杠杆演变`)}<p class="method-note">开放式基金通常受140%总资产/净资产上限约束，定期开放或封闭式产品口径可能不同；异常值需回查报告。</p>` : '<p class="empty-copy">杠杆历史不足。</p>', "定期报告总资产与净资产；Choice组合杠杆增量", { wide: true }));
+  cards.push(pureBondReferenceCard("⑨", "持仓结构 vs 同类", "最新截面", `${pureBondPeerPositionRow("披露久期", currentPeer.duration, (value) => `${num(value, 2)}年`, "仅使用定期报告反推久期")}${pureBondPeerPositionRow("杠杆", currentPeer.leverage, (value) => `${num(value, 2)}x`, "总资产/净资产")}${pureBondPeerPositionRow("金融债", currentPeer.financial_bond, (value) => pct(value, 1), "占基金净值")}${pureBondPeerPositionRow("企业债", currentPeer.corporate_bond, (value) => pct(value, 1), "占基金净值")}`, "同一长/短期纯债子类当前截面；底层基金去重"));
+  cards.push(pureBondReferenceCard("⑩", "逐券持仓明细", "季报", latestBond ? genericBondHistoryTable(latestBond, false) : '<p class="empty-copy">暂无重仓债券披露。</p>', "基金定期报告重仓债券；债券特征为Choice最新快照", { wide: true }));
+
+  cards.push(pureBondReferenceCard("⑪", "五因子数学构造 · Duration-Neutral Long-Short + Gram-Schmidt正交化", "方法", `<div class="pb-formula"><b>基金日收益</b><code>rₜ = α + β₁Levelₜ + β₂Slopeₜ + β₃Curveₜ + β₄Creditₜ + β₅Defaultₜ + εₜ</code><p>利率水平、曲线斜率、曲线凸度、信用利差与违约利差先做久期中性多空构造，再用 Gram-Schmidt 顺序正交化，降低因子共线性。</p><p>本页是基于净值的 Return-Based Attribution，不等同于逐券交易归因。</p></div>`, "沿用同事因子正交化生成脚本的方法定义", { wide: true }));
+  const betaRows = campisiWindow ? ["level", "slope", "curve", "credit", "default"].map((key) => [CAMPISI_LABELS[key], num(campisiWindow.betas?.[key], 4), num(campisiWindow.t_values?.[key], 2), pct(campisiWindow.contributions?.[key], 2, true)]) : [];
+  cards.push(pureBondReferenceCard("⑫", "五因子暴露 · Campisi/RBA净值归因", "日频 / 多窗口", betaRows.length ? `${renderTable(["因子", "Beta", "t值", "收益贡献"], betaRows)}${renderCampisiPeerPosition(campisi, campisiWindow)}` : '<p class="empty-copy">五因子共同样本不足。</p>', "正交化债券因子 + 基金复权净值", { wide: true }));
+  cards.push(pureBondReferenceCard("⑬", "收益贡献分解", "日频 / 多窗口", campisiWindow ? `${renderCampisiWaterfall(campisiWindow)}<section class="research-metric-grid metric-four">${metric("模型合计", pct(campisiWindow.contributions?.total, 2, true))}${metric("主动管理Alpha", pct(campisiWindow.contributions?.alpha, 2, true))}${metric("拟合优度R²", num(campisiWindow.r2, 3))}${metric("共同样本", `${campisiWindow.n}日`)}</section>` : '<p class="empty-copy">归因样本不足。</p>', "Campisi五因子日收益回归", { wide: true }));
+  cards.push(pureBondReferenceCard("⑭", "因子暴露时间演变 · 本基金 vs 全市场", "60日滚动", campisiRolling.length > 1 ? `${renderMiniLineChart(campisiRolling, [{ key: "level", label: "利率水平", color: "#0a6fb0", width: 2.6, format: "number" }, { key: "credit", label: "信用利差", color: "#c20000", width: 2.3, format: "number" }, { key: "default", label: "违约利差", color: "#122844", width: 2.2, format: "number" }], `${fund.name}因子暴露时间演变`)}<p class="method-note">全市场位置见上一卡的同类百分位；滚动曲线用于观察本基金自身暴露迁移。</p>` : '<p class="empty-copy">滚动因子数据将在Campisi v3重建后展示。</p>', "Campisi 60交易日滚动回归；20交易日步长", { wide: true }));
+
+  cards.push(pureBondReferenceCard("⑮", "久期时间序列（反推）", "半年报/年报", durationHistory.length > 1 ? renderMiniLineChart(durationHistory, [{ key: "duration", label: "披露持仓反推久期", color: "#122844", width: 3, format: "years" }], `${fund.name}披露久期`) : '<p class="empty-copy">披露久期历史不足。</p>', "定期报告债券持仓 + 债券最新久期特征；仅作披露期近似", { wide: true }));
+  cards.push(pureBondReferenceCard("⑯", "月度久期测算 · 收益率反推法（RBSA对照）", "月度 / 日频在线", `${rbsa.length > 1 ? renderMiniLineChart(rbsa, [{ key: "duration", label: "月度RBSA久期", color: "#0a6fb0", width: 2.8, format: "years" }], `${fund.name}月度RBSA久期`) : '<p class="empty-copy">RBSA需要5个中债国债期限桶，当前公共指数分片重建后展示。</p>'}${kalmanSeries.length > 1 ? renderMiniLineChart(kalmanSeries.filter((_, index) => index % 5 === 0 || index === kalmanSeries.length - 1), [{ key: "duration", label: "日频Kalman久期", color: "#c20000", width: 2.7, format: "years" }], `${fund.name}日频Kalman久期`) : '<p class="empty-copy">日频Kalman暂无结果。</p>'}<div class="pb-model-boundary"><strong>不要混用：</strong>RBSA按月用当月完整数据回看；Kalman只观测截至当日净值与债券指数，可用于在线估计，但不等于真实披露久期。高共线、低R²或披露偏差大时应降级为“不可靠”。</div>`, "同事RBSA生成脚本 + 仅观测净值Kalman模型", { wide: true }));
+
+  cards.push(pureBondReferenceCard("⑰", "收益来源结构", "半年报/年报", renderPureBondIncomeBreakdown(income), "基金利润表；年内累计值还原为单期"));
+  cards.push(pureBondReferenceCard("⑱", "回购融资 · 借了多少钱", "季报/半年报", repo.length > 1 ? `${renderMiniLineChart(repo, [{ key: "repo_to_nav", label: "回购负债/净资产", color: "#c20000", width: 2.8 }, { key: "leverage", label: "总资产/净资产", color: "#122844", width: 2.5, format: "number" }], `${fund.name}回购融资`)}<p class="method-note">回购融资与杠杆同向但并非一一对应；需结合现金、应付款和估值日判断。</p>` : '<p class="empty-copy">回购融资历史不足。</p>', "基金资产负债表 + 资产配置"));
+  cards.push(pureBondReferenceCard("⑲", "规模演变", "季报/半年报", assetHistory.length > 1 ? renderMiniLineChart(assetHistory, [{ key: "scale", label: "净资产（亿元）", color: "#0a6fb0", width: 3, format: "number" }], `${fund.name}规模演变`) : '<p class="empty-copy">规模历史不足。</p>', "基金定期报告净资产"));
+  cards.push(pureBondReferenceCard("⑳", "申赎压力（A类）", "季报", flows.length ? `${renderSignedBarChart(flows, `${fund.name}净申购率`)}${renderTable(["报告期", "申购（亿份）", "赎回（亿份）", "净流量（亿份）", "净申购率"], flows.slice(-10).reverse().map((item) => [item.report_date, num(item.purchase, 2), num(item.redemption, 2), num(item.net, 2), pct(item.net_rate, 2, true)]))}` : '<p class="empty-copy">申赎份额历史不足。</p>', "基金份额变动表；同底层份额聚合", { wide: true }));
+  const latestFof = fof.at(-1);
+  cards.push(pureBondReferenceCard("㉑", "聪明钱因子 · FOF持仓视角", "半年报/年报", latestFof ? `<section class="research-metric-grid metric-three">${metric("持有FOF数", `${latestFof.holder_count}只`)}${metric("披露持有市值", `${num(latestFof.holding_value, 2)}亿元`)}${metric("单产品最高仓位", pct(latestFof.max_weight, 2))}</section>${renderTable(["FOF产品", "持有市值", "占FOF净值"], (latestFof.top_holders || []).map((item) => [`<strong>${escapeHTML(item.name)}</strong><small>${escapeHTML(item.code)}</small>`, `${num(item.value, 3)}亿元`, pct(item.weight, 2)]))}` : '<p class="empty-copy">暂无公募FOF披露持有。</p>', "公募FOF其他组合持仓；底层份额去重", { wide: true }));
+  cards.push(pureBondReferenceCard("㉒", "全市场净值相关性 · 正/负相关榜", "多窗口", genericCorrelationPanel(fund), "基金复权净值 + 债券财富指数；不同窗口共同样本", { wide: true }));
+
+  const commentaryRows = (research.commentary || []).slice(0, 8).map((item) => [escapeHTML(item.end), escapeHTML(item.report_type), escapeHTML((item.keywords || []).join("、") || "未命中关键词"), `<span class="pb-commentary-excerpt">${escapeHTML(item.excerpt)}</span>`]);
+  cards.push(pureBondReferenceCard("㉓", "基金经理评述 · 说的 vs 做的", "季报/半年报", commentaryRows.length ? `${renderTable(["报告期", "类型", "文字信号", "原文摘录"], commentaryRows)}<p class="method-note">本期只展示原文与关键词，不把手工样板标签伪装为全市场自动情感判断；“做的”请与上方券种、杠杆、久期变化联读。</p>` : '<p class="empty-copy">尚未取得基金经理运作回顾原文。</p>', "基金定期报告运作回顾 + 披露持仓", { wide: true }));
+  const managerRows = pureBondManagerFingerprintRows(research, detail);
+  cards.push(pureBondReferenceCard("㉔", "历任经理风格指纹", "任期", managerRows.length ? `${renderPureBondManagerTimeline(research.manager_history, research.as_of)}${renderTable(["经理与任期", "年化收益", "最大回撤", "平均久期", "平均杠杆", "平均金融债"], managerRows)}<p class="method-note">共管期如实保留，不强拆个人贡献；任期很短或净值样本不足时不做强结论。</p>` : '<p class="empty-copy">基金经理任期记录不足。</p>', "基金经理任职公告 + 任期内净值/披露结构", { wide: true }));
+  cards.push(pureBondReferenceCard("⚠", "数据缺口汇总", "自动检查", `<div class="pb-gap-grid">${gapItems.map(([label, available, note]) => `<div class="${available ? "ok" : "missing"}"><b>${available ? "✓" : "!"}</b><span><strong>${escapeHTML(label)}</strong><small>${escapeHTML(note)}</small></span></div>`).join("")}</div><p class="pb-key-reading">缺口不是零值。模型结果、披露值与实时真实持仓属于不同口径；页面不会用插值或推断伪造未披露数据。</p>`, "本页各分片的实时覆盖检查", { wide: true }));
+
+  const sections = [
+    pureBondReferenceSection("壹", "产品与业绩", "先回答产品怎么收费、赚了什么、承担了什么风险", cards.splice(0, 8)),
+    pureBondReferenceSection("贰", "持仓与风格", "把券种、杠杆、同类位置和逐券披露放在同一条证据链", cards.splice(0, 4)),
+    pureBondReferenceSection("叁", "五因子归因", "沿用因子正交化版的数学构造、收益贡献与滚动暴露", cards.splice(0, 4)),
+    pureBondReferenceSection("肆", "久期高频拟合", "披露反推、月度RBSA与日频Kalman分层呈现", cards.splice(0, 2)),
+    pureBondReferenceSection("伍", "规模、申赎与资金来源", "理解产品负债端和组合杠杆的约束", cards.splice(0, 5)),
+    pureBondReferenceSection("陆", "相关性与管理行为", "把全市场参照、经理表述和任期指纹连起来", cards.splice(0, 3)),
+    pureBondReferenceSection("柒", "数据边界", "明确哪些有数据、哪些只是模型、哪些仍然缺失", cards),
+  ];
+  return `<div class="pb-reference-report"><section class="pb-reference-hero"><div><p>PURE BOND · SINGLE FUND RESEARCH</p><h2>${escapeHTML(fund.name)}</h2><h3>纯债基金单产品详细分析</h3><span>${escapeHTML(fund.code)} · ${escapeHTML(fund.subtype)} · 数据截至 ${escapeHTML(research.as_of || fund.performance?.latest_date || "—")}</span></div><aside><b>27</b><small>研究卡片</small><em>日频净值 × 披露持仓 × 模型估计</em></aside></section><nav class="pb-report-toc">${["产品与业绩", "持仓与风格", "五因子归因", "久期高频拟合", "规模与申赎", "管理行为", "数据边界"].map((label, index) => `<a href="#pb-report-section-${["壹", "贰", "叁", "肆", "伍", "陆", "柒"][index]}">${escapeHTML(label)}</a>`).join("")}</nav>${sections.join("")}<section class="pb-reference-method"><strong>方法与口径</strong><p>页面以同事交付的因子正交化单基金报告为视觉和功能母版，使用本项目全市场分片重建；净值、披露和模型输出严格区分，付费原始表不上传网站。所有模型结论均需结合数据缺口与可靠性阅读，不构成投资建议。</p></section></div>`;
+}
+
+function genericPureBondDeepResearchPanel(fund, detail, research, campisi, kalmanDuration, bondHistory) {
+  return pureBondReferenceReportPanel(fund, detail, research, campisi, kalmanDuration, bondHistory);
 }
 
 function genericNavChartPoints(fund, detail) {
@@ -4116,7 +4339,7 @@ function loadCorrelationMetrics(code) {
   if (correlationMetricsPromises.has(shardName)) return correlationMetricsPromises.get(shardName);
   const promise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/correlations/${shardName}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/correlations/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => window.FUND_CORRELATION_METRICS?.funds?.[code]
       ? resolve(window.FUND_CORRELATION_METRICS)
       : reject(new Error("相关性数据脚本未生成有效内容"));
@@ -4455,7 +4678,7 @@ function bindGenericPerformancePanel(fund, detail) {
 
 function createGenericTabLoader(fund, detail) {
   const resourcePromises = new Map();
-  const loadedTabs = new Set(["performance"]);
+  const loadedTabs = new Set(fund.category === "pure-bond" ? [] : ["performance"]);
   const once = (key, loader) => {
     if (!resourcePromises.has(key)) {
       const promise = Promise.resolve().then(loader).catch((error) => {
@@ -4499,12 +4722,14 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (id === "research") {
-      const [research, campisiData, kalmanDuration] = await Promise.all([
-        pureBondResearch(), campisi(), pureBondDuration(),
+      const [research, campisiData, kalmanDuration, history] = await Promise.all([
+        pureBondResearch(), campisi(), pureBondDuration(), bondHistory(),
+        commonBenchmarks(), bondAssets(), correlation(),
       ]);
-      target.innerHTML = genericPureBondDeepResearchPanel(fund, detail, research, campisiData, kalmanDuration);
+      target.innerHTML = genericPureBondDeepResearchPanel(fund, detail, research, campisiData, kalmanDuration, history);
       bindMiniLineCharts();
       bindPureBondResearchNavigation();
+      bindGenericCorrelation(fund);
       return;
     }
     if (id === "assets") {
@@ -4619,7 +4844,10 @@ function createGenericTabLoader(fund, detail) {
 
 function renderGenericFund(fund, detail) {
   document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
-  const tabs = GENERIC_TABS[fund.category] || GENERIC_TABS["active-equity"];
+  document.body.classList.toggle("pure-bond-reference-page", fund.category === "pure-bond");
+  const tabs = fund.category === "pure-bond"
+    ? [["research", "纯债研究报告"], ["documents", "公告原文"]]
+    : (GENERIC_TABS[fund.category] || GENERIC_TABS["active-equity"]);
   const tabLabels = Object.fromEntries(tabs);
   const content = Object.fromEntries(tabs.map(([id, label]) => [
     id,
@@ -4640,9 +4868,11 @@ function renderGenericFund(fund, detail) {
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
     <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
     <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>${navSource}；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>披露持仓是报告期快照，不代表实时持仓；研究结果不构成投资建议。</li></ul></section>`;
-  bindTabs(createGenericTabLoader(fund, detail));
-  bindGenericPerformancePanel(fund, detail);
-  if (!detail?.benchmark?.length) {
+  const loadTab = createGenericTabLoader(fund, detail);
+  bindTabs(loadTab);
+  if (fund.category === "pure-bond") loadTab("research");
+  else bindGenericPerformancePanel(fund, detail);
+  if (fund.category !== "pure-bond" && !detail?.benchmark?.length) {
     loadDashboardAsset("common_benchmarks.js").then(() => {
       const performancePanel = document.querySelector('[data-panel="performance"]');
       if (!performancePanel) return;
@@ -4703,7 +4933,7 @@ function loadGenericDetail(code) {
   if (window.FUND_DETAIL_DATA?.[code]) return Promise.resolve(window.FUND_DETAIL_DATA[code]);
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/funds/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/funds/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     // 单个按基金拆分的连续序列缺失时，仍使用全量目录和公共数据渲染详情页。
     // 不能让一条可选数据失败阻断基金基础信息、收益回撤和持仓模块。
     script.onload = () => resolve(window.FUND_DETAIL_DATA?.[code] || null);
@@ -4724,7 +4954,7 @@ function loadDeepSampleData() {
   if (window.FUND_DEEP_SAMPLE_DATA) return Promise.resolve(window.FUND_DEEP_SAMPLE_DATA);
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/deep_samples.js";
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/deep_samples.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => window.FUND_DEEP_SAMPLE_DATA
       ? resolve(window.FUND_DEEP_SAMPLE_DATA)
       : reject(new Error("深度样本数据脚本未生成有效内容"));
@@ -4738,7 +4968,7 @@ function loadHoldingCharacteristicDates(dates) {
       if (window.FUND_HOLDING_CHARACTERISTICS?.[date]) return Promise.resolve();
       return new Promise((resolve) => {
         const script = document.createElement("script");
-        script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js`;
+        script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`;
         script.onload = script.onerror = () => resolve();
         document.head.appendChild(script);
       });
@@ -4773,7 +5003,7 @@ function loadGenericHoldingHistory(code) {
   if (window.FUND_HOLDING_HISTORY?.[code]) return loadCharacteristics(window.FUND_HOLDING_HISTORY[code]);
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holdings/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holdings/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => loadCharacteristics(window.FUND_HOLDING_HISTORY?.[code]).then(resolve);
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
@@ -4790,7 +5020,7 @@ function loadGenericStockPrice(code) {
     }
     return new Promise((resolve) => {
       const script = document.createElement("script");
-      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js`;
+      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
       script.onload = () => resolve(normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
       script.onerror = () => resolve([]);
       document.head.appendChild(script);
@@ -4812,7 +5042,7 @@ function loadGenericStockPrice(code) {
   } else {
     const shardPromise = new Promise((resolve) => {
       const script = document.createElement("script");
-      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_price_updates/${shardName}.js`;
+      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_price_updates/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`;
       script.onload = () => resolve(window.FUND_STOCK_PRICE_UPDATES?.[shardName] || null);
       script.onerror = () => resolve(null);
       document.head.appendChild(script);
@@ -4845,7 +5075,7 @@ function loadGenericHeavyStockTrends(code, detail) {
   if (window.FUND_HEAVY_STOCK_TRENDS?.[code]) return normalize(window.FUND_HEAVY_STOCK_TRENDS[code]);
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/heavy_stock/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/heavy_stock/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => normalize(window.FUND_HEAVY_STOCK_TRENDS?.[code]).then(resolve);
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
@@ -4913,7 +5143,7 @@ function loadGenericBondHistory(code) {
   if (window.FUND_BOND_HISTORY?.[code]) return Promise.resolve(normalizeGenericBondHistory(window.FUND_BOND_HISTORY[code]));
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_history/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_history/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => resolve(normalizeGenericBondHistory(window.FUND_BOND_HISTORY?.[code]));
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
@@ -4924,7 +5154,7 @@ function loadPureBondKalmanDuration(code) {
   if (window.FUND_PURE_BOND_DURATION?.[code]) return Promise.resolve(window.FUND_PURE_BOND_DURATION[code]);
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_duration/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_duration/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => resolve(window.FUND_PURE_BOND_DURATION?.[code] || null);
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
@@ -4942,7 +5172,7 @@ function loadPureBondResearch(code) {
   }
   const promise = new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => resolve(window.FUND_PURE_BOND_RESEARCH?.[shard] || null);
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
@@ -4955,7 +5185,7 @@ function loadGenericDocuments(code) {
   if (window.FUND_DOCUMENTS?.[code]) return Promise.resolve(window.FUND_DOCUMENTS[code]);
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/documents/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/documents/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => resolve(window.FUND_DOCUMENTS?.[code] || null);
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
@@ -4966,7 +5196,7 @@ function loadGenericCampisi(code) {
   if (window.FUND_CAMPISI?.[code]) return Promise.resolve(window.FUND_CAMPISI[code]);
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/campisi/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => resolve(window.FUND_CAMPISI?.[code] || null);
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
@@ -4993,7 +5223,7 @@ function loadGenericBrinson(code) {
   if (window.FUND_BRINSON?.[code]) return Promise.resolve(normalizeGenericBrinson(window.FUND_BRINSON[code]));
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/brinson/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/brinson/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => resolve(normalizeGenericBrinson(window.FUND_BRINSON?.[code]));
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
@@ -5004,7 +5234,7 @@ function loadGenericMultiAssetAttribution(code) {
   if (window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]) return Promise.resolve(window.FUND_MULTI_ASSET_ATTRIBUTION[code]);
   return new Promise((resolve) => {
     const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js`;
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => resolve(window.FUND_MULTI_ASSET_ATTRIBUTION?.[code] || null);
     script.onerror = () => resolve(null);
     document.head.appendChild(script);
