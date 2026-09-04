@@ -639,6 +639,84 @@ select { width: 190px; padding: 0 14px; color: #435568; }
 .pure-bond-flow-table { max-height: 430px; overflow: auto; }
 .pure-bond-deep-campisi { margin-top: 22px; }
 .pure-bond-research-boundary { margin: 18px 0 0; }
+.pure-bond-research-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: end;
+  margin-bottom: 20px;
+  padding: 34px 38px;
+  overflow: hidden;
+  color: white;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 91% 15%, rgba(190,41,45,.48), transparent 21rem),
+    linear-gradient(125deg, #081526 0%, #102c45 58%, #173653 100%);
+  box-shadow: 0 18px 45px rgba(9,28,46,.18);
+}
+.pure-bond-research-hero::after { content: ""; position: absolute; inset: 0; opacity: .12; background-image: linear-gradient(rgba(255,255,255,.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.2) 1px, transparent 1px); background-size: 30px 30px; pointer-events: none; }
+.pure-bond-research-hero > * { position: relative; z-index: 1; }
+.pure-bond-research-hero .eyebrow { color: #f0c977; }
+.pure-bond-research-hero h2 { margin: 0; font-family: Georgia, "Songti SC", serif; font-size: clamp(27px, 3.3vw, 44px); letter-spacing: -.03em; }
+.pure-bond-research-hero p:last-child { max-width: 720px; margin: 14px 0 0; color: #c8d6df; font-size: 13px; line-height: 1.8; }
+.pure-bond-research-hero dl { display: grid; grid-template-columns: repeat(3, minmax(88px, 1fr)); gap: 8px; margin: 0; }
+.pure-bond-research-hero dl div { min-width: 90px; padding: 13px 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.07); backdrop-filter: blur(8px); }
+.pure-bond-research-hero dt { color: #91aabd; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.pure-bond-research-hero dd { margin: 6px 0 0; color: white; font-family: Georgia, "Songti SC", serif; font-size: 16px; font-weight: 700; }
+.pure-bond-research-group { margin: 0 0 22px; }
+.pure-bond-group-heading {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto 22px;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  min-height: 72px;
+  padding: 14px 20px;
+  color: white;
+  border: 0;
+  border-radius: 12px 12px 0 0;
+  background: linear-gradient(105deg, #0a182a, #173652);
+  box-shadow: 0 9px 24px rgba(15,39,60,.12);
+  cursor: pointer;
+  text-align: left;
+}
+.pure-bond-group-heading[aria-expanded="false"] { border-radius: 12px; }
+.pure-bond-group-index { display: grid; width: 38px; height: 38px; place-items: center; color: #f0c977; border: 1px solid rgba(240,201,119,.35); border-radius: 50%; font-family: Georgia, serif; font-size: 13px; }
+.pure-bond-group-heading h2 { margin: 0; font-family: Georgia, "Songti SC", serif; font-size: 20px; letter-spacing: .01em; }
+.pure-bond-group-heading p { margin: 4px 0 0; color: #aebfcb; font-size: 10px; line-height: 1.5; }
+.pure-bond-frequency { padding: 5px 8px; color: #d4e2ea; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; background: rgba(255,255,255,.06); font-size: 9px; font-weight: 700; white-space: nowrap; }
+.pure-bond-group-chevron { color: #f0c977; font-size: 15px; text-align: center; transition: transform .18s ease; }
+.pure-bond-group-heading[aria-expanded="false"] .pure-bond-group-chevron { transform: rotate(180deg); }
+.pure-bond-group-body { padding: 16px; border: 1px solid #d7e0e5; border-top: 0; border-radius: 0 0 12px 12px; background: #edf1f4; }
+.pure-bond-group-body[hidden] { display: none; }
+.pure-bond-group-body .subpanel { position: relative; overflow: hidden; border-color: #dbe3e7; background: #fff; box-shadow: 0 8px 24px rgba(18,43,64,.055); }
+.pure-bond-group-body .subpanel::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, #0a7c78, #3f78a8, #bd4046); opacity: .82; }
+.pure-bond-module-map { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.pure-bond-module-jump { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; min-height: 82px; padding: 15px 16px; color: var(--ink); border: 1px solid #d7e0e5; border-radius: 10px; background: white; cursor: pointer; text-align: left; transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+.pure-bond-module-jump:hover { border-color: #8bb3ad; box-shadow: 0 8px 20px rgba(20,62,76,.08); transform: translateY(-1px); }
+.pure-bond-module-jump span { font-size: 13px; font-weight: 800; }
+.pure-bond-module-jump small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; line-height: 1.55; }
+.pure-bond-module-jump b { grid-row: 1 / 3; grid-column: 2; align-self: center; color: #bd4046; font-size: 18px; }
+.pure-bond-model-diagnostic { margin-top: 0; }
+.pure-bond-income-breakdown { display: grid; gap: 11px; margin: 8px 0 16px; }
+.pure-bond-income-row { display: grid; grid-template-columns: 96px minmax(110px, 1fr) 88px; gap: 10px; align-items: center; color: var(--muted); font-size: 10px; }
+.pure-bond-income-row i { position: relative; height: 13px; overflow: hidden; border-radius: 3px; background: linear-gradient(90deg, rgba(74,139,104,.08) 0 50%, rgba(188,85,74,.08) 50% 100%); }
+.pure-bond-income-row i::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: #a9b4ba; }
+.pure-bond-income-row i b { position: absolute; top: 2px; bottom: 2px; border-radius: 2px; }
+.pure-bond-income-row i b.positive { background: #4f948a; }
+.pure-bond-income-row i b.negative { background: #b96b63; }
+.pure-bond-income-row > strong { font-family: Georgia, "Songti SC", serif; font-size: 11px; text-align: right; white-space: nowrap; }
+.pure-bond-manager-timeline { display: grid; gap: 11px; margin: 7px 0 18px; }
+.pure-bond-manager-row { display: grid; grid-template-columns: 82px minmax(120px, 1fr) 160px; gap: 10px; align-items: center; font-size: 10px; }
+.pure-bond-manager-row > strong { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.pure-bond-manager-row > div { position: relative; height: 11px; border-radius: 999px; background: #e8edf0; }
+.pure-bond-manager-row i { position: absolute; top: 1px; bottom: 1px; border-radius: 999px; background: #0a7c78; }
+.pure-bond-manager-row i.tone-1 { background: #315f91; }
+.pure-bond-manager-row i.tone-2 { background: #c69a4b; }
+.pure-bond-manager-row i.tone-3 { background: #8e6a9a; }
+.pure-bond-manager-row > span { color: var(--muted); text-align: right; white-space: nowrap; }
 .industry-distribution-list { display: grid; gap: 7px; }
 .industry-distribution-row { display: grid; grid-template-columns: minmax(130px, 220px) minmax(90px, 1fr) 58px; gap: 12px; align-items: center; width: 100%; padding: 8px 10px; color: #425869; border: 1px solid transparent; border-radius: 8px; background: transparent; cursor: pointer; text-align: left; }
 .industry-distribution-row:hover, .industry-distribution-row.active { border-color: #c9dfda; background: #f1f8f6; }
@@ -949,6 +1027,8 @@ footer { display: flex; justify-content: space-between; padding: 24px 5vw; color
   .panel-intro > p { text-align: left; }
   .fund-analysis-grid { grid-template-columns: 1fr; }
   .research-grid.two-column-grid { grid-template-columns: 1fr; }
+  .pure-bond-research-hero { grid-template-columns: 1fr; align-items: start; }
+  .pure-bond-module-map { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .panel-heading-row { align-items: start; flex-direction: column; gap: 10px; }
   .panel-heading-row > p { text-align: left; }
   .framework-grid { grid-template-columns: 1fr 1fr; }
@@ -956,6 +1036,20 @@ footer { display: flex; justify-content: space-between; padding: 24px 5vw; color
 }
 
 @media (max-width: 620px) {
+  .pure-bond-research-hero { padding: 24px 20px; border-radius: 13px; }
+  .pure-bond-research-hero dl { grid-template-columns: 1fr; }
+  .pure-bond-research-hero dl div { display: flex; align-items: center; justify-content: space-between; padding: 9px 11px; }
+  .pure-bond-research-hero dd { margin: 0; }
+  .pure-bond-group-heading { grid-template-columns: 34px minmax(0, 1fr) 18px; gap: 10px; min-height: 64px; padding: 11px 13px; }
+  .pure-bond-group-index { width: 30px; height: 30px; font-size: 11px; }
+  .pure-bond-group-heading h2 { font-size: 17px; }
+  .pure-bond-frequency { display: none; }
+  .pure-bond-group-body { padding: 9px; }
+  .pure-bond-module-map { grid-template-columns: 1fr; }
+  .pure-bond-manager-row { grid-template-columns: 66px minmax(95px, 1fr); }
+  .pure-bond-manager-row > span { grid-column: 1 / -1; font-size: 9px; text-align: left; }
+  .pure-bond-income-row { grid-template-columns: 78px minmax(90px, 1fr) 76px; gap: 7px; }
+  .pure-bond-income-row > strong { font-size: 9px; }
   .compact-home .category-hub { padding-block: 20px 7px; }
   .compact-home .home-search-box { margin-bottom: 9px; }
   .compact-home .home-search-box input { min-height: 44px; border-radius: 10px; box-shadow: 0 6px 18px rgba(18,43,64,.05); }
