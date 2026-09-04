@@ -4881,9 +4881,155 @@ function createGenericTabLoader(fund, detail) {
   };
 }
 
-function renderPureBondReferenceFund(fund) {
+function refreshPureBondReferenceData(reference, fund, detail, currentDuration) {
+  const nav = genericFundNavPoints(detail);
+  if (nav.length > 1) {
+    const latest = nav.at(-1);
+    reference.head.asof = latest.date;
+    reference.head.nav_latest = latest.fund;
+    const ranges = [
+      ["近1月", 1], ["近3月", 3], ["近6月", 6], ["今年以来", "ytd"],
+      ["近1年", 12], ["近3年", 36], ["近5年", 60], ["成立以来", "all"],
+    ];
+    reference.perf.stage = ranges.map(([label, range]) => {
+      let start = null;
+      if (range === "ytd") start = `${latest.date.slice(0, 4)}-01-01`;
+      else if (range !== "all") {
+        const date = new Date(`${latest.date}T00:00:00`);
+        date.setMonth(date.getMonth() - range);
+        start = date.toISOString().slice(0, 10);
+      }
+      const points = start ? nav.filter((point) => point.date >= start) : nav;
+      const stats = performanceStats(points);
+      const first = points[0];
+      const years = first ? Math.max((new Date(latest.date) - new Date(first.date)) / (365.25 * 86400000), 1 / 252) : 0;
+      const sharpe = stats?.volatility > 0 ? (stats.annualizedReturn - 0.015) / stats.volatility : null;
+      return {
+        stage: label,
+        d0: first?.date || null,
+        d1: latest.date,
+        days: first ? Math.round((new Date(latest.date) - new Date(first.date)) / 86400000) : null,
+        cum: stats?.cumulative ?? null,
+        mdd: stats?.maxDrawdown ?? null,
+        ann: stats?.annualizedReturn ?? null,
+        vol: stats?.volatility ?? null,
+        sharpe,
+        calmar: stats?.calmar ?? null,
+        short: years < 300 / 365.25,
+        n: points.length,
+      };
+    });
+
+    const dailyReturns = nav.slice(1).map((point, index) => ({
+      date: point.date,
+      value: point.fund / nav[index].fund - 1,
+    }));
+    const byYear = new Map();
+    const byMonth = new Map();
+    dailyReturns.forEach((item) => {
+      const year = item.date.slice(0, 4);
+      const month = item.date.slice(0, 7);
+      if (!byYear.has(year)) byYear.set(year, []);
+      if (!byMonth.has(month)) byMonth.set(month, []);
+      byYear.get(year).push(item.value);
+      byMonth.get(month).push(item.value);
+    });
+    const compounded = (values) => values.reduce((value, item) => value * (1 + item), 1) - 1;
+    reference.perf.annual = [...byYear].map(([year, values]) => {
+      const points = nav.filter((point) => point.date.startsWith(year));
+      const stats = performanceStats(points);
+      return {
+        year: Number(year),
+        cum: compounded(values),
+        mdd: stats?.maxDrawdown ?? null,
+        partial: year === nav[0].date.slice(0, 4) && !nav[0].date.endsWith("01-01"),
+        n: points.length,
+      };
+    });
+    const years = [...byYear.keys()].map(Number);
+    reference.perf.monthly = {
+      years,
+      rows: years.map((year) => ({
+        year,
+        months: Array.from({ length: 12 }, (_, index) => {
+          const key = `${year}-${String(index + 1).padStart(2, "0")}`;
+          return byMonth.has(key) ? compounded(byMonth.get(key)) : null;
+        }),
+        annual: compounded(byYear.get(String(year)) || []),
+      })),
+    };
+    let peak = nav[0].fund;
+    const curve = nav.map((point) => {
+      peak = Math.max(peak, point.fund);
+      return [point.date, point.fund / nav[0].fund - 1, point.fund / peak - 1];
+    }).filter((_point, index) => index % 5 === 0 || index === nav.length - 1);
+    reference.perf.curve = {
+      nav: curve.map(([date, value]) => [date, value]),
+      dd: curve.map(([date, _value, drawdown]) => [date, drawdown]),
+    };
+  }
+
+  const assetHistory = (detail?.asset_history || []).map((item) => {
+    const percent = (value) => Number.isFinite(Number(value)) ? Number(value) * 100 : 0;
+    const bond = percent(item.bond);
+    const knownBond = percent(item.government_bond) + percent(item.financial_bond)
+      + percent(item.corporate_bond) + percent(item.convertible_bond) + percent(item.abs);
+    return {
+      dt: item.date,
+      gov: percent(item.government_bond),
+      fin: percent(item.financial_bond),
+      corp: percent(item.corporate_bond),
+      cb: percent(item.convertible_bond),
+      bill: 0,
+      absv: percent(item.abs),
+      cds: 0,
+      othbd: Math.max(0, bond - knownBond),
+      other: 0,
+      bond,
+      cash: percent(item.cash),
+      stk: percent(item.stock),
+      fund: percent(item.fund),
+      othasset: percent(item.other),
+      mm: 0,
+      na: Number.isFinite(Number(item.net_asset)) ? Number(item.net_asset) / 1e8 : null,
+      lev: Number.isFinite(Number(item.leverage)) ? Number(item.leverage) : null,
+    };
+  });
+  if (assetHistory.length) {
+    reference.alloc.style = assetHistory;
+    reference.head.scale = assetHistory.at(-1).na;
+    reference.head.scale_dt = assetHistory.at(-1).dt;
+  }
+  const durationHistory = (detail?.duration_history || []).map((item) => ({
+    dt: item.date,
+    dur: Number(item.duration),
+    na: assetHistory.find((asset) => asset.dt === item.date)?.na ?? null,
+  })).filter((item) => Number.isFinite(item.dur));
+  if (durationHistory.length) reference.alloc.duration = durationHistory;
+
+  if (currentDuration?.status === "ok" && currentDuration.dates?.length) {
+    const previous = window.DURKF_STORE?.[fund.code] || {};
+    window.DURKF_STORE = window.DURKF_STORE || {};
+    window.DURKF_STORE[fund.code] = {
+      ...previous,
+      dates: currentDuration.dates,
+      dur: currentDuration.duration,
+      meta: {
+        ...(previous.meta || {}),
+        q: currentDuration.meta?.q,
+        warmup: currentDuration.meta?.warmup,
+        n: currentDuration.meta?.observations,
+        d0: currentDuration.meta?.start,
+        d1: currentDuration.meta?.end,
+      },
+    };
+  }
+}
+
+function renderPureBondReferenceFund(fund, detail, currentDuration) {
   const reference = window.FUND_STORE?.[fund.code];
   if (!reference || !window.__PB) return false;
+  refreshPureBondReferenceData(reference, fund, detail, currentDuration);
   document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
   document.body.classList.remove("pure-bond-reference-page");
   window.__PB.setCurrent(reference);
@@ -4977,8 +5123,8 @@ function bindPureBondReferenceInteractions() {
   });
 }
 
-function renderGenericFund(fund, detail) {
-  if (fund.category === "pure-bond" && renderPureBondReferenceFund(fund)) return;
+function renderGenericFund(fund, detail, pureBondDuration = null) {
+  if (fund.category === "pure-bond" && renderPureBondReferenceFund(fund, detail, pureBondDuration)) return;
   document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
   document.body.classList.remove("pure-bond-reference-page");
   const tabs = fund.category === "pure-bond"
@@ -5440,8 +5586,15 @@ if (!fundId && !fundCode) {
       if (!catalogFund) throw new Error("没有找到该基金的研究数据");
       if (!genericDetail) throw new Error("该基金的净值详情尚未生成");
       if (catalogFund.category === "active-equity") await loadDashboardAsset("active_equity_profiles.js");
-      if (catalogFund.category === "pure-bond") await loadPureBondReferenceBundle(catalogFund.code).catch(() => null);
-      renderGenericFund(catalogFund, genericDetail);
+      let pureBondDuration = null;
+      if (catalogFund.category === "pure-bond") {
+        const [, currentDuration] = await Promise.all([
+          loadPureBondReferenceBundle(catalogFund.code).catch(() => null),
+          loadPureBondKalmanDuration(catalogFund.code).catch(() => null),
+        ]);
+        pureBondDuration = currentDuration;
+      }
+      renderGenericFund(catalogFund, genericDetail, pureBondDuration);
     })
     .catch((error) => showError(error.message));
 }
