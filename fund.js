@@ -248,6 +248,43 @@ function loadProfileDetails(code) {
   return promise;
 }
 
+function disclosedProfileDimensions() {
+  return [
+    ["log_cap", "股票市值", "偏小盘", "偏大盘"],
+    ["log_pb", "估值 PB", "偏低估值", "偏高估值"],
+    ["roe", "盈利 ROE", "较低", "较高"],
+    ["activity", "调仓活跃度", "较低", "较高"],
+    ["concentration", "持仓集中度", "较分散", "较集中"],
+    ["persistence", "持股延续性", "较低", "较高"],
+    ["industry_stability", "行业稳定性", "变化较多", "较稳定"],
+  ];
+}
+
+function disclosedPercentileLabel(value) {
+  return Number.isFinite(value) && value >= 0 && value <= 1 ? `P${Math.round(value * 100)}` : "—";
+}
+
+function renderDisclosedPercentiles(r) {
+  const dimensions = disclosedProfileDimensions();
+  const group = (title, items) => `<div><h4>${title}</h4>${items.map(([key, label, low, high]) => {
+    const value = r.feature_percentiles?.[key];
+    const available = Number.isFinite(value) && value >= 0 && value <= 1;
+    return `<div class="profile-percentile-row"><div class="profile-percentile-heading"><span>${label}</span><strong>${available ? `第${Math.round(value * 100)}百分位` : "暂不可比"}</strong></div>${available ? `<div class="profile-percentile-track" role="img" aria-label="${label}，第${Math.round(value * 100)}百分位"><i style="left:${(value * 100).toFixed(2)}%"></i></div><div class="profile-percentile-scale"><span>${low}</span><span>中位</span><span>${high}</span></div>` : '<p class="method-note">可比条件或有效样本不足，不以零分位代替。</p>'}</div>`;
+  }).join("")}</div>`;
+  return `<article class="subpanel profile-percentiles"><div class="subpanel-heading"><div><h3>画像分位 · 在可比基金中的位置</h3><span>股票风格与投资行为分开看，不合成为总分</span></div></div><div class="profile-percentile-grid">${group("股票风格", dimensions.slice(0, 3))}${group("投资行为", dimensions.slice(3))}</div><p class="method-note">分位基于${escapeHTML(r.report_date)}同报告期、满足画像可比条件的主观权益产品，A/C份额合并；行为使用截至该期最近有效区间。分位越高只表示该特征越突出，不代表基金越好。PB是估值维度，不能直接当作成长性。</p></article>`;
+}
+
+function renderProfilePeers(r, errorMessage = "") {
+  const heading = '<div class="subpanel-heading"><div><h3>画像相似基金</h3><span>行业配置、股票风格与投资行为相近，不等同净值走势相关</span></div></div>';
+  if (!r || r.status !== "available") return `<article class="subpanel profile-peers">${heading}<p class="empty-copy">${escapeHTML(errorMessage || "暂无可用的完整披露画像，暂不生成相似基金。")}</p></article>`;
+  const peers = r.peers || [];
+  const distance = value => Number.isFinite(value) ? value.toFixed(3) : "—";
+  const cards = peers.map(x => `<li class="profile-peer-card"><div class="profile-peer-identity"><a href="fund.html?code=${encodeURIComponent(x.code)}&tab=profile">${escapeHTML(x.name)}</a><span>${escapeHTML(x.code)} · ${escapeHTML(x.company || "")}</span></div><dl class="profile-peer-distances">${[["综合距离", x.distance], ["行业", x.industry_distance], ["股票风格", x.style_distance], ["投资行为", x.behavior_distance]].map(([label, value]) => `<div><dt>${label}</dt><dd>${distance(value)}</dd></div>`).join("")}</dl></li>`).join("");
+  const dimensions = disclosedProfileDimensions();
+  const comparison = peers.length ? `<details class="profile-peer-comparison"><summary>展开分位对照 · 本基金与相似基金</summary><div class="table-scroll"><table class="profile-evidence-table"><thead><tr><th>基金</th>${dimensions.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead><tbody>${[r, ...peers].map((x, index) => `<tr${index === 0 ? ' class="profile-peer-current"' : ""}><th scope="row">${escapeHTML(x.name)}${index === 0 ? "（本基金）" : ""}</th>${dimensions.map(([key]) => `<td>${disclosedPercentileLabel(x.feature_percentiles?.[key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="method-note">P表示百分位，P80表示第80百分位；各维度高低不是好坏评分。股票风格采用市值、正PB与ROE，目前没有可靠的完整成长性指标。</p></details>` : "";
+  return `<article class="subpanel profile-peers">${heading}<p class="method-note">完整持仓：${escapeHTML(r.report_date)} · ${peers.length ? "以下各项距离越小越相近" : "暂无满足可比条件的基金"}</p>${peers.length ? `<ul class="profile-peer-list">${cards}</ul>` : `<p class="empty-copy">${escapeHTML((r.peer_reasons || []).join("；") || "当前管理结构、特征覆盖或可比样本仍需积累")}。</p>`}${comparison}<p class="method-note">综合距离＝50%行业＋25%股票风格＋25%行为；不使用个股重合度排序。同报告期、同名称主题线索、同A/H市场组内比较，排除同经理产品。名单随披露更新，不是推荐榜、相似概率或永久类别。</p></article>`;
+}
+
 function renderDisclosedProfile(r) {
   if (r.status !== "available") return '<div class="empty-copy">尚无可用的完整披露持仓，不以季度前十大代替完整画像。</div>';
   const p = (v, digits=1) => Number.isFinite(v) ? `${(v*100).toFixed(digits)}%` : "—";
@@ -263,16 +300,16 @@ function renderDisclosedProfile(r) {
   const mandate = r.mandate;
   const link = mandate && /^https:\/\//.test(mandate.source_url || "") ? `<a href="${escapeHTML(mandate.source_url)}" target="_blank" rel="noopener noreferrer">查看文件原文（${escapeHTML((mandate.pdf_pages||[]).join("、"))}页）</a>` : "";
   const contract = mandate ? `<p>${escapeHTML(mandate.theme_numerator)}至少占${escapeHTML(mandate.theme_denominator_label)}的${p(mandate.theme_minimum,0)}。</p><p class="method-note">${escapeHTML(mandate.mapping_caution)} 文件公告：${escapeHTML(mandate.contract_publication_date)}；当前审阅版本，不代表完整历史生效核验。</p>${link}` : `<p>合同主题未人工核验。</p><p class="method-note">名称线索：${escapeHTML((r.name_theme_hints||[]).join("、")||"未命中")}。名称不是合同约束，未命中也不代表可全市场投资。</p>`;
-  const peers = r.peers?.length ? rows(`<thead><tr><th>可比基金</th><th>综合距离↓</th><th>个股权重重合</th></tr></thead><tbody>${r.peers.map(x=>`<tr><td><a href="fund.html?code=${encodeURIComponent(x.code)}&tab=profile">${escapeHTML(x.name)}</a></td><td>${x.distance.toFixed(3)}</td><td>${p(x.stock_weight_overlap)}</td></tr>`).join("")}</tbody>`) : `<p class="method-note">暂不生成相似基金：${escapeHTML((r.peer_reasons||[]).join("；"))}。</p>`;
   return `<div class="profile-head"><div><h2>披露持仓画像</h2><p>描述历史投资行为，不是实时持仓识别或基金评级。</p></div><span class="tag">${maturity}</span></div>
     <div class="profile-date-strip"><span>完整持仓 <strong>${escapeHTML(r.report_date)}</strong></span><span>公告 <strong>${escapeHTML(r.announcement_date)}</strong></span><span>行为样本 <strong>${r.completed_transitions}个区间</strong></span></div>
     ${r.current_manager_match===false?'<div class="calibration-note"><strong>经理变更或任期待核对</strong><p>下方保留产品已披露持仓；旧经理行为不继承，相似基金暂不生成。</p></div>':""}
+    ${renderDisclosedPercentiles(r)}
     <div class="profile-detail-grid"><article class="subpanel"><h3>实际股票风格</h3>${style}<p class="method-note">只统计A股，同报告期匹配；低于80%有效覆盖留空。PE/PB只取正值，ROE不等于完整质量评分。增长字段暂无可靠覆盖。</p></article>
     <article class="subpanel"><h3>本期主要A股行业</h3>${industries}<p class="method-note">占已披露A股权重。A股占基金净资产${p(r.a_share_nav_weight)}；港股占股票资产${p(r.hk_share)}。</p></article></div>
     <article class="subpanel"><h3>近期行为与历史习惯</h3><p class="method-note">最近行为期：${escapeHTML(r.behavior_report_date||"暂无")}；此前历史不含最近一期，仅同连续管理结构比较。集中度的本期值来自${escapeHTML(r.report_date)}。</p>${history}<details><summary>这些指标如何理解</summary><p class="method-note">调仓活跃度是剔除价格漂移后的持仓距离，不是官方换手率；持股延续率衡量上期股票是否继续持有；行业稳定性为1减二级行业主动距离，不是稳定概率。历史中位数是描述性基线，不直接控制模型仓位。</p></details></article>
     <details class="subpanel"><summary>相对上期的行业变化 · ${escapeHTML(r.previous_report_date||"暂无上期")}</summary>${changes}<p class="method-note">披露截面变化包含股价涨跌，不等同主动增减仓，也不能据此识别期内所有交易。</p></details>
     <details class="subpanel"><summary>产品主题与合同依据</summary>${contract}</details>
-    <details class="subpanel"><summary>相似基金 · 研究参考</summary>${peers}<p class="method-note">同报告期、同名称主题线索、同A/H市场组；排除同经理产品。距离＝50%行业＋25%股票风格＋25%行为，越小越近；不是推荐榜或相似概率。名单随披露更新，不是永久类别。</p></details>
+    ${renderProfilePeers(r)}
     <details class="subpanel"><summary>画像如何更新，识别如何验真</summary><p>完整持仓披露后，先用当时留档的预测验真，再生成下一版画像；旧预测和旧画像版本不改写。当前页面只展示披露画像，尚未接入主动权益实时识别成绩。</p><p class="method-note">本版生成：${escapeHTML(r.snapshot_generated_at||r.as_of)}。历史统计是披露后整理，不冒充当时在线预测。新经理重新积累样本。</p></details>`;
 }
 
@@ -4645,7 +4682,6 @@ function genericStyleCorrelationContent(fund) {
 function genericCorrelationSide(fund, data, key, type) {
   const windowData = data?.windows?.[key] || {};
   const source = windowData[type] || (key === "5y" ? data?.[type] : []) || [];
-  const sampleUnit = windowData.frequency === "daily_return" ? "日" : "月";
   if (type === "peers") {
     const rows = source.map((item) => {
       return [
@@ -4653,10 +4689,9 @@ function genericCorrelationSide(fund, data, key, type) {
         `<a href="fund.html?code=${encodeURIComponent(item.code)}"><strong>${escapeHTML(item.name)}</strong></a>`,
         escapeHTML((item.manager || []).join("、") || item.fund_company || "—"),
         `<strong>${num(item.correlation, 3)}</strong>`,
-        `${item.observations || "—"}${sampleUnit}`,
       ];
     });
-    return rows.length ? renderTable(["代码", "名称", "管理人", "相关系数", "共同样本"], rows, "pure-bond-correlation-table") : '<p class="empty-copy">该窗口共同样本不足。</p>';
+    return rows.length ? renderTable(["代码", "名称", "管理人", "相关系数"], rows, "pure-bond-correlation-table") : '<p class="empty-copy">该窗口共同样本不足。</p>';
   }
   const fallbackGroup = fund.category === "pure-bond" ? "bond" : "broad_style";
   const groupOrder = fund.category === "pure-bond"
@@ -4682,22 +4717,36 @@ function genericCorrelationSide(fund, data, key, type) {
       `<strong>${escapeHTML(item.name)}</strong>`,
       scopeLabels[group] || "价格",
       `<strong>${num(item.correlation, 3)}</strong>`,
-      `${item.observations || "—"}${sampleUnit}`,
     ]);
-    return `<section class="correlation-index-group"><h4>${groupLabels[group] || "其他指数"}</h4>${renderTable(["代码", "名称", "口径", "相关系数", "共同样本"], rows, "pure-bond-correlation-table")}</section>`;
+    return `<section class="correlation-index-group"><h4>${groupLabels[group] || "其他指数"}</h4>${renderTable(["代码", "名称", "口径", "相关系数"], rows, "pure-bond-correlation-table")}</section>`;
   });
   return sections.length ? sections.join("") : '<p class="empty-copy">该窗口共同样本不足。</p>';
 }
 
-function genericCorrelationPanel(fund) {
+async function loadCorrelationPanelData(fund) {
+  // 两类相似性独立加载；其中一个数据源失败，不隐藏另一个结果。
+  const results = await Promise.allSettled([
+    loadCorrelationMetrics(fund.code),
+    fund.category === "active-equity" ? loadProfileDetails(fund.code) : Promise.resolve(),
+  ]);
+  return {
+    correlation: results[0].status === "rejected" ? results[0].reason.message : "",
+    profile: results[1].status === "rejected" ? results[1].reason.message : "",
+  };
+}
+
+function genericCorrelationPanel(fund, errors = {}) {
   const data = window.FUND_CORRELATION_METRICS?.funds?.[fund.code];
-  if (!data?.peers?.length && !data?.indices?.length) return genericPendingPanel(fund, "correlation");
+  const profilePeers = fund.category === "active-equity" ? renderProfilePeers(window.FUND_PROFILE_DETAILS?.[fund.code], errors.profile ? `${errors.profile}；可切换到基金画像页重试。` : "") : "";
+  const hasCorrelations = data?.peers?.length || data?.indices?.length || Object.values(data?.windows || {}).some(item => item.peers?.length || item.indices?.length);
+  if (!hasCorrelations) return profilePeers + (errors.correlation ? genericCorrelationLoadingPanel(`${errors.correlation}。刷新页面可重试，不影响上方披露画像。`) : genericPendingPanel(fund, "correlation"));
   if (["pure-bond", "active-equity", "hybrid-bond"].includes(fund.category) && data.windows && Object.keys(data.windows).length) {
     const windowLabels = { "1m": "近1月", "3m": "近3月", "6m": "近6月", ytd: "今年以来", "1y": "近1年", "3y": "近3年", "5y": "近5年" };
     const available = Object.keys(data.windows || { "5y": {} }).filter((key) => windowLabels[key]);
     const selected = available.includes("ytd") ? "ytd" : available.includes("3y") ? "3y" : available.includes("5y") ? "5y" : available[0];
     const options = available.map((key) => `<option value="${key}"${key === selected ? " selected" : ""}>${windowLabels[key]}</option>`).join("");
     return `
+      ${profilePeers}
       <div class="panel-intro"><div><p class="eyebrow">CORRELATION</p><h2>同类基金与代表指数相关性</h2></div><p>近1/3/6月和今年以来按日收益，近1/3/5年按月收益；左右卡片可独立切换。${fund.category === "pure-bond" ? "纯债指数仅保留含票息再投资的财富口径。" : fund.category === "hybrid-bond" ? "一级/二级债基同时覆盖债券财富指数、权益宽基/风格及一级行业指数。" : "主动权益同时覆盖宽基、大小盘、成长价值及一级行业指数。"}</p></div>
       <div class="research-grid two-column-grid pure-bond-correlation-grid">
         <article class="subpanel"><div class="subpanel-heading"><div><h3>与其他基金相关性</h3><span>按所选窗口频率 · 正相关TOP</span></div></div><label class="correlation-window-select"><span class="sr-only">其他基金相关性窗口</span><select id="generic-peer-correlation-window">${options}</select></label><div id="generic-peer-correlation-output">${genericCorrelationSide(fund, data, selected, "peers")}</div></article>
@@ -4709,18 +4758,17 @@ function genericCorrelationPanel(fund) {
   const peerRows = (data.peers || []).map((item) => [
     `<a href="fund.html?code=${encodeURIComponent(item.code)}"><strong>${escapeHTML(item.name)}</strong></a><small>${escapeHTML(item.code)}</small>`,
     num(item.correlation, 3),
-    `${item.observations}个月`,
   ]);
   const indexRows = (data.indices || []).map((item) => [
     `<strong>${escapeHTML(item.name)}</strong><small>${escapeHTML(item.code)}</small>`,
     num(item.correlation, 3),
-    `${item.observations}个月`,
   ]);
   return `
+    ${profilePeers}
     <div class="panel-intro"><div><p class="eyebrow">CORRELATION</p><h2>同类基金与代表指数相关性</h2></div><p>基于近五年月度复权净值收益，至少需要24个共同月份；同类基金按相关系数从高到低列示。</p></div>
     <div class="research-grid two-column-grid">
-      <article class="subpanel"><div class="subpanel-heading"><div><h3>相关性最高的同类基金</h3><span>产品口径，A/C等份额已合并</span></div></div>${peerRows.length ? renderTable(["基金", "相关系数", "共同样本"], peerRows) : '<p class="empty-copy">共同样本不足。</p>'}</article>
-      <article class="subpanel"><div class="subpanel-heading"><div><h3>代表指数相关性</h3><span>${fund.category === "active-equity" || fund.category === "index-enhanced" ? "宽基、大小盘与成长价值" : "仅含票息再投资的中债财富指数"}</span></div></div>${indexRows.length ? renderTable(["指数", "相关系数", "共同样本"], indexRows) : '<p class="empty-copy">共同样本不足。</p>'}</article>
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>相关性最高的同类基金</h3><span>产品口径，A/C等份额已合并</span></div></div>${peerRows.length ? renderTable(["基金", "相关系数"], peerRows) : '<p class="empty-copy">共同样本不足。</p>'}</article>
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>代表指数相关性</h3><span>${fund.category === "active-equity" || fund.category === "index-enhanced" ? "宽基、大小盘与成长价值" : "仅含票息再投资的中债财富指数"}</span></div></div>${indexRows.length ? renderTable(["指数", "相关系数"], indexRows) : '<p class="empty-copy">共同样本不足。</p>'}</article>
     </div>
     <p class="method-note">相关性描述历史共同波动，不代表持仓相似度、因果关系或未来表现。</p>`;
 }
@@ -4754,7 +4802,7 @@ function loadCorrelationMetrics(code) {
 }
 
 function bindLazyCorrelation(fund) {
-  let loaded = Boolean(window.FUND_CORRELATION_METRICS?.funds?.[fund.code]);
+  let loaded = false;
   let loading = false;
   return async (target) => {
     if (!["correlation", "rebalancing"].includes(target) || loading) return;
@@ -4764,10 +4812,10 @@ function bindLazyCorrelation(fund) {
     const state = correlationPanel?.querySelector("#generic-correlation-load-state");
     if (state) state.textContent = "正在加载全市场相关性数据…";
     try {
-      await loadCorrelationMetrics(fund.code);
-      loaded = true;
+      const errors = await loadCorrelationPanelData(fund);
+      loaded = !errors.correlation && !errors.profile;
       if (correlationPanel) {
-        correlationPanel.innerHTML = genericCorrelationPanel(fund);
+        correlationPanel.innerHTML = genericCorrelationPanel(fund, errors);
         bindGenericCorrelation(fund);
       }
       const styleOutput = document.querySelector("#generic-style-correlation-output");
@@ -5203,8 +5251,8 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (id === "correlation") {
-      await correlation();
-      target.innerHTML = genericCorrelationPanel(fund);
+      const errors = await loadCorrelationPanelData(fund);
+      target.innerHTML = genericCorrelationPanel(fund, errors);
       bindGenericCorrelation(fund);
       return;
     }
