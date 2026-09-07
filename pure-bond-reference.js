@@ -1081,7 +1081,7 @@ function distStrip(key,fac){
   if(!fac||fac.pctl==null)return `<div class="pctl-row"><div class="pctl-head"><span>${FACN[key]}</span><b style="color:var(--muted)">数据不足</b></div></div>`;
   const pos=Math.max(1,Math.min(99,fac.pctl*100));
   return `<div class="pctl-row">
-    <div class="pctl-head"><span>${FACN[key]} <span style="color:var(--muted)">β=${NN(fac.fund,3)}</span></span><b style="color:var(--f-${key})">第${(fac.pctl*100).toFixed(0)}百分位</b></div>
+    <div class="pctl-head"><span>${FACN[key]} <span style="color:var(--muted)">β=${NN(fac.fund,4)}</span></span><b style="color:var(--f-${key})">第${(fac.pctl*100).toFixed(0)}百分位</b></div>
     <div class="pctl-track">
       <div class="base-line"></div>
       ${fac.p10!=null?`<div class="iqr-band outer" style="left:10%;width:80%;background:var(--f-${key})"></div>`:""}
@@ -1089,7 +1089,7 @@ function distStrip(key,fac){
       <div class="p50-mark"></div>
       <div class="fund-mark" style="left:${pos.toFixed(1)}%;background:var(--f-${key})"></div>
     </div>
-    <div class="pctl-scale">${fac.p10!=null?`<span>P10 ${NN(fac.p10,2)}</span>`:""}<span>P25 ${NN(fac.p25,2)}</span><span>P50 ${NN(fac.p50,2)}</span><span>P75 ${NN(fac.p75,2)}</span>${fac.p90!=null?`<span>P90 ${NN(fac.p90,2)}</span>`:""}</div>
+    <div class="pctl-scale">${fac.p10!=null?`<span>P10 ${NN(fac.p10,4)}</span>`:""}<span>P25 ${NN(fac.p25,4)}</span><span>P50 ${NN(fac.p50,4)}</span><span>P75 ${NN(fac.p75,4)}</span>${fac.p90!=null?`<span>P90 ${NN(fac.p90,4)}</span>`:""}</div>
   </div>`;
 }
 /* ===== 同类百分位定位 · 日频版(★2026-08-07用户需求) =====
@@ -1345,7 +1345,7 @@ function renderCampisi(d){
       `<div class="auto-note" id="peerSentence">${esc(peerPctlSentence(cur.dt,cur))}</div>`+
       `<div class="pctl-rows" id="pctlRows" style="margin-top:12px">${FAC_KEYS.map(k=>distStrip(k,cur[k])).join("")}</div>`+
       `<div class="method-note">
-        <b>怎么看</b>：分位越高＝该因子暴露(β)相对同类越高、越依赖这个因子赚钱（如信用分位高＝信用下沉更激进）；
+        <b>怎么看</b>：分位越高＝该因子β数值在同类分布中越大（未反转风险方向）；不直接等于信用下沉、收益贡献或管理能力更强；
         越低＝相对越保守。50分位＝与同类中位打平。图①灰虚线就是50分位。<br>
         <b>图②为什么要单独画一幅</b>：分位是相对量，只看图①分不清"分位上升"是本基金自己加了暴露、
         还是同类集体降暴露把它衬托上去了。图②画了<b>双层分布带</b>——深色＝同类P25~P75（中间50%）、
@@ -1630,7 +1630,7 @@ function peerPctlSentence(dt,cur){
   const parts=keys.map(k=>{
     const pctl=cur[k]&&cur[k].pctl!=null?cur[k].pctl:null;
     if(pctl==null)return `${FACN[k]}缺数据`;
-    const tag=pctl>=0.75?"显著偏高":pctl>=0.6?"偏高":pctl<=0.25?"显著偏低":pctl<=0.4?"偏低":"中性";
+    const tag=pctl>=0.75?"同类较高":pctl>=0.6?"偏高":pctl<=0.25?"同类较低":pctl<=0.4?"偏低":"中性";
     return `${FACN[k]}${tag}(${Math.round(pctl*100)}%)`;
   });
   return `${dt}期，该基金五因子同类定位：${parts.join("、")}。`;

@@ -10,7 +10,7 @@
     <title>财富产品部-基金研究系统看板</title>
     <link rel="preconnect" href="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" crossorigin />
     <link rel="dns-prefetch" href="//fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" />
-    <link rel="stylesheet" href="styles.css?v=e0f7892e575c" />
+    <link rel="stylesheet" href="styles.css?v=3809e623753b" />
   </head>
   <body class="compact-home">
     <header class="site-header">
@@ -104,6 +104,7 @@
           <button data-category="hybrid-bond" role="tab" aria-selected="false">一级债基/二级债基</button>
           <button data-category="convertible-bond" role="tab" aria-selected="false">转债基金</button>
         </div>
+        <select id="mobile-category" class="mobile-only-control" aria-label="基金分类"><option value="all">全部基金</option><option value="active-equity">主观权益</option><option value="pure-bond">纯债基金</option><option value="hybrid-bond">一级/二级债</option><option value="convertible-bond">转债基金</option></select>
       </section>
 
       <section id="comparison" class="section-shell section-block comparison-section" data-active-equity-section>
@@ -143,28 +144,42 @@
       <section id="samples" class="section-shell section-block">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">FIRST RESEARCH COHORT</p>
+            <p class="eyebrow">基金研究目录</p>
             <h2 id="fund-list-title">全部基金全量列表</h2>
           </div>
           <p id="fund-list-description">按基金主体合并份额，点击基金进入对应研究模块。</p>
         </div>
 
         <div class="toolbar list-toolbar">
+          <div class="period-switch decision-view-switch" aria-label="指标视图">
+            <button data-view="complete" class="active" aria-pressed="true">完整指标</button>
+            <button data-view="performance" aria-pressed="false">业绩视图</button>
+            <button data-view="portfolio" aria-pressed="false">组合视图</button>
+            <button data-view="changes" aria-pressed="false">变化视图</button>
+          </div>
+          <button id="mobile-filter-toggle" class="mobile-only-control" aria-expanded="false" aria-controls="decision-filters">筛选条件</button>
+          <select id="mobile-sort" class="mobile-only-control" aria-label="排序"></select>
+          <div id="decision-filters" class="decision-filters"></div>
+          <label class="page-density">每页<select id="page-size" aria-label="每页基金数量"><option>10</option><option>25</option><option>50</option></select></label>
+          <details class="column-settings"><summary>显示设置</summary><div id="decision-columns"></div></details>
           <select id="fund-filter" aria-label="按产品名称类型筛选" hidden>
             <option value="all">全部子类</option>
           </select>
           <div id="fund-subtype-tabs" class="period-switch subtype-switch" aria-label="基金子类切换" hidden></div>
-          <div class="period-switch" aria-label="收益回撤时间维度">
+          <div class="period-switch legacy-period-switch" aria-label="收益回撤时间维度">
             <button class="active" data-list-period="short">短期</button>
             <button data-list-period="long">长期</button>
           </div>
         </div>
 
         <p id="search-result-count" class="search-result-count" aria-live="polite"></p>
+        <div id="selected-filters" class="selected-filters"></div>
+        <nav id="fund-pagination-top" class="fund-pagination" aria-label="基金列表顶部分页"></nav>
 
         <p id="fund-list-methodology" class="method-note home-classification-note">净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。</p>
 
-        <div class="fund-list-wrap" aria-live="polite">
+        <div id="table-top-scroll" class="table-top-scroll" tabindex="0" role="region" aria-label="表格顶部横向滚动"><div></div></div>
+        <div class="fund-list-wrap" aria-live="polite" tabindex="0" role="region" aria-label="基金指标表，左右滚动查看全部列">
           <table class="fund-list-table">
             <thead id="fund-list-head"></thead>
             <tbody id="fund-grid"></tbody>
@@ -193,6 +208,12 @@
         </div>
       </section>
 
+      <section id="notes" class="section-shell site-data-notes">
+        <details><summary>数据说明与解读边界</summary>
+          <p>净值、资产配置、季度前十大与完整持仓各用各自可得日期，不能将报告期当作公告日。半年报、年报画像不代表今天的实际持仓。</p>
+          <p>同产品多份额合并展示；缺失值为“—”，不等于零。收益、回撤与画像均不是评级或投资建议。主动权益画像目前是披露后描述，尚未上线实时个股识别成绩。</p>
+        </details>
+      </section>
     </main>
 
     <footer>
@@ -202,6 +223,8 @@
 
     <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_catalog.js" defer></script>
     <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_classification_summary.js" defer></script>
-    <script src="app.js?v=67c5e4ab70b9" defer></script>
+    <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/research_summary.js" defer></script>
+    <script src="research-core.js?v=d53181142b2d" defer></script>
+    <script src="app.js?v=b15f341e45cd" defer></script>
   </body>
 </html>
