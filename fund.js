@@ -19,6 +19,7 @@ const DASHBOARD_DATA_VERSION = 'history-v4-' + new Date().toLocaleDateString("en
 
 const DASHBOARD_GLOBAL_ASSETS = {
   "equity_reconstruction_index.js": "FUND_EQUITY_RECONSTRUCTION_INDEX",
+  "equity_filter_extension_index.js": "FUND_EQUITY_FILTER_EXTENSION_INDEX",
   "equity_simulation_index.js": "FUND_EQUITY_SIMULATION_INDEX",
   "research_summary.js": "FUND_RESEARCH_SUMMARY",
   "stock_classification.js": "FUND_STOCK_CLASSIFICATION",
@@ -2887,16 +2888,82 @@ async function loadEquityReconstruction(code) {
     script.onerror=()=>reject(new Error('历史重建加载失败，可刷新重试'));
     document.head.appendChild(script);
   });
-  return {index,data:window.FUND_EQUITY_RECONSTRUCTION[code]};
+  const historyData=window.FUND_EQUITY_RECONSTRUCTION[code];
+  try {
+    const extensionIndex=await loadDashboardAsset('equity_filter_extension_index.js');
+    const info=extensionIndex.funds?.[code];
+    if(info?.status!=='available') throw new Error(info?.reason||'本基金尚无合格的Filter接续段');
+    if(!window.FUND_EQUITY_FILTER_EXTENSION?.[code]) await new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src=`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/equity_filter_extension/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
+      script.onload=()=>window.FUND_EQUITY_FILTER_EXTENSION?.[code]?resolve():reject(new Error('Filter接续内容不完整'));
+      script.onerror=()=>reject(new Error('Filter接续段加载失败，可刷新重试'));
+      document.head.appendChild(script);
+    });
+    return {index,data:mergeReconstructionExtension(historyData,window.FUND_EQUITY_FILTER_EXTENSION[code])};
+  } catch(error) {
+    return {index,data:{...historyData,extension_issue:error.message}};
+  }
+}
+
+function mergeReconstructionExtension(data, extension) {
+  if(extension?.status!=='available') return {...data,extension_issue:extension?.reason||'暂无合格Filter接续段'};
+  const tail=extension.segment,last=data.segments.at(-1);
+  if(extension.code!==data.code || tail?.method!=='filter' || tail.start!==last?.dates.at(-1) || tail.dates?.[0]!==tail.start || tail.dates.at(-1)!==tail.end || tail.end<=tail.start) throw new Error('Filter与历史末端不一致，未跨缺口连线');
+  if(tail.weights.length!==tail.dates.length || tail.weights.some(row=>row.length!==tail.codes.length+tail.buckets.length || row.some(w=>!Number.isFinite(w)||w<0))) throw new Error('Filter接续权重无效');
+  return {...data,end:tail.end,as_of:extension.as_of,smoother_end:data.end,filter_start:tail.start,
+    filter_available:extension.anchor_available,filter_seam_pp:extension.seam_half_l1_pp,
+    segments:[...data.segments,tail],stock_names:{...data.stock_names,...extension.stock_names},
+    classifications:{...data.classifications,...extension.classifications}};
+}
+
+function reconstructionMethod(segment) {
+  return segment.method==='filter'?'Filter（事后重放）':'Smoother（历史重建）';
+}
+
+function simulationBasisLabel(basis) {
+  return basis==='equity'?'占股票市值':'占基金净资产';
+}
+
+function simulationWeight(value, basis, equity) {
+  if(!Number.isFinite(value)) return null;
+  if(basis!=='equity') return value;
+  return Number.isFinite(equity)&&equity>0?value/equity:null;
+}
+
+function simulationBasisControl(basis) {
+  return `<label>比例口径 <select data-simulation-basis aria-label="持仓比例口径"><option value="nav"${basis!=='equity'?' selected':''}>占基金净资产</option><option value="equity"${basis==='equity'?' selected':''}>占股票市值</option></select></label>`;
+}
+
+function simulationDisplayRows(rows, basis) {
+  return rows.map(row=>{
+    const passiveTotal=Object.values(row.passive_industry).reduce((a,b)=>a+b,0);
+    const scale=(groups,total)=>Object.fromEntries(Object.entries(groups).map(([key,w])=>[key,simulationWeight(w,basis,total)]));
+    return {...row, stock:row.stock.map(w=>simulationWeight(w,basis,row.equity)),
+      passive_stock:row.passive_stock.map(w=>simulationWeight(w,basis,passiveTotal)),
+      industry:scale(row.industry,row.equity),passive_industry:scale(row.passive_industry,passiveTotal),
+      unidentified:simulationWeight(row.unidentified,basis,row.equity)};
+  });
+}
+
+function reconstructionDisclosureTotal(data, disclosure) {
+  const values=Object.values(disclosure.weights);
+  if(!values.every(w=>Number.isFinite(w)&&w>=0)) return null;
+  const disclosed=values.reduce((a,b)=>a+b,0);
+  if(disclosure.full) return disclosed;
+  const asset=window.FUND_DETAIL_DATA?.[data.code]?.asset_history?.find(a=>a.date===disclosure.report_date);
+  const equity=disclosure.equity_total ?? disclosure.allocation ?? asset?.stock;
+  return Number.isFinite(equity)&&equity>0&&disclosed<=equity+1e-6?equity:null;
 }
 
 function reconstructionIndustry(data, code, date, level) {
+  if(code.endsWith('.HK')) return '港股';
   const records=data.classifications[code] || [];
   const row=[...records].reverse().find(r=>r[0]<=date);
   return row?.[1]?.[level] || '未映射';
 }
 
-function reconstructionPoints(data, view, start) {
+function reconstructionPoints(data, view, start, basis='nav') {
   const level=Math.max(0,Number(view)-1), points=[];
   data.segments.forEach((segment,s)=>segment.dates.forEach((date,i)=>{
     if(date<start) return;
@@ -2909,7 +2976,9 @@ function reconstructionPoints(data, view, start) {
       const key=view==='stocks'?'未识别到个股':level===0?name:'未细分行业桶';
       groups[key]=(groups[key] || 0)+weights[segment.codes.length+j];
     });
-    points.push({date,groups,segment:s,index:i});
+    const equity=weights.reduce((a,b)=>a+b,0);
+    for(const key of Object.keys(groups)) groups[key]=simulationWeight(groups[key],basis,equity);
+    points.push({date,groups,segment:s,index:i,equity});
   }));
   return points;
 }
@@ -2923,7 +2992,7 @@ function reconstructionColor(label) {
   return colors[hash%colors.length];
 }
 
-function reconstructionStackChart(data, points, keys, view, selectedDate) {
+function reconstructionStackChart(data, points, keys, view, selectedDate, basis='nav') {
   if(!points.length) return '<p class="empty-copy">所选范围没有通过数据质量检查的轨迹。</p>';
   const width=window.innerWidth<=600?420:960, left=48, right=width-15, bottom=280, top=32;
   const first=Date.parse(points[0].date),last=Date.parse(points.at(-1).date),other=view==='stocks'?'其余已识别股票':'其他已识别行业';
@@ -2936,7 +3005,7 @@ function reconstructionStackChart(data, points, keys, view, selectedDate) {
     labels.forEach((key,k)=>{
       const upper=rows.map((p,i)=>`${x(p.date).toFixed(1)},${y(vectors[i].slice(0,k+1).reduce((a,b)=>a+b,0)).toFixed(1)}`);
       const lower=rows.map((p,i)=>`${x(p.date).toFixed(1)},${y(vectors[i].slice(0,k).reduce((a,b)=>a+b,0)).toFixed(1)}`).reverse();
-      paths+=`<path d="M${upper.join(' L')} L${lower.join(' L')} Z" fill="${reconstructionColor(key)}" opacity=".83"><title>${escapeHTML(view==='stocks'?(data.stock_names[key]||key):key)} · 模型事后估计，占基金净资产</title></path>`;
+      paths+=`<path data-estimation-method="${data.segments[segment].method==='filter'?'filter':'smoother'}" d="M${upper.join(' L')} L${lower.join(' L')} Z" fill="${reconstructionColor(key)}" opacity=".83"><title>${escapeHTML(view==='stocks'?(data.stock_names[key]||key):key)} · ${reconstructionMethod(data.segments[segment])}，${simulationBasisLabel(basis)}</title></path>`;
     });
   }
   const disclosures=new Map();
@@ -2945,89 +3014,116 @@ function reconstructionStackChart(data, points, keys, view, selectedDate) {
   for(const d of disclosures.values()) {
     const groups={};
     Object.entries(d.weights).forEach(([code,w])=>{const key=view==='stocks'?code:d.classes[code]?.[Number(view)-1]||'未映射';groups[key]=(groups[key]||0)+w;});
-    const vector=values(groups), pos=x(d.report_date), kind=d.full?'完整披露真值':'季报前十局部真值（行业是已披露下限）';
-    truth+=`<g><title>${d.report_date} ${kind}；公告/保守可得日 ${d.announcement_date}</title><line x1="${pos}" x2="${pos}" y1="${top-5}" y2="${bottom}" stroke="${d.full?'#17324d':'#826851'}" stroke-dasharray="${d.full?'2 3':'6 4'}" opacity=".5"/>`;
+    const denominator=reconstructionDisclosureTotal(data,d), available=basis!=='equity'||(denominator!==null&&denominator>0);
+    if(available) for(const key of Object.keys(groups)) groups[key]=simulationWeight(groups[key],basis,denominator);
+    const vector=available?values(groups):[], pos=x(d.report_date), kind=d.full?'完整披露真值':'季报前十局部真值（行业是已披露下限）';
+    truth+=`<g data-truth-date="${d.report_date}" data-truth-weight-status="${available?'available':'unavailable'}"><title>${d.report_date} ${kind}；${simulationBasisLabel(basis)}${available?'':'；缺少有效股票总仓位，仅标日期、不画比例柱'}；公告/保守可得日 ${d.announcement_date}</title><line x1="${pos}" x2="${pos}" y1="${top-5}" y2="${bottom}" stroke="${d.full?'#17324d':'#826851'}" stroke-dasharray="${d.full?'2 3':'6 4'}" opacity=".5"/>`;
     let cumulative=0;
     vector.forEach((v,k)=>{truth+=`<rect x="${pos-3}" y="${y(cumulative+v)}" width="6" height="${Math.max(0,y(cumulative)-y(cumulative+v))}" fill="${reconstructionColor(labels[k])}" stroke="${d.full?'#17324d':'#fff'}" stroke-width=".8"/>`;cumulative+=v;});
-    truth+=`<text x="${pos}" y="20" text-anchor="middle">${d.full?'全':'季'}</text></g>`;
+    truth+=`<text x="${pos}" y="20" text-anchor="middle">${d.full?'全':'季'}${available?'':'*'}</text></g>`;
   }
   const grid=[0,.25,.5,.75,1].map(v=>`<line x1="${left}" x2="${right}" y1="${y(v)}" y2="${y(v)}" stroke="#dce5ea"/><text x="40" y="${y(v)+4}" text-anchor="end">${v*100}%</text>`).join('');
   const tickCount=width===420?3:6;
   const ticks=Array.from({length:tickCount},(_,i)=>{const t=first+(last-first)*i/(tickCount-1);return `<text x="${left+(right-left)*i/(tickCount-1)}" y="307" text-anchor="${i===0?'start':i===tickCount-1?'end':'middle'}">${new Date(t).toISOString().slice(0,10)}</text>`;}).join('');
-  return `<svg class="reconstruction-chart" viewBox="0 0 ${width} 320" role="img" aria-label="历史每日持仓堆叠，完整与季度局部真值按报告日标注"><title>历史Smoother：阴影是事后估计，细柱是披露真值；不跨数据缺口连线</title>${grid}${paths}${truth}<line x1="${x(selectedDate)}" x2="${x(selectedDate)}" y1="${top}" y2="${bottom}" stroke="#17324d" stroke-width="1.5"/>${ticks}</svg><div class="reconstruction-legend">${labels.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(view==='stocks'?(data.stock_names[k]||k):k)}</span>`).join('')}</div>`;
+  const boundary=data.filter_start,showFilter=boundary&&Date.parse(boundary)<=last;
+  const boundaryX=showFilter?Math.max(left,x(boundary)):right;
+  const methodBand=showFilter?`<g data-filter-boundary="${boundary}"><rect x="${left}" y="282" width="${Math.max(0,boundaryX-left)}" height="5" fill="#477e8c"/><rect x="${boundaryX}" y="282" width="${Math.max(0,right-boundaryX)}" height="5" fill="#b67829"/><line x1="${boundaryX}" x2="${boundaryX}" y1="${top}" y2="${bottom}" stroke="#b67829" stroke-width="2" stroke-dasharray="6 4"/><text x="${left}" y="338">${boundaryX>left?'Smoother':''}</text><text x="${right}" y="338" text-anchor="end">${boundary} 起 · Filter</text><title>左侧Smoother；${boundary}起右侧Filter事后重放。相同行业使用相同颜色与比例轴。</title></g>`:'';
+  return `<svg class="reconstruction-chart" viewBox="0 0 ${width} ${showFilter?352:320}" role="img" aria-label="每日持仓同轴堆叠，Smoother与Filter分段标注，${simulationBasisLabel(basis)}，完整与季度局部真值按报告日标注"><title>色带是模型估计，细柱是披露真值；${simulationBasisLabel(basis)}；不跨数据缺口连线</title>${grid}${paths}${truth}${methodBand}<line x1="${x(selectedDate)}" x2="${x(selectedDate)}" y1="${top}" y2="${bottom}" stroke="#17324d" stroke-width="1.5"/>${ticks}</svg><div class="reconstruction-legend">${labels.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(view==='stocks'?(data.stock_names[k]||k):k)}</span>`).join('')}</div>`;
 }
 
 function reconstructionPanel(data, options) {
+  const basis=options.basis==='equity'?'equity':'nav', basisLabel=simulationBasisLabel(basis);
   const end=data.end, start=options.range==='all'?data.start:(()=>{const d=new Date(end);d.setUTCFullYear(d.getUTCFullYear()-Number(options.range));return d.toISOString().slice(0,10);})();
-  const points=reconstructionPoints(data,options.view,start);
+  // A denominator switch must not repeat all stock-to-industry lookups. Source
+  // trajectories are immutable; retain at most four view/range projections.
+  const cache=reconstructionPanel.pointCache ||= new WeakMap();
+  let projections=cache.get(data);
+  if(!projections){projections=new Map();cache.set(data,projections);}
+  const projectionKey=`${options.view}|${start}`;
+  let rawPoints=projections.get(projectionKey);
+  if(!rawPoints){
+    rawPoints=reconstructionPoints(data,options.view,start);
+    if(projections.size>=4) projections.delete(projections.keys().next().value);
+    projections.set(projectionKey,rawPoints);
+  }
+  const points=basis==='nav'?rawPoints:rawPoints.map(point=>({...point,groups:Object.fromEntries(Object.entries(point.groups).map(([key,value])=>[key,simulationWeight(value,basis,point.equity)]))}));
   const chosen=[...points].reverse().find(p=>p.date<=(options.date||end)) || points[0];
   if(!chosen) return '<p class="empty-copy">所选范围暂无历史轨迹。</p>';
-  const sum={}; [...new Map(points.map(p=>[p.date,p])).values()].forEach(p=>Object.entries(p.groups).forEach(([k,v])=>{sum[k]=(sum[k]||0)+v;}));
+  const sum={}; [...new Map(rawPoints.map(p=>[p.date,p])).values()].forEach(p=>Object.entries(p.groups).forEach(([k,v])=>{sum[k]=(sum[k]||0)+v;}));
   const ordered=Object.keys(sum).filter(k=>sum[k]>1e-5).sort((a,b)=>sum[b]-sum[a]);
   const unresolved=k=>/未细分|未映射|UNKNOWN/.test(k);
   const keys=options.view==='stocks'?[...ordered.filter(k=>k!=='未识别到个股').slice(0,10),'未识别到个股']:options.count==='all'?ordered:[...ordered.filter(k=>!unresolved(k)).slice(0,12),...ordered.filter(unresolved)];
   const label=k=>options.view==='stocks'?(data.stock_names[k]||k):k;
   const segment=data.segments[chosen.segment];
   const currentRows=Object.entries(chosen.groups).sort((a,b)=>b[1]-a[1]);
-  const table=renderTable([options.view==='stocks'?'候选股票':'行业','估计占基金净资产'],currentRows.map(([k,v])=>[`${escapeHTML(label(k))}${options.view==='stocks'?`<small>${escapeHTML(k)}</small>`:''}`,pct(v,2)]),'table-scroll');
+  const table=renderTable([options.view==='stocks'?'候选股票':'行业',`估计${basisLabel}`],currentRows.map(([k,v])=>[`${escapeHTML(label(k))}${options.view==='stocks'?`<small>${escapeHTML(k)}</small>`:''}`,pct(v,2)]),'table-scroll');
   const maxSeam=Math.max(0,...data.seams.map(x=>x.stock_and_bucket_half_l1_pp));
-  return `<div class="simulation-head"><div><h2>历史持仓重建 <span class="tag">Smoother研究版</span></h2><p>仍从个股状态估计，再映射行业；使用后续披露，不能当作实时预测。</p></div></div><div class="profile-date-strip"><span>可得轨迹 <strong>${escapeHTML(data.start)} 至 ${escapeHTML(data.end)}</strong></span><span>信息截止 <strong>${escapeHTML(data.as_of)}</strong></span><span>完整披露分段 <strong>${data.segments.length}段</strong></span></div>
+  return `<div class="simulation-head"><div><h2>持仓模拟 <span class="tag">连续轨迹 · 研究版</span></h2><p>个股状态估计，行业堆叠展示；历史重建与右端逐日估计同轴，不能当作实时预测或真实交易记录。</p></div></div><div class="profile-date-strip"><span>可得轨迹 <strong>${escapeHTML(data.start)} 至 ${escapeHTML(data.end)}</strong></span><span>Smoother 至 <strong>${escapeHTML(data.smoother_end||data.end)}</strong></span>${data.filter_start?`<span>Filter 起点 <strong>${data.filter_start}</strong></span>`:''}</div>
+    ${data.filter_start?`<p class="method-note">图下蓝绿色标带：Smoother；金色标带：Filter（事后重放）。以 ${data.filter_start} 完整持仓初始化，信息可得日为 ${escapeHTML(data.filter_available)}；之后按每日行情和净值向前估计，没有用右侧后续收益回修前日权重。</p>`:`<p class="simulation-warning">右端 Filter 尚未接续：${escapeHTML(data.extension_issue||'暂无合格接续数据')}。仅显示实际已有历史，不填补缺口。</p>`}
+    ${data.filter_seam_pp>5?`<p class="simulation-warning">边界修订较大：6月末Smoother估计与Filter披露初值相差 ${num(data.filter_seam_pp,2)} 个百分点（股票＋行业桶half-L1）。图上保留跳变，应先核对这一接缝，不能解读为当天真实调仓。</p>`:''}
     <article class="subpanel"><div class="history-controls"><label>堆叠维度 <select data-reconstruction-control="view" aria-label="堆叠维度">${[['1','中信一级行业'],['2','中信二级行业'],['3','中信三级行业'],['stocks','个股前十']].map(([k,v])=>`<option value="${k}"${options.view===k?' selected':''}>${v}</option>`).join('')}</select></label><label>历史范围 <select data-reconstruction-control="range" aria-label="历史范围">${[['1','最近1年轨迹'],['3','最近3年轨迹'],['5','最近5年轨迹'],['all','全部可得轨迹']].map(([k,v])=>`<option value="${k}"${options.range===k?' selected':''}>${v}</option>`).join('')}</select></label>${options.view!=='stocks'?`<label>图例 <select data-reconstruction-control="count" aria-label="行业图例数量"><option value="12"${options.count!=='all'?' selected':''}>主要12类＋其他</option><option value="all"${options.count==='all'?' selected':''}>全部行业</option></select></label>`:''}<label>查看日期 <input type="date" data-reconstruction-control="date" aria-label="重建查看日期" min="${data.start}" max="${data.end}" value="${chosen.date}"></label></div>
-    ${reconstructionStackChart(data,points,keys,options.view,chosen.date)}<p class="method-note">色带为每日模型估计；“全”细柱为完整持仓真值，“季”细柱仅为季度前十真值。行业季度柱是下限，不是整个行业仓位；公告日只在提示中说明，横坐标是报告日。个股前十按所选区间平均估计权重固定，避免每天换图例；其余股票与未识别权益分开。</p></article>
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>${chosen.date} · ${options.view==='stocks'?'个股模拟明细':'行业模拟明细'}</h3><span>合计 ${pct(Object.values(chosen.groups).reduce((a,b)=>a+b,0),1)}，占基金净资产</span></div></div><details${currentRows.length<=35?' open':''}><summary>查看全部${currentRows.length}项模型估计</summary>${table}</details><details><summary>本段实际披露日期与输入</summary>${renderTable(['报告日','信息可得日','披露范围'],segment.disclosures.map(d=>[d.report_date,d.announcement_date,d.full?'完整持仓':'季度前十（局部真值）']),'table-scroll')}</details></article>
-    <details class="simulation-method"><summary>研究边界、分段接缝与数据缺口</summary><p>冻结已验证的股票＋行业桶Smoother，融合区间季报，不新增调参。按完整披露分段，年段候选超过计算上限时拆为半年段；不插值覆盖接缝。当前最大接缝修订距离为${maxSeam.toFixed(2)}个百分点（股票＋行业桶half-L1），这是分段差异，不是准确率。</p><p>历史重建截至最近完整披露报告日，不把6月30日持仓冒充8月31日持仓。右端之后尚未形成闭合历史重建区间；当前Filter在另一模式独立显示，二者之间不强行连线。二/三级无法拆分的行业桶保留“未细分”。</p><p>40只研究样本曾做独立留出披露测试，但此图已吸收可得真值，其贴合程度不能再算独立验证，更不能代表每天真实交易。原始行情与分类存在版本修订；无校准的95%区间不展示。</p>${data.issues.length?`<p>未生成区间：${data.issues.map(x=>`${escapeHTML(x.start)}—${escapeHTML(x.end)}：${escapeHTML(x.reason)}`).join('；')}</p>`:'<p>该基金所选历史段均通过行情覆盖、权重守恒和协方差检查。</p>'}</details>`;
+    <div class="history-controls">${simulationBasisControl(basis)}<span class="method-note">${basis==='equity'?'分母为全部股票资产，含未识别权益；不按前十或已显示行业归一。':'保留总股票仓位的变化；分母为基金净资产。'}</span></div>${reconstructionStackChart(data,points,keys,options.view,chosen.date,basis)}<p class="method-note">色带为每日模型估计；“全”细柱为完整持仓真值，“季”细柱仅为季度前十真值。行业季度柱是下限，不是整个行业仓位；公告日只在提示中说明，横坐标是报告日。个股前十按所选区间平均占基金净资产权重固定，切换分母不换图例；其余股票与未识别权益分开。${basis==='equity'?'披露柱使用真实股票总仓位作分母；“季*”表示当期分母缺失，仅标日期，不以模型或前十合计替代。':''}</p></article>
+    <article class="subpanel"><div class="subpanel-heading"><div><h3>${chosen.date} · ${options.view==='stocks'?'个股模拟明细':'行业模拟明细'} <span class="tag">${reconstructionMethod(segment)}</span></h3><span>${basis==='equity'&&!(chosen.equity>0)?'无有效股票仓位，股票市值口径不适用':`合计 ${pct(Object.values(chosen.groups).reduce((a,b)=>a+b,0),1)}，${basisLabel}`}；股票总仓位 ${pct(chosen.equity,1)}（占基金净资产）</span></div></div><details${currentRows.length<=35?' open':''}><summary>查看全部${currentRows.length}项模型估计</summary>${table}</details><details><summary>本段实际披露日期与输入</summary>${renderTable(['报告日','信息可得日','披露范围'],segment.disclosures.map(d=>[d.report_date,d.announcement_date,d.full?'完整持仓':'季度前十（局部真值）']),'table-scroll')}</details></article>
+    <details class="simulation-method"><summary>研究边界、分段接缝与数据缺口</summary><p>沿用冻结股票＋行业桶研究核心与Q/P/R；历史运行Smoother并融合区间季报，右端只运行同一核心的前向Filter，不调用反向平滑。原试点Filter采用另一既有初始化方案，其留档、对照与验真仍独立保留，不将本轮接续当成调参改善。</p><p>历史分段最大接缝修订为${maxSeam.toFixed(2)}个百分点（股票＋行业桶half-L1）。${data.filter_start?`本次Filter以完整披露重新初始化权重与冻结初始协方差，与Smoother末端差 ${num(data.filter_seam_pp,2)} 个百分点；保留这次边界修订，不用插值抹平。`:''}同轴不表示协方差无缝延续，也不代表准确率。</p><p>信息截止 ${escapeHTML(data.as_of)}。不把6月30日持仓冒充8月31日持仓；后来才公开的锚点使这段Filter属于事后重放，不是当时已留档预测。候选池仍以该完整披露为准，池外新股只能留在未识别权益。二/三级无法拆分的行业桶保留“未细分”。</p><p>此图已吸收可得披露与净值，其贴合程度不是独立持仓验证。原始行情和分类未逐日版本化；无校准的95%区间不展示。</p>${data.issues.length?`<p>未生成历史区间：${data.issues.map(x=>`${escapeHTML(x.start)}—${escapeHTML(x.end)}：${escapeHTML(x.reason)}`).join('；')}</p>`:'<p>该基金所选历史段均通过行情覆盖、权重守恒和协方差检查。</p>'}</details>`;
 }
 
 function bindCombinedEquitySimulation(target, current, historical, historicalError='') {
   const params=new URLSearchParams(location.search);
   let mode=params.get('simMode') || (historical?.data?'history':'current');
-  const options={view:['1','2','3','stocks'].includes(params.get('historyView'))?params.get('historyView'):'1',range:['1','3','5','all'].includes(params.get('historyRange'))?params.get('historyRange'):'all',count:params.get('historyCount')==='all'?'all':'12',date:params.get('historyDate')||''};
+  const options={view:['1','2','3','stocks'].includes(params.get('historyView'))?params.get('historyView'):'1',range:['1','3','5','all'].includes(params.get('historyRange'))?params.get('historyRange'):'all',count:params.get('historyCount')==='all'?'all':'12',date:params.get('historyDate')||'',basis:params.get('simBasis')==='equity'?'equity':'nav'};
   const render=()=>{
     const meta=historical?.index?.funds?.[fundCode];
-    target.innerHTML=`<div class="simulation-tabs" role="group" aria-label="实时与历史模式"><button data-model-mode="history" class="${mode==='history'?'active':''}" aria-pressed="${mode==='history'}">历史重建 · Smoother</button><button data-model-mode="current" class="${mode!=='history'?'active':''}" aria-pressed="${mode!=='history'}">当前估计 · Filter</button></div><div data-model-content></div>`;
+    target.innerHTML=`<div class="simulation-tabs" role="group" aria-label="连续轨迹与原试点档案"><button data-model-mode="history" class="${mode==='history'?'active':''}" aria-pressed="${mode==='history'}">连续轨迹 · Smoother → Filter</button><button data-model-mode="current" class="${mode!=='history'?'active':''}" aria-pressed="${mode!=='history'}">原试点对照与验真</button></div><div data-model-content></div>`;
     const body=target.querySelector('[data-model-content]');
     if(mode==='history') body.innerHTML=historical?.data?reconstructionPanel(historical.data,options):`<article class="subpanel"><h2>历史持仓重建</h2><p>${escapeHTML(historicalError || meta?.issues?.map(x=>x.reason).join('；') || '本基金尚未纳入固定历史重建试点，不生成虚构轨迹。')}</p><p class="method-note">历史重建与当前Filter覆盖范围独立；本批固定研究/原试点并集，不代表全部主观权益基金。</p></article>`;
     else bindEquitySimulation(body,current.data,current.index);
-    target.querySelectorAll('[data-model-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.modelMode;update();}));
+    target.querySelectorAll('[data-model-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.modelMode;options.basis=new URLSearchParams(location.search).get('simBasis')==='equity'?'equity':'nav';update();}));
     target.querySelectorAll('[data-reconstruction-control]').forEach(c=>c.addEventListener('change',()=>{options[c.dataset.reconstructionControl]=c.value;update();}));
+    if(mode==='history') target.querySelector('[data-simulation-basis]')?.addEventListener('change',e=>{options.basis=e.target.value==='equity'?'equity':'nav';update();});
   };
-  const update=()=>{const url=new URL(location.href);url.searchParams.set('simMode',mode);for(const [k,v] of Object.entries(options))url.searchParams.set('history'+k[0].toUpperCase()+k.slice(1),v);history.replaceState(null,'',url);render();};
+  const update=()=>{const url=new URL(location.href);url.searchParams.set('simMode',mode);for(const [k,v] of Object.entries(options))url.searchParams.set(k==='basis'?'simBasis':'history'+k[0].toUpperCase()+k.slice(1),v);history.replaceState(null,'',url);render();};
   render();
 }
 
-function simulationLineChart(rows, industry, disclosed) {
+function simulationLineChart(rows, industry, disclosed, basis='nav') {
   const width = typeof window !== 'undefined' && window.innerWidth <= 600 ? 360 : 890;
   const right = width - (width === 360 ? 16 : 56);
-  const values = rows.flatMap(r => [r.industry[industry] || 0, r.passive_industry[industry] || 0]);
+  const value=(row,key)=>Object.hasOwn(row[key],industry)?row[key][industry]:0;
+  const values = rows.flatMap(r => [value(r,'industry'),value(r,'passive_industry')]).filter(Number.isFinite);
   const high = Math.max(.01, disclosed || 0, ...values) * 1.12;
   const x = i => 62 + i / Math.max(rows.length - 1, 1) * (right - 62);
   const y = value => 207 - value / high * 166;
-  const line = key => rows.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(2)},${y(r[key][industry] || 0).toFixed(2)}`).join(' ');
+  const line = key => {let connected=false;return rows.map((r,i)=>{const v=value(r,key);if(!Number.isFinite(v)){connected=false;return '';}const command=connected?'L':'M';connected=true;return `${command}${x(i).toFixed(2)},${y(v).toFixed(2)}`;}).join(' ');};
   const grid = [0, .5, 1].map(t => `<line x1="62" x2="${right}" y1="${y(t*high)}" y2="${y(t*high)}" stroke="#dce5ea"/><text x="51" y="${y(t*high)+4}" text-anchor="end">${(t*high*100).toFixed(1)}%</text>`).join('');
-  return `<svg class="simulation-chart" viewBox="0 0 ${width} 248" role="img" aria-label="${escapeHTML(industry)}行业每日估计与无调仓对照，权重占基金净资产"><title>${escapeHTML(industry)} · 每日模型估计，不是真实交易记录</title>${grid}
-    <line x1="62" x2="${right}" y1="${y(disclosed || 0)}" y2="${y(disclosed || 0)}" stroke="#80909d" stroke-dasharray="2 6"/>
+  return `<svg class="simulation-chart" viewBox="0 0 ${width} 248" role="img" aria-label="${escapeHTML(industry)}行业每日估计与无调仓对照，${simulationBasisLabel(basis)}"><title>${escapeHTML(industry)} · 每日模型估计，不是真实交易记录；${simulationBasisLabel(basis)}</title>${grid}
+    ${Number.isFinite(disclosed)?`<line x1="62" x2="${right}" y1="${y(disclosed)}" y2="${y(disclosed)}" stroke="#80909d" stroke-dasharray="2 6"/>`:''}
     <path d="${line('passive_industry')}" fill="none" stroke="#b67829" stroke-width="2.5" stroke-dasharray="7 4"/>
     <path d="${line('industry')}" fill="none" stroke="#087f83" stroke-width="3"/>
-    ${rows.map((r,i) => `<circle cx="${x(i)}" cy="${y(r.industry[industry] || 0)}" r="3.5" fill="#087f83"><title>${escapeHTML(r.date)}：估计 ${pct(r.industry[industry] || 0,1)}；无调仓 ${pct(r.passive_industry[industry] || 0,1)}</title></circle>`).join('')}
+    ${rows.map((r,i) => Number.isFinite(value(r,'industry'))?`<circle cx="${x(i)}" cy="${y(value(r,'industry'))}" r="3.5" fill="#087f83"><title>${escapeHTML(r.date)}：估计 ${pct(value(r,'industry'),1)}；无调仓 ${pct(value(r,'passive_industry'),1)}；${simulationBasisLabel(basis)}</title></circle>`:'').join('')}
     <text x="62" y="236">${escapeHTML(rows[0]?.date || '')}</text><text x="${right}" y="236" text-anchor="end">${escapeHTML(rows.at(-1)?.date || '')}</text></svg>`;
 }
 
-function equitySimulationPanel(data, index, selectedDate, view, selectedIndustry) {
+function equitySimulationPanel(data, index, selectedDate, view, selectedIndustry, basis='nav') {
+  basis=basis==='equity'?'equity':'nav';
+  const basisLabel=simulationBasisLabel(basis);
   const peers = Object.entries(index.funds || {}).map(([code, fund]) => `<a href="fund.html?code=${encodeURIComponent(code)}&tab=simulation">${escapeHTML(fund.name)} <small>${escapeHTML(code)}</small></a>`).join('');
   if (!data || data.status !== 'available') return `<div class="panel-intro"><div><h2>持仓模拟（研究版）</h2><p>目前仅覆盖 ${Object.keys(index.funds || {}).length} 只固定试点基金。</p></div></div><article class="subpanel"><p>${escapeHTML(data?.reason || '本基金暂未纳入试点，不生成推测性持仓。')}</p><p class="method-note">按完整持仓、A股覆盖和行情质量选择，未按模型效果筛选；尚不推广到全部主动权益基金。</p><div class="simulation-pilot-links">${peers}</div></article>`;
-  const rows = data.rows || [];
+  const rows = simulationDisplayRows(data.rows || [],basis);
   const row = rows.find(r => r.date === selectedDate) || rows.at(-1);
   if (!row) return '<p class="empty-copy">暂无可用模拟日期。</p>';
   const names = Object.keys(row.industry).sort((a,b) => row.industry[b] - row.industry[a]);
   const industry = names.includes(selectedIndustry) ? selectedIndustry : names[0];
   const pointRows = rows.filter(r => r.date <= row.date);
-  const delta = value => `${value > 0 ? '+' : ''}${(value*100).toFixed(1)}个百分点`;
+  const delta = value => Number.isFinite(value)?`${value > 0 ? '+' : ''}${(value*100).toFixed(1)}个百分点`:'—';
+  const difference=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)?a-b:null;
+  const groupWeight=(groups,name)=>Object.hasOwn(groups,name)?groups[name]:0;
+  const anchorWeight=w=>simulationWeight(w,basis,data.anchor.equity);
   const button = (id,label) => `<button type="button" data-simulation-view="${id}" aria-pressed="${view === id}" class="${view === id ? 'active' : ''}">${label}</button>`;
   const table = (heads,body) => `<div class="table-scroll"><table class="simulation-table"><thead><tr>${heads.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`;
   let content = '';
   if (view === 'stocks') {
     const stockRows = data.candidates.map((h,i)=>({h, estimated:row.stock[i], passive:row.passive_stock[i]})).sort((a,b)=>b.estimated-a.estimated);
-    content = `<article class="subpanel"><h3>${escapeHTML(row.date)} · 候选股票仓位估计</h3><p class="simulation-warning">候选池外未识别到具体股票的权益：${pct(row.unidentified,1)}。不会把它强行分给某只股票，也不能把模型排名当成真实前十大。</p>${table(['股票','披露锚点','无调仓对照','模型估计','相对无调仓'],stockRows.map(({h,estimated,passive})=>`<tr><td>${escapeHTML(h.name)}<small>${escapeHTML(h.code)} · ${escapeHTML(h.industry)}</small></td><td>${pct(h.weight,1)}</td><td>${pct(passive,1)}</td><td><strong>${pct(estimated,1)}</strong></td><td>${delta(estimated-passive)}</td></tr>`).join(''))}<p class="method-note">全表 ${stockRows.length} 只候选股票；权重占基金净资产。初始候选来自已公开持仓，目前不能可靠发现池外新股。锚点如合并季报，尾部是延续假设而非新披露。</p></article>`;
+    content = `<article class="subpanel"><h3>${escapeHTML(row.date)} · 候选股票仓位估计</h3><p class="simulation-warning">候选池外未识别到具体股票的权益：${pct(row.unidentified,1)}（${basisLabel}）。不会把它强行分给某只股票，也不能把模型排名当成真实前十大。</p>${table(['股票','披露锚点','无调仓对照','模型估计','相对无调仓'],stockRows.map(({h,estimated,passive})=>`<tr><td>${escapeHTML(h.name)}<small>${escapeHTML(h.code)} · ${escapeHTML(h.industry)}</small></td><td>${pct(anchorWeight(h.weight),1)}</td><td>${pct(passive,1)}</td><td><strong>${pct(estimated,1)}</strong></td><td>${delta(difference(estimated,passive))}</td></tr>`).join(''))}<p class="method-note">全表 ${stockRows.length} 只候选股票；${basisLabel}。初始候选来自已公开持仓，目前不能可靠发现池外新股。锚点如合并季报，尾部是延续假设而非新披露。</p></article>`;
   } else if (view === 'validation') {
     const evaluations = data.evaluations || [];
     const evidenceLabel = kind => kind === 'frozen_before_disclosure' ? '实际披露前留档' : kind === 'frozen_before_availability_actual_announcement_unverified' ? '可得日前留档，实际公告日待核验' : '事后补算';
@@ -3036,13 +3132,15 @@ function equitySimulationPanel(data, index, selectedDate, view, selectedIndustry
       <article class="subpanel"><h3>历史补算与 Smoother 的边界</h3><p>当前图表是从最近公开锚点补算的每日 Filter 路径，不代表每一天都在当时留档。网页暂不混入使用后续完整持仓的 Smoother；此前研究结果也不计入本批在线成绩。</p><p class="method-note">首次留档：${escapeHTML(data.freeze.recorded_at.replace('T',' ').slice(0,19))}；记录估计日：${escapeHTML(data.as_of)}。${data.freeze.revision_since_first_freeze ? '输入发生修订，本页为重算展示，首次留档仍保留用于验真。' : '后续每个新增估计日单独留档。'}</p></article>`;
   } else {
     content = `<article class="subpanel"><div class="simulation-chart-toolbar"><h3>行业每日轨迹</h3><label>行业 <select data-simulation-industry>${names.map(name=>`<option value="${escapeHTML(name)}" ${name === industry ? 'selected' : ''}>${escapeHTML(name)}</option>`).join('')}</select></label></div>
-      <div class="simulation-legend"><span class="estimated">模型估计</span><span class="passive">无调仓对照</span><span class="disclosed">${escapeHTML(data.anchor.report_date)} 披露锚点水平参照</span></div>${simulationLineChart(pointRows,industry,data.anchor.industry[industry] || 0)}
+      <div class="simulation-legend"><span class="estimated">模型估计</span><span class="passive">无调仓对照</span><span class="disclosed">${escapeHTML(data.anchor.report_date)} 披露锚点水平参照</span></div>${simulationLineChart(pointRows,industry,anchorWeight(data.anchor.industry[industry] || 0),basis)}
       <p class="method-note">信息可得日后起算，当前共 ${pointRows.length} 个交易日；部分披露采用保守可得日，不是核验过的实际公告日。不把报告日至可得日的补算当作实时识别。估计与无调仓对照之差也不等于已证实交易。</p></article>
-      <article class="subpanel"><h3>${escapeHTML(row.date)} · 行业配置对照</h3>${table(['行业','披露锚点','无调仓对照','模型估计','相对无调仓'],names.map(name=>`<tr><td>${escapeHTML(name)}</td><td>${pct(data.anchor.industry[name] || 0,1)}</td><td>${pct(row.passive_industry[name] || 0,1)}</td><td><strong>${pct(row.industry[name] || 0,1)}</strong></td><td>${delta((row.industry[name] || 0)-(row.passive_industry[name] || 0))}</td></tr>`).join(''))}</article>`;
+      <article class="subpanel"><h3>${escapeHTML(row.date)} · 行业配置对照 <small>${basisLabel}</small></h3>${table(['行业','披露锚点','无调仓对照','模型估计','相对无调仓'],names.map(name=>`<tr><td>${escapeHTML(name)}</td><td>${pct(anchorWeight(data.anchor.industry[name] || 0),1)}</td><td>${pct(groupWeight(row.passive_industry,name),1)}</td><td><strong>${pct(groupWeight(row.industry,name),1)}</strong></td><td>${delta(difference(groupWeight(row.industry,name),groupWeight(row.passive_industry,name)))}</td></tr>`).join(''))}</article>`;
   }
   return `<div class="simulation-head"><div><h2>持仓模拟 <span class="tag">研究版</span></h2><p>观察可能的配置变化，不是真实持仓披露。</p></div><label>估计日期 <select data-simulation-date>${rows.map(r=>`<option value="${r.date}" ${r.date === row.date ? 'selected' : ''}>${r.date}</option>`).join('')}</select></label></div>
     <div class="profile-date-strip"><span>持仓锚点 <strong>${escapeHTML(data.anchor.report_date)}</strong></span><span>信息可得日（保守） <strong>${escapeHTML(data.anchor.announcement_date)}</strong></span><span>模拟至 <strong>${escapeHTML(data.as_of)}</strong></span></div>
-    <div class="simulation-metrics">${metric('估计股票仓位',pct(row.equity,1))}${metric('未识别到个股',pct(row.unidentified,1))}${metric('候选行情覆盖',pct(data.quality.candidate_weight_coverage,1))}</div>
+    <div class="history-controls">${simulationBasisControl(basis)}<span class="method-note">${basis==='equity'?'模型、无调仓、披露锚点各自除以对应全部股票仓位；包含未识别权益，不以候选合计替代。':'图表及持仓明细按基金净资产计算。'}${view==='validation'?' 验真误差固定按基金净资产计算，不随展示口径切换。':''}</span></div>
+    ${basis==='equity'&&!(row.equity>0)?'<p class="simulation-warning">无有效股票仓位，股票市值口径不适用。</p>':''}
+    <div class="simulation-metrics">${metric('估计股票仓位（占基金净资产）',pct(row.equity,1))}${metric(`未识别到个股（${basisLabel}）`,pct(row.unidentified,1))}${metric('候选行情覆盖',pct(data.quality.candidate_weight_coverage,1))}</div>
     <div class="simulation-tabs" role="group" aria-label="持仓模拟视图">${button('industry','行业模拟')}${button('stocks','个股模拟')}${button('validation','披露验证与方法')}</div>${content}
     <details class="simulation-method"><summary>模型、数据及适用边界</summary><p>沿用 V2 行业状态结构与固定 Q/P/R；不启用机器学习新股先验、画像调 P 或动态 R。历史画像仍在“基金画像”中独立展示，没有强制把估计拉回旧偏好。</p><p>中信一级行业采用本地历史成分中有行情股票的等权收益代理，不是官方行业指数；本窗口最低行业成分覆盖 ${pct(data.quality.industry_member_coverage_min,1)}。历史分类与行情未逐日版本化，可能有修订；因此补算不能作为严格在线证据。没有校准过的不确定性不会伪装成95%置信区间。</p><p>仅试点A股主导基金，暂不覆盖港股汇率与复杂非股票资产的独立解释。结果不构成投资建议。</p></details>`;
 }
@@ -3052,15 +3150,18 @@ function bindEquitySimulation(target, data, index) {
   let view = ['industry','stocks','validation'].includes(query.get('simView')) ? query.get('simView') : 'industry';
   let selectedDate = query.get('simDate') || data?.as_of;
   let industry = query.get('simIndustry') || '';
+  let basis = query.get('simBasis')==='equity'?'equity':'nav';
   const render = () => {
-    target.innerHTML = equitySimulationPanel(data,index,selectedDate,view,industry);
+    target.innerHTML = equitySimulationPanel(data,index,selectedDate,view,industry,basis);
     target.querySelectorAll('[data-simulation-view]').forEach(button=>button.addEventListener('click',()=>{view=button.dataset.simulationView; update();}));
     target.querySelector('[data-simulation-date]')?.addEventListener('change',event=>{selectedDate=event.target.value;update();});
     target.querySelector('[data-simulation-industry]')?.addEventListener('change',event=>{industry=event.target.value;update();});
+    target.querySelector('[data-simulation-basis]')?.addEventListener('change',event=>{basis=event.target.value==='equity'?'equity':'nav';update();});
   };
   const update = () => {
     const url = new URL(location.href);
     url.searchParams.set('simView',view);
+    url.searchParams.set('simBasis',basis);
     if(selectedDate) url.searchParams.set('simDate',selectedDate);
     if(industry) url.searchParams.set('simIndustry',industry);
     history.replaceState(null,'',url);

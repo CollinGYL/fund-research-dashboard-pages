@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-07T14:50:34+08:00",
-  "source": "dist/web_release/frontend",
+  "generatedAt": "2026-09-08T09:28:29+08:00",
+  "source": "dist/web_release_simulations_20260908_cached/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "index.html": {
@@ -10,7 +10,7 @@
     },
     "fund.html": {
       "size": 2415,
-      "sha256": "e7e6a879decea1e0420002587530a1bd53685baeed78f6f13f108c2e69f79e64"
+      "sha256": "bded583a5044986008399ba1ddf96443f0486d3424e61a93fb12842275a12529"
     },
     "styles.css": {
       "size": 140575,
@@ -29,8 +29,8 @@
       "sha256": "62f5b190ea61e425cf01136e577ee72e79a2835346650e0560bab908aa860020"
     },
     "fund.js": {
-      "size": 505059,
-      "sha256": "43b327834fbeb122dc3a7cbed6d925268b1a13f29fd67ab5e0036e8dc34e0150"
+      "size": 515770,
+      "sha256": "b5e5c62d51f05c31f2e56b29e5fa14b0afeb281c0860b4d56e1a6b69d596d0d1"
     },
     "research-core.js": {
       "size": 2368,
@@ -46,7 +46,7 @@
     "fund.html": 0,
     "app.js": 3,
     "pure-bond-reference.js": 4,
-    "fund.js": 20,
+    "fund.js": 21,
     "research-core.js": 0
   }
 }
