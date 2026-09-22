@@ -1747,3 +1747,53 @@ details.subpanel[open] > summary { margin-bottom: 16px; }
   .workbench footer { width:calc(100% - 28px); }
 }
 @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .workbench * { transition:none !important; } }
+
+/* Keep the equity research columns together without widening the whole page. */
+.workbench .list-sort-state { margin:6px 0; color:#486478; font-size:12px; line-height:1.6; }
+.workbench .fund-list-table [data-sort-key][aria-pressed="true"] { color:#066e68; background:#dcefeb; border-radius:4px; }
+.workbench .equity-overview-cell .equity-manager { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#536a7d; font-size:12px; line-height:1.5; }
+.workbench .equity-overview-cell a strong { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; overflow-wrap:anywhere; line-height:1.4; }
+.workbench .fund-row-details { min-width:0; margin-top:4px; grid-column:1 / -1; }
+.workbench .fund-row-details > summary { width:fit-content; padding:2px 0; color:#346c7b; font-size:11px; line-height:1.6; }
+.workbench .fund-row-details[open] > summary { margin-bottom:6px; }
+.workbench .fund-row-details dl { display:grid; gap:2px; margin:0; padding:8px; border:1px solid #dce5ed; border-radius:5px; background:#f3f7fa; }
+.workbench .fund-row-details dt { color:#61798c; font-size:10px; }
+.workbench .fund-row-details dd { margin:0 0 5px; color:#304d63; font-size:12px; line-height:1.55; overflow-wrap:anywhere; white-space:normal; }
+.workbench .fund-row-details dd:last-child { margin-bottom:0; }
+@media (min-width:721px) {
+  .compact-home.workbench .fund-list-table.active-equity-mode { width:100%; min-width:1200px; table-layout:fixed; }
+  .compact-home.workbench .fund-list-table.active-equity-mode :is(th,td) { min-width:0; padding:10px 9px; overflow-wrap:anywhere; }
+  .compact-home.workbench .fund-list-table.active-equity-mode :is(th,td):first-child { width:204px; min-width:0; }
+  .workbench .active-equity-mode .size-filter-heading { width:90px; }
+  .workbench .active-equity-mode .sortable-period-heading { width:74px; }
+  .workbench .active-equity-mode .equity-stock-heading { width:90px; }
+  .workbench .active-equity-mode .profile-filter-heading { width:170px; }
+  .workbench .active-equity-mode .sector-filter-heading { width:124px; }
+  .workbench .active-equity-mode .industry-filter-heading { width:152px; }
+  .workbench .active-equity-mode tbody td:nth-last-child(4) > small { white-space:nowrap; font-size:11px; }
+  .compact-home.workbench .fund-list-table.active-equity-mode .table-header-select { width:100%; min-width:0; max-width:100%; padding-left:5px; padding-right:17px; font-size:11px; }
+  .workbench .active-equity-mode .table-header-filter-row { display:grid; grid-template-columns:minmax(0,1fr) 28px; gap:4px; }
+  .workbench .active-equity-mode .table-header-level-select { grid-column:1 / -1; }
+  .workbench .active-equity-mode .table-filter-direction { width:28px; padding:0; font-size:15px; }
+  .workbench .active-equity-mode .metric-sort-controls { display:flex; flex-direction:column; align-items:stretch; gap:3px; margin-top:6px; }
+  .workbench .active-equity-mode .metric-sort-controls button { padding:2px; text-align:left; font-size:11px; line-height:1.5; font-weight:500; }
+  .workbench .active-equity-mode .period-cell { white-space:nowrap; }
+  .workbench .active-equity-mode .period-cell small { font-size:10px; }
+  .workbench .active-equity-mode .fund-profile-chip-grid { gap:4px; }
+  .workbench .active-equity-mode .fund-profile-chip-grid span { padding:4px; white-space:normal; line-height:1.35; }
+  .workbench .active-equity-mode .fund-profile-chip-grid b { display:block; margin:0 0 2px; color:#647e79; font-size:10px; }
+}
+@media (max-width:720px) {
+  .compact-home.workbench .fund-list-table.active-equity-mode { width:100%; min-width:0; table-layout:auto; }
+  .workbench .active-equity-mode .equity-manager { grid-column:1 / -1; }
+  .workbench .active-equity-mode .equity-overview-cell a strong { white-space:normal; }
+  .workbench .active-equity-mode .fund-row-details > summary { min-height:30px; display:flex; align-items:center; }
+  .workbench .active-equity-mode .fund-row-details > summary::before { content:'▸'; margin-right:5px; }
+  .workbench .active-equity-mode .fund-row-details[open] > summary::before { content:'▾'; }
+  .workbench .active-equity-mode .fund-row-details dl { max-width:100%; }
+  .workbench .list-sort-state { flex-basis:100%; margin:0 0 6px; }
+}
+
+.workbench .model-coverage{font-size:12px;line-height:1.7;color:#526579;background:#f0f4f7;border-left:3px solid #879eaf;padding:8px 12px;margin:10px 0;}
+.workbench .model-coverage strong{color:#253e53;font-variant-numeric:tabular-nums;}
+@media(max-width:720px){.workbench .legacy-period-switch{width:auto;flex-shrink:0}.workbench .legacy-period-switch button{white-space:nowrap;min-width:85px;padding:6px 9px}}

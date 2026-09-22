@@ -3036,12 +3036,20 @@ function reconstructionStackChart(data, points, keys, view, selectedDate, basis=
   const values=groups=>labels.map(k=>k===other?Math.max(0,Object.entries(groups).reduce((sum,[name,v])=>sum+(keys.includes(name)?0:v),0)):(groups[k]||0));
   let paths='';
   for(const segment of [...new Set(points.map(p=>p.segment))]) {
-    const rows=points.filter(p=>p.segment===segment), vectors=rows.map(p=>values(p.groups));
+    const blocks=[];
+    for(const row of points.filter(p=>p.segment===segment)) {
+      const previous=blocks.at(-1)?.at(-1);
+      if(!previous||(data.coverage_gaps||[]).some(g=>g.start>previous.date&&g.end<row.date)) blocks.push([]);
+      blocks.at(-1).push(row);
+    }
+    for(const rows of blocks) {
+    const vectors=rows.map(p=>values(p.groups));
     labels.forEach((key,k)=>{
       const upper=rows.map((p,i)=>`${x(p.date).toFixed(1)},${y(vectors[i].slice(0,k+1).reduce((a,b)=>a+b,0)).toFixed(1)}`);
       const lower=rows.map((p,i)=>`${x(p.date).toFixed(1)},${y(vectors[i].slice(0,k).reduce((a,b)=>a+b,0)).toFixed(1)}`).reverse();
       paths+=`<path data-estimation-method="${data.segments[segment].method==='filter'?'filter':'smoother'}" d="M${upper.join(' L')} L${lower.join(' L')} Z" fill="${reconstructionColor(key)}" opacity=".83"><title>${escapeHTML(view==='stocks'?(data.stock_names[key]||key):key)} · ${reconstructionMethod(data.segments[segment])}，${simulationBasisLabel(basis)}</title></path>`;
     });
+    }
   }
   const disclosures=new Map();
   data.segments.forEach(s=>s.disclosures.forEach(d=>{if(Date.parse(d.report_date)>=first && Date.parse(d.report_date)<=last) disclosures.set(d.report_date,d);}));
@@ -3063,7 +3071,11 @@ function reconstructionStackChart(data, points, keys, view, selectedDate, basis=
   const boundary=data.filter_start,showFilter=boundary&&Date.parse(boundary)<=last;
   const boundaryX=showFilter?Math.max(left,x(boundary)):right;
   const methodBand=showFilter?`<g data-filter-boundary="${boundary}"><rect x="${left}" y="282" width="${Math.max(0,boundaryX-left)}" height="5" fill="#477e8c"/><rect x="${boundaryX}" y="282" width="${Math.max(0,right-boundaryX)}" height="5" fill="#b67829"/><line x1="${boundaryX}" x2="${boundaryX}" y1="${top}" y2="${bottom}" stroke="#b67829" stroke-width="2" stroke-dasharray="6 4"/><text x="${left}" y="338">${boundaryX>left?'Smoother':''}</text><text x="${right}" y="338" text-anchor="end">${boundary} 起 · Filter</text><title>左侧Smoother；${boundary}起右侧Filter事后重放。相同行业使用相同颜色与比例轴。</title></g>`:'';
-  return `<svg class="reconstruction-chart" viewBox="0 0 ${width} ${showFilter?352:320}" role="img" aria-label="每日持仓同轴堆叠，Smoother与Filter分段标注，${simulationBasisLabel(basis)}，完整与季度局部真值按报告日标注"><title>色带是模型估计，细柱是披露真值；${simulationBasisLabel(basis)}；不跨数据缺口连线</title>${grid}${paths}${truth}${methodBand}<line x1="${x(selectedDate)}" x2="${x(selectedDate)}" y1="${top}" y2="${bottom}" stroke="#17324d" stroke-width="1.5"/>${ticks}</svg><div class="reconstruction-legend">${labels.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(view==='stocks'?(data.stock_names[k]||k):k)}</span>`).join('')}</div>`;
+  const coverage=(data.coverage_gaps||[]).map(g=>{
+    const a=Math.max(left,x(g.start)),b=Math.min(right,x(g.end)),w=Math.min(right-a,Math.max(2,b-a));
+    return `<g data-coverage-gap="${g.kind}" data-gap-start="${g.start}" data-gap-end="${g.end}"><title>${escapeHTML(g.start)} — ${escapeHTML(g.end)}：${escapeHTML(g.label)}</title><rect x="${a}" y="${top}" width="${w}" height="${bottom-top}" fill="#e9eef3" opacity=".86"/><line x1="${a}" x2="${a}" y1="${top}" y2="${bottom}" stroke="#8a99aa" stroke-dasharray="3 4"/>${w>85?`<text x="${a+w/2}" y="${top+28}" text-anchor="middle" fill="#576879">${escapeHTML(g.label)}</text>`:''}</g>`;
+  }).join('');
+  return `<svg class="reconstruction-chart" viewBox="0 0 ${width} ${showFilter?352:320}" role="img" aria-label="每日持仓同轴堆叠，Smoother与Filter分段标注，${simulationBasisLabel(basis)}，完整与季度局部真值按报告日标注"><title>色带是模型估计，细柱是披露真值；${simulationBasisLabel(basis)}；不跨数据缺口连线</title>${grid}${coverage}${paths}${truth}${methodBand}<line x1="${x(selectedDate)}" x2="${x(selectedDate)}" y1="${top}" y2="${bottom}" stroke="#17324d" stroke-width="1.5"/>${ticks}</svg><div class="reconstruction-legend">${labels.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(view==='stocks'?(data.stock_names[k]||k):k)}</span>`).join('')}</div>`;
 }
 
 function reconstructionPanel(data, options) {
@@ -3142,12 +3154,76 @@ function loadFullFilterDaily(code) {
   return loadEquityModelAsset('equity_filter_daily', 'FUND_FILTER_DAILY', code, '每日 Filter', validateFullFilterDaily);
 }
 
+// Coverage comes from actual segment bounds, never interpolated model weights.
+function comparisonCoverage(segments, referenceDates, start, end, method, declaredEnd='', issues=[]) {
+  const shift=(date,days)=>new Date(Date.parse(date)+days*86400000).toISOString().slice(0,10);
+  const datePattern=/^\d{4}-\d{2}-\d{2}$/;
+  const failures=issues.filter(i=>i&&typeof i==='object').map(i=>({
+    start:datePattern.test(i.reason||'')?i.reason:i.start,
+    end:i.end||segments.find(s=>s.start===i.start)?.end||declaredEnd||end
+  })).filter(i=>datePattern.test(i.start||'')&&datePattern.test(i.end||''));
+  const failed=(a,b)=>failures.some(i=>i.start<=b&&i.end>=a);
+  const allDates=new Set(segments.flatMap(s=>s.dates||[]));
+  const missingReference=referenceDates.filter(d=>!allDates.has(d));
+  const spans=[];
+  for(const segment of segments) {
+    if(!segment.dates?.length) continue;
+    let first=segment.dates[0],last=first;
+    for(const day of segment.dates.slice(1)) {
+      const a=shift(last,1),b=shift(day,-1);
+      if(a<=b && (missingReference.some(d=>d>=a&&d<=b)||failed(a,b))) {
+        spans.push({start:first,end:last});first=day;
+      }
+      last=day;
+    }
+    spans.push({start:first,end:last});
+  }
+  spans.sort((a,b)=>a.start.localeCompare(b.start));
+  const merged=[];
+  for(const span of spans) {
+    const last=merged.at(-1);
+    if(last && span.start<=last.end) last.end=span.end>last.end?span.end:last.end;
+    else merged.push({...span});
+  }
+  const gaps=[];
+  const add=(from,to,kind,terminal=false)=>{
+    const a=from<start?start:from,b=to>end?end:to;
+    if(a>b) return;
+    const expected=referenceDates.some(d=>d>=a&&d<=b);
+    // Do not mistake normal weekends/holidays for gaps. Explicit failures,
+    // a missing known session, or an unproduced declared end take precedence.
+    if(!expected && !failed(a,b) && !terminal && Date.parse(b)-Date.parse(a)<14*86400000) return;
+    gaps.push({start:a,end:b,kind,label:kind==='pending'?'等待后续完整披露':kind==='leading'?'尚无可用估计':'此段暂无有效估计'});
+  };
+  if(!merged.length) return [{start,end,kind:'missing',label:'暂无合格轨迹'}];
+  add(start,shift(merged[0].start,-1),'leading');
+  merged.forEach((span,i)=>{if(i)add(shift(merged[i-1].end,1),shift(span.start,-1),'missing');});
+  const last=merged.at(-1).end;
+  const complete=declaredEnd && Date.parse(declaredEnd)-Date.parse(last)<=4*86400000;
+  add(shift(last,1),end,method==='smoother'&&complete?'pending':'missing',Boolean(declaredEnd&&end>last));
+  return gaps;
+}
+
+function comparisonPoint(points,date,gaps) {
+  if(gaps.some(g=>date>=g.start&&date<=g.end)) return null;
+  return [...points].reverse().find(p=>p.date<=date)||null;
+}
+
+function comparisonIssueText(issue) {
+  if(typeof issue==='string') return issue;
+  let reason=issue.reason||issue.error||'数据不足';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(reason)) reason=`${reason} 起行情或收益输入未通过完整性检查，区间估计中断`;
+  if(reason==='No already-available full anchor') reason='该期间没有满足模型协议、当时已公布的完整持仓锚点';
+  reason=reason.replace(/^Candidate count (\d+) exceeds frozen compute limit$/, '候选股票 $1 只，超过当前模型计算上限').replace(/^Input holding price coverage ([\d.]+)% below frozen minimum$/, '持仓行情覆盖率 $1%，低于模型要求的最低覆盖率');
+  return [issue.start&&`${issue.start}${issue.end?' — '+issue.end:''}`,reason].filter(Boolean).join('：');
+}
+
 function fullFilterComparison(historical,daily,options,error='') {
   if(!daily) return `<p class="empty-copy">${escapeHTML(error||'正在加载逐日 Filter 轨迹…')}</p>`;
   const valid=daily.segments||[],history=historical?.segments?.filter(s=>s.method!=='filter')||[];
   const availableDates=[...history.flatMap(s=>s.dates),...valid.flatMap(s=>s.dates)].filter(d=>d<=daily.end).sort();
   if(!availableDates.length)return `<p class="empty-copy">暂无可展示的历史轨迹：${escapeHTML(daily.summary?.reason||'数据不足')}</p>`;
-  const end=availableDates.at(-1),begin=availableDates[0];
+  const end=daily.end,begin=availableDates[0];
   const start=options.range==='all'?begin:(()=>{const d=new Date(end);d.setUTCFullYear(d.getUTCFullYear()-Number(options.range));return [begin,d.toISOString().slice(0,10)].sort().at(-1);})();
   const date=options.date&&options.date>=start&&options.date<=end?options.date:end;
   const topData={...historical,segments:history,axis_start:start,axis_end:end,filter_start:null};
@@ -3157,15 +3233,25 @@ function fullFilterComparison(historical,daily,options,error='') {
   // Both charts show percent of NAV; bond/HK sleeves stay explicitly named.
   const totals={};[...upper,...lower].forEach(p=>Object.entries(p.groups).forEach(([k,v])=>totals[k]=(totals[k]||0)+v));
   const keys=Object.keys(totals).filter(k=>totals[k]>1e-6).sort((a,b)=>totals[b]-totals[a]);
+  // NAV may contain weekend report valuations. Only index-observed sessions
+  // are additional calendar evidence; do not fetch extra assets just for this.
+  const marketDates=new Set((window.FUND_COMMON_BENCHMARKS?.benchmarks?.['000906.SH']?.series||[]).map(row=>row[0]));
+  const navDates=(window.FUND_DETAIL_DATA?.[daily.code]?.nav||[]).map(row=>row[0]).filter(d=>d>=start&&d<=end&&marketDates.has(d));
+  const referenceDates=[...new Set([...availableDates,...navDates])].sort();
+  const smootherIssues=historical?.issues||options.smootherIssues||[];
+  const lastHistorical=history.flatMap(s=>s.dates).sort().at(-1);
+  const hasUnbuiltTail=smootherIssues.some(issue=>issue.end>lastHistorical||issue.start>=lastHistorical);
+  topData.coverage_gaps=comparisonCoverage(history,referenceDates,start,end,'smoother',hasUnbuiltTail?'':historical?.end,smootherIssues);
+  bottomData.coverage_gaps=comparisonCoverage(valid,referenceDates,start,end,'filter',daily.end,daily.issues||[]);
+  const coverageNote=(data,points)=>`<p class="model-coverage">可得轨迹 <strong>${escapeHTML(points[0]?.date||'无')} — ${escapeHTML(points.at(-1)?.date||'无')}</strong>${data.coverage_gaps.length?` · ${data.coverage_gaps.map(g=>`${escapeHTML(g.start)} — ${escapeHTML(g.end)}：${escapeHTML(g.label)}`).join('；')}`:' · 所选范围无已识别缺段'}</p>`;
   const chart=(data,points,label)=>points.length?reconstructionStackChart(data,points,keys,'1',date,'nav').replace('每日持仓同轴堆叠，Smoother与Filter分段标注',label+' 独立时间轴逐日持仓'):`<p class="empty-copy">${label} 无合格数据，保留缺口。</p>`;
-  const selected=points=>[...points].reverse().find(p=>p.date<=date);
-  const a=selected(upper),b=selected(lower);
+  const a=comparisonPoint(upper,date,topData.coverage_gaps),b=comparisonPoint(lower,date,bottomData.coverage_gaps);
   return `<h2>Smoother / Filter · 上下对照</h2><p class="method-note">两张独立时间轴，日期范围与刻度完全一致；颜色一致，均占基金净资产。上图为事后平滑，下图为逐日 Event-P Filter（港股＋债券版）历史回放。初始化及状态不同，不能把两图差异全部归因于平滑；不是实时留档预测。</p>
     <div class="history-controls"><label>历史范围 <select data-reconstruction-control="range" aria-label="上下对照历史范围">${[['all','全部可得轨迹'],['1','最近1年'],['3','最近3年'],['5','最近5年']].map(([v,l])=>`<option value="${v}"${options.range===v?' selected':''}>${l}</option>`).join('')}</select></label><label>查看日期 <input type="date" data-reconstruction-control="date" aria-label="上下对照日期" min="${start}" max="${end}" value="${date}"></label></div>
-    <article class="subpanel" data-comparison-chart="smoother"><h3>Smoother · 历史平滑</h3><p class="method-note">上图沿用股票与行业状态；未单独建模的港股、债券不解释为零仓位。</p>${chart(topData,upper,'Smoother')}</article>
-    <article class="subpanel" data-comparison-chart="filter"><h3>Filter · 全程逐日估计</h3>${chart(bottomData,lower,'Filter')}<p class="method-note">计算截止 ${escapeHTML(daily.end)}，本基金最近有效日 ${escapeHTML(lower.at(-1)?.date||'无')}；债券固定在堆叠最上层。信息版本边界独立分段，不跨缺口连线，早期无可得锚点的区间留空。港股和债券为指数汇总状态。</p></article>
-    <article class="subpanel"><h3>${date} · 同日期对照</h3><p>实际估计日期：Smoother ${a?.date||'无'}；Filter ${b?.date||'无'}。没有当天数据时显示最近可得日，并标明日期。</p>${renderTable(['行业 / 资产','Smoother','Filter'],keys.map(k=>[escapeHTML(k),a?(['港股','债券'].includes(k)&&!Object.hasOwn(a.groups,k)?'—':pct(a.groups[k]||0,2)):'—',b?pct(b.groups[k]||0,2):'—']),'table-scroll')}</article>
-    <details><summary>Filter 数据缺口（${daily.issues?.length||0}）</summary><p>${escapeHTML((daily.issues||[]).map(x=>typeof x==='string'?x:`${x.start||''}—${x.end||''}：${x.reason||x.error||'数据不足'}`).join('；')||'无记录缺口')}</p></details>`;
+    <article class="subpanel" data-comparison-chart="smoother"><h3>Smoother · 历史平滑</h3><p class="method-note">上图沿用股票与行业状态；未单独建模的港股、债券不解释为零仓位。</p>${coverageNote(topData,upper)}${chart(topData,upper,'Smoother')}</article>
+    <article class="subpanel" data-comparison-chart="filter"><h3>Filter · 全程逐日估计</h3>${coverageNote(bottomData,lower)}${chart(bottomData,lower,'Filter')}<p class="method-note">计算截止 ${escapeHTML(daily.end)}，本基金最近有效日 ${escapeHTML(lower.at(-1)?.date||'无')}；债券固定在堆叠最上层。信息版本边界独立分段，不跨缺口连线，早期无可得锚点的区间留空。港股和债券为指数汇总状态。</p></article>
+    <article class="subpanel"><h3>${date} · 行业 / 资产对照</h3><p>实际估计日期：Smoother ${a?.date||'该日无有效估计'}；Filter ${b?.date||'该日无有效估计'}。灰色区间没有有效轨迹，不沿用缺口前的估计；区间内非交易日取最近可得日。</p>${renderTable(['行业 / 资产','Smoother','Filter'],keys.map(k=>[escapeHTML(k),a?(['港股','债券'].includes(k)&&!Object.hasOwn(a.groups,k)?'—':pct(a.groups[k]||0,2)):'—',b?pct(b.groups[k]||0,2):'—']),'table-scroll')}</article>
+    <details class="simulation-method"><summary>数据覆盖与未生成区间</summary><p><strong>Smoother：</strong>${escapeHTML(smootherIssues.map(comparisonIssueText).join('；')||'已生成历史区间无记录异常；末端平滑须等待后续完整披露，不能用 Filter 冒充 Smoother。')}</p><p><strong>Filter：</strong>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'无记录输入异常。')}</p></details>`;
 }
 
 function bindCombinedEquitySimulation(target, current=null, historical=null, historicalError='', eventp=null, eventpError='', code=fundCode) {
@@ -3201,7 +3287,7 @@ function bindCombinedEquitySimulation(target, current=null, historical=null, his
     target.innerHTML=`<div class="simulation-tabs" role="group" aria-label="持仓研究模型"><button data-model-mode="comparison" class="${mode==='comparison'?'active':''}" aria-pressed="${mode==='comparison'}">Smoother / Filter 上下对照</button><button data-model-mode="eventp" class="${mode==='eventp'?'active':''}" aria-pressed="${mode==='eventp'}">Event-P · 全量回测</button><button data-model-mode="history" class="${mode==='history'?'active':''}" aria-pressed="${mode==='history'}">连续轨迹 · Smoother → Filter</button><button data-model-mode="current" class="${mode==='current'?'active':''}" aria-pressed="${mode==='current'}">原试点对照与验真</button></div><div data-model-content></div>`;
     const body=target.querySelector('[data-model-content]');
     if(mode==='comparison') {
-      body.innerHTML=resources.daily.error ? errorPanel('daily') : fullFilterComparison(historical?.data,daily,options);
+      body.innerHTML=resources.daily.error ? errorPanel('daily') : fullFilterComparison(historical?.data,daily,{...options,smootherIssues:historical?.index?.funds?.[code]?.issues||[]});
       if(resources.smoother.pending) body.innerHTML='<p class="empty-copy" role="status">Smoother 历史正在加载；每日 Filter 独立加载。</p>'+body.innerHTML;
       if(resources.smoother.error) body.innerHTML=errorPanel('smoother')+body.innerHTML;
     } else if(resources[mode].error) body.innerHTML=errorPanel(mode);
