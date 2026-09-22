@@ -72,6 +72,9 @@ let activeSuggestionIndex = -1;
 let stockClassificationPromise = null;
 let activeEquityProfilesPromise = null;
 let activeEquityProfileFilter = "all";
+let researchSummaryPromise = null;
+let researchSummaryError = null;
+let listRenderRequest = 0;
 const initialListQuery = new URLSearchParams(window.location.search);
 const searchTextByCode = new Map();
 
@@ -562,7 +565,45 @@ function prepareMobileFundCards() {
   });
 }
 
+function needsResearchSummary() {
+  return listView !== 'complete' || dataFilter !== 'all' || sortState.metric === 'decision';
+}
+
+function ensureResearchSummary() {
+  if (window.FUND_RESEARCH_SUMMARY?.catalog_generated_at === catalog?.generated_at) return Promise.resolve();
+  if (researchSummaryPromise) return researchSummaryPromise;
+  researchSummaryPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    const finish = error => {
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      if (error) { script.remove(); reject(error); } else resolve();
+    };
+    const timer = setTimeout(() => finish(new Error('研究摘要加载超时，请重试')), 20000);
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/research_summary.js?v=${encodeURIComponent(catalog?.generated_at || '')}`;
+    script.onload = () => finish(window.FUND_RESEARCH_SUMMARY?.catalog_generated_at === catalog?.generated_at
+      ? null : new Error('摘要与目录版本不一致，请稍后刷新页面'));
+    script.onerror = () => finish(new Error('研究摘要加载失败，请检查网络后重试'));
+    document.head.appendChild(script);
+  }).catch(error => { researchSummaryPromise = null; throw error; });
+  return researchSummaryPromise;
+}
+
 function renderFunds() {
+  const request = ++listRenderRequest;
+  if (needsResearchSummary() && window.FUND_RESEARCH_SUMMARY?.catalog_generated_at !== catalog?.generated_at) {
+    saveListQuery();
+    renderListHead();
+    renderDecisionControls();
+    resultCount.textContent = researchSummaryError ? '研究摘要暂不可用，基础列表仍可使用' : '正在加载研究摘要…';
+    grid.innerHTML = `<tr><td colspan="${listHead.querySelectorAll('th').length}" class="empty-state fund-search-empty">${researchSummaryError ? `${escapeHtml(researchSummaryError.message)} <button type="button" id="retry-research-summary">重试</button>` : '正在载入当前视图所需的数据…'}</td></tr>`;
+    pagination.innerHTML = '';
+    document.querySelector('#fund-pagination-top').innerHTML = '';
+    if (!researchSummaryError) ensureResearchSummary().then(() => { if (request === listRenderRequest) renderFunds(); }).catch(error => {
+      if (request === listRenderRequest) { researchSummaryError = error; renderFunds(); }
+    });
+    return;
+  }
   const visible = filteredFunds();
   currentPage = Math.max(1, Math.min(currentPage, Math.max(1, Math.ceil(visible.length / PAGE_SIZE))));
   saveListQuery();
@@ -571,7 +612,7 @@ function renderFunds() {
   resultCount.textContent = `${visible.length.toLocaleString("zh-CN")}只基金主体 · 净值至${catalog?.source?.nav_latest || catalog?.as_of || '—'} · 数据版本 ${(catalog?.generated_at || '').replace('T', ' ').slice(0, 16)}`;
   renderListHead();
   listHead.querySelectorAll('[data-sort-key]').forEach(button => {
-    const selected = button.dataset.sortKey === sortState.key && !classificationRankState.name;
+    const selected = button.dataset.sortKey === sortState.key && button.dataset.sortMetric === sortState.metric && !classificationRankState.name;
     button.closest('th').setAttribute('aria-sort', selected ? (sortState.direction === 'asc' ? 'ascending' : 'descending') : 'none');
     button.textContent = button.textContent.replace('↕', selected ? (sortState.direction === 'asc' ? '↑' : '↓') : '↕');
   });
@@ -605,8 +646,12 @@ function restoreListQuery() {
   listPeriodMode=q.get('period')==='long'?'long':'short';
   currentPage=Math.max(1,Math.floor(Number(q.get('page'))||1));
   if(FUND_SIZE_FILTERS.some(([key])=>key===q.get('size'))) fundSizeFilterState=q.get('size');
-  if(['1m','3m','6m','1y','3y','5y','ytd'].includes(q.get('sort'))) sortState={key:q.get('sort'),metric:'return',direction:q.get('dir')==='asc'?'asc':'desc'};
-  if (['return','drawdown','decision'].includes(q.get('metric')) && Object.values(DECISION_COLUMNS).flat().some(c=>c[0]===q.get('sort'))) sortState={key:q.get('sort'),metric:q.get('metric'),direction:q.get('dir')==='asc'?'asc':'desc'};
+  const sortKey = q.get('sort'), sortMetric = q.get('metric');
+  if (['1m','3m','6m','1y','3y','5y','ytd'].includes(sortKey)) {
+    sortState = {key:sortKey, metric:sortMetric === 'drawdown' ? 'drawdown' : 'return', direction:q.get('dir') === 'asc' ? 'asc' : 'desc'};
+  } else if (Object.values(DECISION_COLUMNS).flat().some(c => c[0] === sortKey && c[2] === sortMetric)) {
+    sortState = {key:sortKey, metric:sortMetric, direction:q.get('dir') === 'asc' ? 'asc' : 'desc'};
+  }
   if(['sector','level1','level2','level3'].includes(q.get('level'))) classificationRankState={...classificationRankState,level:q.get('level'),industryLevel:q.get('level')==='sector'?'level1':q.get('level'),name:q.get('industry')||'',direction:q.get('dir')==='asc'?'asc':'desc'};
   activeEquityProfileFilter=q.get('profile')||'all';
   document.querySelectorAll('[data-category]').forEach(b=>{const active=b.dataset.category===activeCategory;b.classList.toggle('active',active);b.setAttribute('aria-selected',String(active));});
@@ -712,7 +757,7 @@ listHead.addEventListener("click", (event) => {
   }
   const button = event.target.closest("[data-sort-key]");
   if (!button) return;
-  const same = sortState.key === button.dataset.sortKey;
+  const same = sortState.key === button.dataset.sortKey && sortState.metric === button.dataset.sortMetric;
   sortState = { key: button.dataset.sortKey, metric: button.dataset.sortMetric, direction: same && sortState.direction === "desc" ? "asc" : "desc" };
   classificationRankState.name = "";
   currentPage = 1;
@@ -948,6 +993,7 @@ document.addEventListener('change', event => {
   currentPage = 1; renderFunds();
 });
 document.addEventListener('click', event => {
+  if (event.target.id === 'retry-research-summary') { researchSummaryError = null; renderFunds(); return; }
   if (event.target.id === 'mobile-filter-toggle') { const open=document.body.classList.toggle('mobile-filters-open');event.target.setAttribute('aria-expanded',String(open)); }
   const view = event.target.closest('[data-view]');
   if (view || event.target.id === 'show-complete') { listView = view?.dataset.view || 'complete'; hiddenDecisionColumns.clear(); sortState = {key:null,metric:'return',direction:'desc'}; renderFunds(); }

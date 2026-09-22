@@ -1,36 +1,36 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-22T08:59:16+08:00",
-  "source": ".",
+  "generatedAt": "2026-09-22T16:42:15+08:00",
+  "source": "results/website_pipeline_fix_2026-09-22/workbench_implementation/candidate/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "index.html": {
-      "size": 13294,
-      "sha256": "50fb895e34679af57cc1f40b907ad179a82c784b0012fb607e4887ab5c43a894"
+      "size": 8735,
+      "sha256": "3546acc6587f10745d874a90b4f74508b4f7d64d30439d5205a120fe82c14d0f"
     },
     "fund.html": {
-      "size": 2415,
-      "sha256": "73252ce31edf9f5df6ca9e5f437fd2b7e87d1b9bf6d0a4413e02e2385f5e80ad"
+      "size": 2417,
+      "sha256": "e1ac05bdd59074ee32809de5edde84334193c10951db1b26e6879c6b4da3dafb"
     },
     "styles.css": {
-      "size": 140575,
-      "sha256": "0119a741de7d4599cf890617bfaaad429fe436b99965a73809252e845a4a22f7"
+      "size": 151281,
+      "sha256": "3291f82b75bb7d2bb820c3da5afeb6566a1a997bd925d38e29ca0f6ecc4dcf34"
     },
     "pure-bond-reference.css": {
       "size": 22114,
       "sha256": "c88ab8454792d1365e868e4aafbc101d7114ac495360a8bb24816809e96813a3"
     },
     "app.js": {
-      "size": 63312,
-      "sha256": "b15f341e45cd15cca02339da2c6f6151768a16b491f7bea4a48fdf0cea802f9b"
+      "size": 66084,
+      "sha256": "feab2502d6f4c9a421745d2fe9d5068bba5e45f350e5bc80c8ba98967576232b"
     },
     "pure-bond-reference.js": {
       "size": 116759,
       "sha256": "62f5b190ea61e425cf01136e577ee72e79a2835346650e0560bab908aa860020"
     },
     "fund.js": {
-      "size": 526462,
-      "sha256": "e0dcf336245f26c2abd3340e89c1236bf835c1eb5f08efe48dfd16045237dbb2"
+      "size": 529570,
+      "sha256": "e2d66e0124eda2530374e3af6a4d96a63f6a631cb56ea169b7703da3c4ae098a"
     },
     "research-core.js": {
       "size": 2368,
@@ -42,11 +42,11 @@
     }
   },
   "pathReplacements": {
-    "index.html": 3,
+    "index.html": 2,
     "fund.html": 0,
-    "app.js": 3,
+    "app.js": 4,
     "pure-bond-reference.js": 4,
-    "fund.js": 23,
+    "fund.js": 19,
     "research-core.js": 0
   }
 }

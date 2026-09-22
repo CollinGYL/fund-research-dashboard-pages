@@ -15,6 +15,7 @@ const PURE_BOND_RESEARCH_SHARD_COUNT = 64;
 const pureBondReferenceAssetPromises = new Map();
 const dashboardAssetPromises = new Map();
 const profileDetailPromises = new Map();
+const equityModelAssetPromises = new Map();
 const DASHBOARD_DATA_VERSION = 'history-v4-' + new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }).replaceAll("-", "");
 
 const DASHBOARD_GLOBAL_ASSETS = {
@@ -41,11 +42,21 @@ function loadDashboardAsset(filename) {
   if (dashboardAssetPromises.has(filename)) return dashboardAssetPromises.get(filename);
   const promise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      script.remove();
+      error ? reject(error) : resolve(window[globalName]);
+    };
+    const timer = setTimeout(() => finish(new Error(`${filename} 加载超时，请重试`)), 20000);
     script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${filename}?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => window[globalName]
-      ? resolve(window[globalName])
-      : reject(new Error(`${filename} 未生成有效内容`));
-    script.onerror = () => reject(new Error(`${filename} 加载失败`));
+      ? finish()
+      : finish(new Error(`${filename} 未生成有效内容`));
+    script.onerror = () => finish(new Error(`${filename} 加载失败，请重试`));
     document.head.appendChild(script);
   }).catch((error) => {
     dashboardAssetPromises.delete(filename);
@@ -2867,45 +2878,64 @@ function renderFund(fund, summaryData, detailData, analysisData, analysis, fundD
   bindMiniLineCharts();
 }
 
+function loadEquityModelAsset(directory, globalName, code, label, validate = null) {
+  if (!/^\d{6}\.(?:OF|SH|SZ)$/.test(code)) return Promise.reject(new Error("模型基金代码无效"));
+  const key = `${directory}/${code}`;
+  const read = () => {
+    const value = window[globalName]?.[code];
+    if (!value || typeof value !== 'object') throw new Error(`${label} 内容缺失，请重试`);
+    if (validate) validate(value, code);
+    return value;
+  };
+  if (window[globalName]?.[code]) {
+    try { return Promise.resolve(read()); }
+    catch (_) { delete window[globalName][code]; }
+  }
+  if (equityModelAssetPromises.has(key)) return equityModelAssetPromises.get(key);
+  const promise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      script.remove();
+      if (error) return reject(error);
+      try { resolve(read()); } catch (invalid) { reject(invalid); }
+    };
+    const timer = setTimeout(() => finish(new Error(`${label} 加载超时，请重试`)), 20000);
+    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${directory}/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
+    script.onload = () => finish();
+    script.onerror = () => finish(new Error(`${label} 加载失败，请检查网络后重试`));
+    document.head.appendChild(script);
+  }).catch(error => {
+    if (window[globalName]) delete window[globalName][code];
+    throw error;
+  }).finally(() => { equityModelAssetPromises.delete(key); });
+  equityModelAssetPromises.set(key, promise);
+  return promise;
+}
+
 async function loadEquitySimulation(code) {
   const index = await loadDashboardAsset("equity_simulation_index.js");
   if (!index.funds?.[code]) return {index, data: null};
   if (index.funds[code].status !== 'available') return {index, data: index.funds[code]};
-  if (!window.FUND_EQUITY_SIMULATION?.[code]) {
-    await new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/equity_simulation/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-      script.onload = () => window.FUND_EQUITY_SIMULATION?.[code] ? resolve() : reject(new Error("持仓模拟内容不完整"));
-      script.onerror = () => reject(new Error("持仓模拟暂时加载失败"));
-      document.head.appendChild(script);
-    });
-  }
-  return {index, data: window.FUND_EQUITY_SIMULATION[code]};
+  const data = await loadEquityModelAsset('equity_simulation', 'FUND_EQUITY_SIMULATION', code, '原试点持仓模拟');
+  return {index, data};
 }
 
-async function loadEquityReconstruction(code) {
+async function loadEquityReconstruction(code, includeExtension = true) {
   const index=await loadDashboardAsset('equity_reconstruction_index.js');
   if(index.funds?.[code]?.status!=='available') return {index,data:null};
-  if(!window.FUND_EQUITY_RECONSTRUCTION?.[code]) await new Promise((resolve,reject)=>{
-    const script=document.createElement('script');
-    script.src=`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/equity_reconstruction/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload=()=>window.FUND_EQUITY_RECONSTRUCTION?.[code]?resolve():reject(new Error('历史重建内容不完整'));
-    script.onerror=()=>reject(new Error('历史重建加载失败，可刷新重试'));
-    document.head.appendChild(script);
-  });
-  const historyData=window.FUND_EQUITY_RECONSTRUCTION[code];
+  const historyData = await loadEquityModelAsset('equity_reconstruction', 'FUND_EQUITY_RECONSTRUCTION', code, '历史重建');
+  if (!includeExtension) return {index, data: historyData};
   try {
     const extensionIndex=await loadDashboardAsset('equity_filter_extension_index.js');
     const info=extensionIndex.funds?.[code];
     if(info?.status!=='available') throw new Error(info?.reason||'本基金尚无合格的Filter接续段');
-    if(!window.FUND_EQUITY_FILTER_EXTENSION?.[code]) await new Promise((resolve,reject)=>{
-      const script=document.createElement('script');
-      script.src=`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/equity_filter_extension/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-      script.onload=()=>window.FUND_EQUITY_FILTER_EXTENSION?.[code]?resolve():reject(new Error('Filter接续内容不完整'));
-      script.onerror=()=>reject(new Error('Filter接续段加载失败，可刷新重试'));
-      document.head.appendChild(script);
-    });
-    return {index,data:mergeReconstructionExtension(historyData,window.FUND_EQUITY_FILTER_EXTENSION[code])};
+    const extension = await loadEquityModelAsset('equity_filter_extension', 'FUND_EQUITY_FILTER_EXTENSION', code, 'Filter接续段');
+    return {index,data:mergeReconstructionExtension(historyData,extension)};
   } catch(error) {
     return {index,data:{...historyData,extension_issue:error.message}};
   }
@@ -3076,14 +3106,8 @@ async function loadEquityEventP(code) {
   await loadDashboardAsset('equity_eventp_index.js');
   const index=window.FUND_EQUITY_EVENTP_INDEX;
   if(!index?.funds?.[code]) return {index,data:null};
-  if(!window.FUND_EQUITY_EVENTP?.[code]) await new Promise((resolve,reject)=>{
-    const script=document.createElement('script');
-    script.src=`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/equity_eventp/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload=()=>window.FUND_EQUITY_EVENTP?.[code]?resolve():reject(new Error('Event-P 数据不完整'));
-    script.onerror=()=>reject(new Error('Event-P 数据加载失败，请刷新重试'));
-    document.head.appendChild(script);
-  });
-  return {index,data:window.FUND_EQUITY_EVENTP[code]};
+  const data = await loadEquityModelAsset('equity_eventp', 'FUND_EQUITY_EVENTP', code, 'Event-P全量回测');
+  return {index,data};
 }
 
 function eventPPanel(data,index,selectedDate='') {
@@ -3097,15 +3121,25 @@ function eventPPanel(data,index,selectedDate='') {
   return intro+`<article class="subpanel"><div class="history-controls"><label>完整披露报告期 <select data-eventp-date>${data.endpoints.map(x=>`<option value="${escapeHTML(x.report)}"${x===e?' selected':''}>${escapeHTML(x.report)}</option>`).join('')}</select></label><span>估计日 ${escapeHTML(e.day)} · 披露可得日 ${escapeHTML(e.available)}</span></div>${boundary}<p>A股行业 half-L1：旧版 ${num(errors('legacy_industry'),2)} → 新版 ${num(errors('multi_industry'),2)} 个百分点（越低越好）；不是准确率。</p><div class="table-scroll"><table class="simulation-table"><thead><tr><th>资产／行业</th><th>完整披露</th><th>旧版估计</th><th>新版估计</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escapeHTML(r[0])}</td>${r.slice(1).map(w=>`<td>${pct(w,2)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="method-note">均占基金净资产，未按股票仓位归一；旧版没有港股／债券状态，所以这两项为零。债券披露缺失时留空。模型允许总状态不超过105%，不能把剩余部分直接当作已核实现金。</p><details class="simulation-method"><summary>数据缺口（${data.issues.length}项）</summary><p>${data.issues.length?data.issues.map(x=>escapeHTML(typeof x==='string'?x:[x.start,x.end,x.reason].filter(Boolean).join(' · '))).join('<br>'):'未记录区间缺口。'}</p></details></article>`;
 }
 
-async function loadFullFilterDaily(code) {
-  window.FUND_FILTER_DAILY ||= {};
-  if(!window.FUND_FILTER_DAILY[code]) await new Promise((resolve,reject)=>{
-    const script=document.createElement('script');
-    script.src=`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/equity_filter_daily/${encodeURIComponent(code)}.js`;
-    script.onload=resolve;script.onerror=()=>reject(new Error('该基金的全程 Filter 数据尚不可用'));
-    document.head.appendChild(script);
-  });
-  return window.FUND_FILTER_DAILY[code];
+function validateFullFilterDaily(data, code) {
+  const dateValid = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+  if (data?.code !== code || !dateValid(data.end) || !Array.isArray(data.names)
+      || data.names.some(name => typeof name !== 'string') || new Set(data.names).size !== data.names.length
+      || !Array.isArray(data.segments)) throw new Error('Filter 数据标识或结构无效，请重试');
+  for (const segment of data.segments) {
+    if (!Array.isArray(segment?.dates) || !segment.dates.length || !Array.isArray(segment.weights)
+        || segment.dates.length !== segment.weights.length || !data.names.length
+        || segment.dates.some((day, i) => !dateValid(day) || day > data.end || (i > 0 && day <= segment.dates[i - 1]))
+        || segment.weights.some(row => !Array.isArray(row) || row.length !== data.names.length || row.some(w => !Number.isFinite(w) || w < 0))) {
+      throw new Error('Filter 日期或权重数据无效，请重试');
+    }
+  }
+  return data;
+}
+
+function loadFullFilterDaily(code) {
+  return loadEquityModelAsset('equity_filter_daily', 'FUND_FILTER_DAILY', code, '每日 Filter', validateFullFilterDaily);
 }
 
 function fullFilterComparison(historical,daily,options,error='') {
@@ -3134,28 +3168,58 @@ function fullFilterComparison(historical,daily,options,error='') {
     <details><summary>Filter 数据缺口（${daily.issues?.length||0}）</summary><p>${escapeHTML((daily.issues||[]).map(x=>typeof x==='string'?x:`${x.start||''}—${x.end||''}：${x.reason||x.error||'数据不足'}`).join('；')||'无记录缺口')}</p></details>`;
 }
 
-function bindCombinedEquitySimulation(target, current, historical, historicalError='', eventp=null, eventpError='') {
+function bindCombinedEquitySimulation(target, current=null, historical=null, historicalError='', eventp=null, eventpError='', code=fundCode) {
   const params=new URLSearchParams(location.search);
-  let mode=params.get('simMode') || 'comparison';
-  let daily=null,dailyError='';
+  let mode=['comparison','eventp','history','current'].includes(params.get('simMode')) ? params.get('simMode') : 'comparison';
   let eventpDate=params.get('eventpDate')||'';
+  // Each model owns its loading state: a failed legacy pilot must not hide the daily Filter.
+  const state = (value=null, error='') => ({value,error,pending:false});
+  const resources = {current:state(current),smoother:state(historical,historicalError),history:state(historical,historicalError),eventp:state(eventp,eventpError),daily:state()};
+  const loaders = {current:()=>loadEquitySimulation(code),smoother:()=>loadEquityReconstruction(code,false),history:()=>loadEquityReconstruction(code),eventp:()=>loadEquityEventP(code),daily:()=>loadFullFilterDaily(code)};
+  const dependencies = {comparison:['smoother','daily'],eventp:['eventp'],history:['history'],current:['current']};
+  const labels = {current:'原试点',smoother:'Smoother',history:'连续轨迹',eventp:'Event-P',daily:'每日 Filter'};
   const options={view:['1','2','3','stocks'].includes(params.get('historyView'))?params.get('historyView'):'1',range:['1','3','5','all'].includes(params.get('historyRange'))?params.get('historyRange'):'all',count:params.get('historyCount')==='all'?'all':'12',date:params.get('historyDate')||'',basis:params.get('simBasis')==='equity'?'equity':'nav'};
+  const ensure = (key, retry=false) => {
+    const item=resources[key];
+    if(item.pending || !retry && (item.value || item.error)) return;
+    item.pending=true; item.error='';
+    if(retry) item.value=null;
+    Promise.resolve().then(loaders[key]).then(value=>{item.value=value;}).catch(error=>{item.error=error.message;}).finally(()=>{
+      item.pending=false;
+      if(dependencies[mode].includes(key)) render();
+    });
+  };
+  const ensureMode = () => dependencies[mode].forEach(key=>ensure(key));
+  const errorPanel = key => `<article class="subpanel"><p class="empty-copy" role="alert">${escapeHTML(resources[key].error)}</p><button type="button" class="text-button" data-model-retry="${key}">重试${labels[key]}</button></article>`;
   const render=()=>{
-    const meta=historical?.index?.funds?.[fundCode];
+    const historical=resources.smoother.value;
+    const history=resources.history.value;
+    const current=resources.current.value;
+    const eventp=resources.eventp.value;
+    const daily=resources.daily.value;
+    const meta=history?.index?.funds?.[code];
     target.innerHTML=`<div class="simulation-tabs" role="group" aria-label="持仓研究模型"><button data-model-mode="comparison" class="${mode==='comparison'?'active':''}" aria-pressed="${mode==='comparison'}">Smoother / Filter 上下对照</button><button data-model-mode="eventp" class="${mode==='eventp'?'active':''}" aria-pressed="${mode==='eventp'}">Event-P · 全量回测</button><button data-model-mode="history" class="${mode==='history'?'active':''}" aria-pressed="${mode==='history'}">连续轨迹 · Smoother → Filter</button><button data-model-mode="current" class="${mode==='current'?'active':''}" aria-pressed="${mode==='current'}">原试点对照与验真</button></div><div data-model-content></div>`;
     const body=target.querySelector('[data-model-content]');
-    if(mode==='comparison') body.innerHTML=fullFilterComparison(historical?.data,daily,options,dailyError);
-    else if(mode==='eventp') body.innerHTML=eventp?.index?eventPPanel(eventp.data,eventp.index,eventpDate):`<article class="subpanel"><p>${escapeHTML(eventpError||'全量回测尚未加载完成。')}</p></article>`;
-    else if(mode==='history') body.innerHTML=historical?.data?reconstructionPanel(historical.data,options):`<article class="subpanel"><h2>历史持仓重建</h2><p>${escapeHTML(historicalError || meta?.issues?.map(x=>x.reason).join('；') || '本基金尚未纳入固定历史重建试点，不生成虚构轨迹。')}</p><p class="method-note">历史重建与当前Filter覆盖范围独立；本批固定研究/原试点并集，不代表全部主观权益基金。</p></article>`;
-    else bindEquitySimulation(body,current.data,current.index);
+    if(mode==='comparison') {
+      body.innerHTML=resources.daily.error ? errorPanel('daily') : fullFilterComparison(historical?.data,daily,options);
+      if(resources.smoother.pending) body.innerHTML='<p class="empty-copy" role="status">Smoother 历史正在加载；每日 Filter 独立加载。</p>'+body.innerHTML;
+      if(resources.smoother.error) body.innerHTML=errorPanel('smoother')+body.innerHTML;
+    } else if(resources[mode].error) body.innerHTML=errorPanel(mode);
+    else if(mode==='eventp') body.innerHTML=eventp?.index?eventPPanel(eventp.data,eventp.index,eventpDate):'<p class="empty-copy" role="status">正在加载 Event-P 全量回测…</p>';
+    else if(mode==='history') {
+      body.innerHTML=history?.data?reconstructionPanel(history.data,options):`<article class="subpanel"><h2>历史持仓重建</h2><p>${resources.history.pending ? '正在加载连续轨迹…' : escapeHTML(meta?.issues?.map(x=>x.reason).join('；') || '本基金尚无合格历史重建轨迹，不生成虚构轨迹。')}</p><p class="method-note">历史重建与当前Filter覆盖范围独立。</p></article>`;
+      if(history?.data?.extension_issue) body.innerHTML+='<button type="button" class="text-button" data-model-retry="history">重新加载接续段</button>';
+    } else if(current) bindEquitySimulation(body,current.data,current.index);
+    else body.innerHTML='<p class="empty-copy" role="status">正在加载原试点对照…</p>';
     target.querySelector('[data-eventp-date]')?.addEventListener('change',e=>{eventpDate=e.target.value;update();});
     target.querySelectorAll('[data-model-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.modelMode;options.basis=new URLSearchParams(location.search).get('simBasis')==='equity'?'equity':'nav';update();}));
+    target.querySelectorAll('[data-model-retry]').forEach(b=>b.addEventListener('click',()=>{ensure(b.dataset.modelRetry,true);render();}));
     target.querySelectorAll('[data-reconstruction-control]').forEach(c=>c.addEventListener('change',()=>{options[c.dataset.reconstructionControl]=c.value;update();}));
     if(mode==='history') target.querySelector('[data-simulation-basis]')?.addEventListener('change',e=>{options.basis=e.target.value==='equity'?'equity':'nav';update();});
   };
-  const update=()=>{const url=new URL(location.href);url.searchParams.set('simMode',mode);if(eventpDate)url.searchParams.set('eventpDate',eventpDate);for(const [k,v] of Object.entries(options))url.searchParams.set(k==='basis'?'simBasis':'history'+k[0].toUpperCase()+k.slice(1),v);history.replaceState(null,'',url);render();};
+  const update=()=>{const url=new URL(location.href);url.searchParams.set('simMode',mode);if(eventpDate)url.searchParams.set('eventpDate',eventpDate);for(const [k,v] of Object.entries(options))url.searchParams.set(k==='basis'?'simBasis':'history'+k[0].toUpperCase()+k.slice(1),v);history.replaceState(null,'',url);ensureMode();render();};
+  ensureMode();
   render();
-  loadFullFilterDaily(fundCode).then(value=>{daily=value;render();}).catch(error=>{dailyError=error.message;render();});
 }
 
 function simulationLineChart(rows, industry, disclosed, basis='nav') {
@@ -5581,8 +5645,7 @@ function createGenericTabLoader(fund, detail) {
     const target = document.querySelector(`[data-panel="${id}"]`);
     if (!target) return;
     if (id === "simulation") {
-      const [current, historical, eventp] = await Promise.all([loadEquitySimulation(fund.code), loadEquityReconstruction(fund.code).then(value=>({value})).catch(error=>({error:error.message})), loadEquityEventP(fund.code).then(value=>({value})).catch(error=>({error:error.message}))]);
-      bindCombinedEquitySimulation(target, current, historical.value, historical.error, eventp.value, eventp.error);
+      bindCombinedEquitySimulation(target, null, null, '', null, '', fund.code);
       return;
     }
     if (id === "profile") {
