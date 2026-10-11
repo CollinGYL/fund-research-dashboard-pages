@@ -1797,3 +1797,315 @@ details.subpanel[open] > summary { margin-bottom: 16px; }
 .workbench .model-coverage{font-size:12px;line-height:1.7;color:#526579;background:#f0f4f7;border-left:3px solid #879eaf;padding:8px 12px;margin:10px 0;}
 .workbench .model-coverage strong{color:#253e53;font-variant-numeric:tabular-nums;}
 @media(max-width:720px){.workbench .legacy-period-switch{width:auto;flex-shrink:0}.workbench .legacy-period-switch button{white-space:nowrap;min-width:85px;padding:6px 9px}}
+
+/* A · 清爽蓝白研究工作台。仅调整视觉与布局，沿用全部业务控件和数据颜色。 */
+.blue-workbench {
+  --ink:#203046; --muted:#66798e; --line:#e1e8f1; --paper:#f3f6fa;
+  --white:#fff; --navy:#24457b; --teal:#3264d5; --teal-soft:#edf2fc;
+  --shadow:0 3px 14px #20304606;
+  background:var(--paper); color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:14px;
+}
+html:has(.blue-workbench) { scroll-padding-top:88px; scroll-behavior:auto; }
+.blue-workbench :is(h1,h2,h3) { font-family:inherit; letter-spacing:-.025em; }
+.blue-workbench :is(button,input,select,summary,a):focus-visible { outline:3px solid #91b2fa; outline-offset:3px; }
+.blue-workbench .site-header {
+  height:66px; min-height:66px; padding:10px 28px; top:0; z-index:50;
+  background:#fff; color:var(--ink); border-bottom:1px solid var(--line); box-shadow:none; backdrop-filter:none;
+}
+.blue-workbench .brand { gap:11px; }
+.blue-workbench .brand-mark { width:31px; height:31px; border:0; border-radius:7px; background:var(--teal); color:#fff; font-size:17px; }
+.blue-workbench .brand strong { font-size:15px; font-weight:650; letter-spacing:.03em; }
+.blue-workbench .brand small { color:var(--muted); font-size:9px; letter-spacing:.14em; }
+.blue-workbench .site-header nav { gap:24px; color:var(--muted); font-size:12px; }
+.blue-workbench .site-header nav a:hover { color:var(--teal); }
+.blue-workbench .research-sidebar {
+  position:fixed; inset:66px auto 0 0; z-index:35; width:188px; overflow:auto;
+  padding:28px 14px; background:#fff; border-right:1px solid var(--line);
+}
+.blue-workbench .sidebar-label { margin:0 12px 16px; color:#748499; font-size:10px; font-weight:600; letter-spacing:.15em; }
+.blue-workbench .research-sidebar .category-tabs,.blue-workbench .sidebar-links {
+  display:flex; flex-direction:column; flex-wrap:nowrap; gap:5px; padding:0; margin:0; border:0; background:none;
+}
+.blue-workbench .research-sidebar .category-tabs button,.blue-workbench .sidebar-links a {
+  display:flex; align-items:center; gap:9px; width:100%; min-height:44px; padding:11px 12px;
+  border:0; border-radius:7px; color:#5d6f84; background:transparent; box-shadow:none;
+  text-align:left; font-size:12px; font-weight:500; line-height:1.5; white-space:normal; cursor:pointer;
+}
+.blue-workbench .research-sidebar .category-tabs button::before,.blue-workbench .sidebar-links a::before { content:""; width:5px; height:5px; flex:0 0 5px; border:1px solid #8e9fb4; border-radius:2px; }
+.blue-workbench .research-sidebar .category-tabs button.active { color:var(--teal); background:var(--teal-soft); font-weight:650; box-shadow:none; }
+.blue-workbench .research-sidebar .category-tabs button.active::before { border-color:var(--teal); background:var(--teal); }
+.blue-workbench .research-sidebar .category-tabs button:hover,.blue-workbench .sidebar-links a:hover { background:#f3f6fc; color:var(--teal); }
+.blue-workbench .sidebar-note { margin:30px 12px 0; padding-top:23px; border-top:1px solid var(--line); color:var(--muted); font-size:11px; line-height:1.8; }
+.blue-workbench .sidebar-note strong { display:block; color:#5b6d83; font-size:11px; font-weight:600; }
+.blue-workbench .sidebar-note p { margin:7px 0 14px; }
+.blue-workbench .sidebar-note a { font-size:10px; color:#506b99; }
+.blue-workbench .sidebar-note-mark { display:block; width:20px; height:3px; margin-bottom:12px; background:#a8bfef; border-radius:2px; }
+.blue-workbench main { margin-left:188px; padding:0 32px; min-width:0; }
+.blue-workbench .section-shell { width:100%; max-width:none; }
+.blue-workbench main.section-shell { width:auto; margin-right:0; }
+.blue-workbench .workspace-intro { padding:28px 0 20px; gap:16px; }
+.blue-workbench .workspace-intro > div { display:block; }
+.blue-workbench .workspace-intro .eyebrow { display:block; margin:0 0 8px; color:#8190a3; font-size:10px; font-weight:500; letter-spacing:.13em; }
+.blue-workbench .workspace-intro h1 { font-size:25px; line-height:1.35; font-weight:650; }
+.blue-workbench .workspace-intro > p { font-size:12px; color:#718298; }
+.blue-workbench.compact-home .category-hub { padding:0 0 21px; gap:12px; border:0; border-radius:0; background:transparent; }
+.blue-workbench.compact-home .home-search-box { max-width:520px; flex:1 1 310px; }
+.blue-workbench.compact-home .home-search-box input { height:46px; padding:0 16px; border:1px solid #dce5f0; border-radius:9px; background:#fff; font-size:13px; }
+.blue-workbench.compact-home .home-search-box input:focus { border-color:#7c9fe8; box-shadow:0 0 0 3px #3264d50b; }
+.blue-workbench .fund-search-suggestions { border-color:var(--line); border-radius:9px; background:#fff; box-shadow:0 10px 30px #20304612; }
+.blue-workbench .fund-search-suggestion:hover,.blue-workbench .fund-search-suggestion.active { background:var(--teal-soft); }
+.blue-workbench.compact-home #samples { padding:0 0 24px; }
+.blue-workbench.compact-home #samples > .section-heading { display:flex; align-items:baseline; gap:18px; margin:0 0 17px; }
+.blue-workbench #samples > .section-heading .eyebrow { display:none; }
+.blue-workbench #fund-list-title { margin:0; font-size:17px; font-weight:650; line-height:1.5; }
+.blue-workbench #fund-list-description { max-width:650px; font-size:11px; line-height:1.7; color:#718298; }
+.blue-workbench.compact-home .list-toolbar { padding:0 0 16px; gap:12px; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; }
+.blue-workbench .toolbar-label { display:none; }
+.blue-workbench .decision-view-switch { padding:0; gap:5px; border:0; background:transparent; border-radius:0; }
+.blue-workbench .decision-view-switch button { min-height:37px; padding:8px 12px; color:#697d94; font-size:12px; border-radius:6px; }
+.blue-workbench .decision-view-switch button.active { color:var(--teal); background:#e8eefb; box-shadow:none; font-weight:650; }
+.blue-workbench .decision-view-switch button:hover { background:#eaf0fa; }
+.blue-workbench .decision-filters { border-left:0; padding-left:0; gap:10px; }
+.blue-workbench .decision-filters label,.blue-workbench .page-density { color:#6a7b90; font-size:11px; }
+.blue-workbench .decision-filters select,.blue-workbench .page-density select { border-color:#dbe4ef; min-height:34px; border-radius:6px; background:#fff; }
+.blue-workbench .column-settings summary,.blue-workbench .more-filters summary { border-color:#dbe4ef; background:#fff; color:#5d728c; border-radius:6px; font-size:11px; }
+.blue-workbench .column-settings > div,.blue-workbench .more-filters > div { border-color:var(--line); box-shadow:0 10px 28px #20304614; }
+.blue-workbench .legacy-period-switch { border:1px solid var(--line); background:#fff; }
+.blue-workbench .legacy-period-switch button.active { color:var(--teal); background:#edf2fc; box-shadow:none; }
+.blue-workbench .list-status-row { gap:6px 12px; min-height:48px; }
+.blue-workbench .list-sort-state,.blue-workbench.compact-home .search-result-count { color:#667b94; font-size:11px; }
+.blue-workbench .home-classification-note { padding:0; color:#77879b; font-size:11px; line-height:1.7; }
+.blue-workbench .filter-chip { color:#496a9f; border-color:#d7e3fa; background:#edf2fc; }
+.blue-workbench .selected-filters button { color:var(--teal); border-color:#d7e3fa; }
+.blue-workbench .table-scroll-hint { display:flex; justify-content:flex-end; gap:7px; margin:7px 0 2px; color:#8090a4; font-size:10px; }
+.blue-workbench .table-scroll-hint span { color:#527cbe; font-size:13px; line-height:1; }
+.blue-workbench .table-top-scroll { height:12px; margin-bottom:5px; border-radius:6px; background:#eaf0f7; scrollbar-color:#a9bcd8 #eaf0f7; }
+.blue-workbench .fund-list-wrap { border-color:var(--line); border-radius:10px; box-shadow:none; background:#fff; scrollbar-color:#a9bcd8 #eaf0f7; }
+.blue-workbench .fund-list-wrap::-webkit-scrollbar,.blue-workbench .table-top-scroll::-webkit-scrollbar { height:10px; }
+.blue-workbench .fund-list-wrap::-webkit-scrollbar-track,.blue-workbench .table-top-scroll::-webkit-scrollbar-track { background:#eaf0f7; }
+.blue-workbench .fund-list-wrap::-webkit-scrollbar-thumb,.blue-workbench .table-top-scroll::-webkit-scrollbar-thumb { background:#a9bcd8; border:2px solid #eaf0f7; border-radius:7px; }
+.blue-workbench .fund-list-table { font-variant-numeric:tabular-nums; }
+.blue-workbench.compact-home .fund-list-table thead th { padding:13px 14px; color:#6c7e95; background:#f7f9fc; border-bottom:1px solid #e1e8f1; font-size:11px; font-weight:500; }
+.blue-workbench.compact-home .fund-list-table th:first-child { background:#f7f9fc; box-shadow:1px 0 #e8edf4; }
+.blue-workbench.compact-home .fund-list-table td { padding:15px 14px; border-color:#edf1f6; line-height:1.55; color:#445a72; font-size:12px; }
+.blue-workbench.compact-home .fund-list-table td small { color:#8090a3; font-size:11px; line-height:1.6; }
+.blue-workbench.compact-home .fund-list-table tbody tr { transition:none; }
+.blue-workbench.compact-home .fund-list-table tbody tr:nth-child(even) td { background:#fff; }
+.blue-workbench.compact-home .fund-list-table tbody tr:hover td { background:#f4f7fd; }
+.blue-workbench .fund-name-cell a strong { color:#2c518d; font-weight:600; font-size:13px; }
+.blue-workbench .fund-name-cell a:hover strong { color:#3264d5; }
+.blue-workbench .fund-list-table .period-cell strong.positive { color:#b44b43; }
+.blue-workbench .fund-list-table .period-cell strong.negative { color:#39816f; }
+.blue-workbench .fund-list-table th button { color:#6c7e95; }
+.blue-workbench .fund-list-table [data-sort-key][aria-pressed="true"] { color:var(--teal); background:#e6edfd; }
+.blue-workbench .fund-list-table .table-header-select { border-color:#dfe7f2; border-radius:5px; color:#627a95; }
+.blue-workbench .fund-list-table .table-filter-direction { color:#416fae; border-color:#d7e2f3; }
+.blue-workbench .all-fund-core-grid > span { background:#f5f7fb; border-radius:5px; }
+.blue-workbench .all-fund-overview-meta { border-color:#edf1f6; }
+.blue-workbench .fund-profile-chip-grid span { color:#58739a; background:#eef3fb; }
+.blue-workbench .fund-row-details > summary { color:#6a87b4; }
+.blue-workbench .fund-row-details dl { border-color:#dee7f4; background:#f5f8fd; }
+.blue-workbench .fund-pagination { color:#708197; font-size:11px; }
+.blue-workbench .fund-pagination button { min-height:31px; padding:5px 10px; border:1px solid #dfe6f0; border-radius:6px; color:#536f96; background:#fff; box-shadow:none; }
+.blue-workbench .fund-pagination button:disabled { color:#aab5c3; background:#f7f9fc; }
+.blue-workbench .site-data-notes { margin-bottom:24px; padding:14px 18px; border-radius:9px; border-color:var(--line); background:#fff; color:#718197; font-size:11px; }
+.blue-workbench .site-data-notes summary { color:#536e92; font-size:12px; }
+.blue-workbench footer { width:auto; max-width:none; margin:0 32px 0 220px; padding:16px 0 24px; border-color:var(--line); color:#8090a4; font-size:10px; }
+.blue-workbench .loading-state { background:#fff; border:1px solid var(--line); border-radius:10px; }
+/* Detail pages share the frame; disclosure, model dates and gaps remain visible. */
+.blue-workbench .fund-page,.blue-workbench.decision-detail .fund-page { padding-top:23px; }
+.blue-workbench .back-link { color:#7488a2; font-size:12px; }
+.blue-workbench.decision-detail .fund-page-hero { padding:13px 0 23px; margin-bottom:19px; border-color:var(--line); }
+.blue-workbench.decision-detail .fund-page-hero h1 { color:#203046; font-size:28px; line-height:1.4; font-weight:650; }
+.blue-workbench.decision-detail .fund-page-hero .eyebrow { color:#7a8ca3; font-size:11px; }
+.blue-workbench.decision-detail .fund-page-summary { color:#7a8ca3; font-size:12px; }
+.blue-workbench.decision-detail .hero-facts { gap:28px; }
+.blue-workbench.decision-detail .hero-facts dt { color:#8190a3; font-size:11px; }
+.blue-workbench.decision-detail .hero-facts dd { color:#3d5572; font-size:15px; font-weight:550; }
+.blue-workbench .research-navigation-mode { gap:6px; margin-bottom:10px; }
+.blue-workbench .research-navigation-mode button { min-height:32px; padding:6px 11px; border-color:#dee6f1; border-radius:6px; color:#70839d; font-size:11px; }
+.blue-workbench .research-navigation-mode button.active { background:#e9effc; color:var(--teal); border-color:#dce6fb; }
+.blue-workbench .research-navigation-mode > span { color:#91a0b3; font-size:10px; }
+.blue-workbench .research-group-nav { border-color:var(--line); }
+.blue-workbench .research-group-nav[hidden] { display:none; }
+.blue-workbench .research-group-nav button { font-size:12px; color:#71859f; min-height:38px; }
+.blue-workbench .research-group-nav button.active { color:var(--teal); background:#e9effc; }
+.blue-workbench.decision-detail .fund-tab-nav:not(.single-subtab) { position:sticky; top:66px; z-index:20; gap:4px; margin:0 0 20px; padding:7px; background:#fff; border:1px solid var(--line); border-radius:9px; }
+.blue-workbench.decision-detail .fund-tab-nav button,.blue-workbench.decision-detail .fund-tab-nav.all-functions button { min-height:37px; padding:8px 12px; border:0; border-radius:5px; color:#637b98; font-size:12px; font-weight:500; background:transparent; box-shadow:none; }
+.blue-workbench.decision-detail .fund-tab-nav button.active,.blue-workbench.decision-detail .fund-tab-nav.all-functions button.active { color:var(--teal); background:#edf2fc; box-shadow:inset 0 -2px #3264d5; font-weight:650; }
+.blue-workbench .research-conclusion { padding:13px 17px; border-left:3px solid #759bee; border-radius:0 8px 8px 0; background:#edf3ff; }
+.blue-workbench .research-conclusion > span { color:#6986b3; font-size:11px; }
+.blue-workbench .research-conclusion p { color:#3e587d; font-size:14px; line-height:1.8; }
+.blue-workbench .research-freshness { gap:6px 18px; padding:14px 0; color:#8090a6; font-size:11px; }
+.blue-workbench .research-freshness b { color:#5b7495; font-weight:550; }
+.blue-workbench .research-decision-metrics { margin-bottom:20px; border-color:var(--line); border-radius:10px; }
+.blue-workbench .research-decision-metrics > div { padding:18px; border-color:var(--line); }
+.blue-workbench .research-decision-metrics strong { color:#345786; font-size:25px; font-weight:550; }
+.blue-workbench .research-decision-metrics span,.blue-workbench .research-decision-metrics small { color:#7d8da3; font-size:11px; }
+.blue-workbench .research-overview-grid { gap:18px; }
+.blue-workbench :is(.subpanel,.research-overview-grid .subpanel,.history-metric,.simulation-metrics .research-metric,.simulation-method) { padding:20px; border:1px solid var(--line); border-radius:10px; background:#fff; box-shadow:none; }
+.blue-workbench .subpanel h3,.blue-workbench .research-overview-grid h3 { color:#3a5477; font-size:15px; font-weight:600; }
+.blue-workbench .subpanel-heading > span { color:#8b9bb0; font-size:11px; }
+.blue-workbench .method-note { color:#7b8ca3; font-size:12px; line-height:1.8; }
+.blue-workbench .research-risk { border-color:var(--line); background:#f7f9fc; border-radius:9px; }
+.blue-workbench .research-risk h3 { color:#5d7492; font-size:14px; }
+.blue-workbench .research-risk :is(p,li) { color:#7b8ba0; font-size:12px; }
+.blue-workbench .research-signal { border-color:var(--line); }
+.blue-workbench .research-signal span,.blue-workbench .research-signal small { color:#7c8da3; font-size:11px; }
+.blue-workbench .research-signal strong { color:#456181; font-size:14px; }
+.blue-workbench .simulation-tabs { gap:6px; }
+.blue-workbench .simulation-tabs button { min-height:39px; padding:9px 13px; border-color:#dee6f1; border-radius:6px; font-size:12px; color:#617a9b; }
+.blue-workbench .simulation-tabs button.active { color:var(--teal); border-color:#d8e4fc; background:#ebf1ff; font-weight:600; }
+.blue-workbench .simulation-chart-toolbar { border-color:var(--line); background:#f8fafe; }
+.blue-workbench .model-coverage { padding:9px 12px; border-left:3px solid #abc1e8; border-radius:0 5px 5px 0; background:#f3f6fc; color:#6d819e; font-size:11px; }
+.blue-workbench .model-coverage strong { color:#526f98; }
+.blue-workbench .history-controls { gap:12px; }
+.blue-workbench .history-controls :is(label,input,select) { font-size:12px; color:#657e9f; }
+.blue-workbench .history-controls :is(input,select) { border-color:#dce5f1; border-radius:6px; background:#fff; }
+.blue-workbench [data-comparison-chart] { margin-top:15px; }
+.blue-workbench [data-comparison-chart] h3 { margin-top:0; }
+.blue-workbench .simulation-warning { border-left-color:#c8a26b; background:#fff8eb; color:#866b44; }
+.blue-workbench .data-boundary { border-color:var(--line); border-radius:10px; background:#fff; }
+.blue-workbench .data-boundary h2 { font-size:18px; color:#4b6587; }
+.blue-workbench .data-boundary li { color:#7a8da4; font-size:12px; line-height:1.8; }
+@media (min-width:761px) {
+  .blue-workbench.compact-home .fund-list-table.active-equity-mode { min-width:1290px; }
+  .blue-workbench.compact-home .fund-list-table.active-equity-mode :is(th,td) { padding:14px 12px; }
+  .blue-workbench.compact-home .fund-list-table.active-equity-mode :is(th,td):first-child { width:218px; }
+}
+@media (max-width:1180px) and (min-width:761px) {
+  .blue-workbench .research-sidebar { width:166px; padding-inline:10px; }
+  .blue-workbench .research-sidebar .category-tabs button,.blue-workbench .sidebar-links a { padding-inline:10px; font-size:11px; }
+  .blue-workbench main { margin-left:166px; padding-inline:24px; }
+  .blue-workbench footer { margin-left:190px; margin-right:24px; }
+  .blue-workbench .workspace-intro > p { display:none; }
+  .blue-workbench.compact-home #samples > .section-heading { display:block; }
+  .blue-workbench #fund-list-description { margin-top:5px; }
+  .blue-workbench .research-overview-grid { grid-template-columns:1fr; }
+}
+@media (max-width:760px) {
+  .blue-workbench .site-header { height:60px; min-height:60px; padding:9px 15px; }
+  .blue-workbench .brand-mark { width:28px; height:28px; font-size:16px; }
+  .blue-workbench .brand strong { font-size:13px; }
+  .blue-workbench .brand small { font-size:8px; letter-spacing:.08em; }
+  .blue-workbench .site-header nav { gap:12px; font-size:10px; }
+  .blue-workbench .research-sidebar { display:none; }
+  .blue-workbench main,.blue-workbench main.section-shell { width:auto; margin-left:0; padding-inline:16px; }
+  .blue-workbench .section-shell { width:100%; }
+  .blue-workbench .workspace-intro { padding:23px 0 17px; }
+  .blue-workbench .workspace-intro h1 { font-size:23px; }
+  .blue-workbench .workspace-intro .eyebrow { font-size:9px; margin-bottom:7px; }
+  .blue-workbench.compact-home .category-hub { gap:8px; padding:0 0 18px; }
+  .blue-workbench.compact-home .home-search-box { flex:1 1 190px; min-width:0; }
+  .blue-workbench.compact-home .home-search-box input { height:44px; padding-inline:12px; font-size:12px; }
+  .blue-workbench #mobile-category { width:110px; min-height:44px; border-color:#dce5f1; font-size:11px; }
+  .blue-workbench.compact-home #samples > .section-heading { display:block; margin-bottom:13px; }
+  .blue-workbench #fund-list-title { font-size:16px; }
+  .blue-workbench #fund-list-description { margin-top:5px; font-size:10px; }
+  .blue-workbench.compact-home .list-toolbar { padding-bottom:13px; gap:10px; }
+  .blue-workbench .decision-view-switch { width:100%; gap:2px; }
+  .blue-workbench .decision-view-switch button { min-height:39px; padding:8px 5px; font-size:12px; }
+  .blue-workbench .mobile-only-control { min-height:38px; border-color:#dce5f1; border-radius:6px; font-size:11px; }
+  .blue-workbench .decision-filters select { max-width:112px; }
+  .blue-workbench .column-settings > div { right:0; max-width:calc(100vw - 34px); }
+  .blue-workbench .page-density { margin-left:0; }
+  .blue-workbench .list-status-row { gap:3px 10px; padding:8px 0; }
+  .blue-workbench .table-scroll-hint { margin-top:9px; }
+  .blue-workbench.compact-home:not([data-list-view="complete"]) .table-scroll-hint { display:none; }
+  .blue-workbench .fund-list-wrap { border-radius:9px; }
+  .blue-workbench.compact-home .fund-list-table td { padding:12px; }
+  .blue-workbench.compact-home .fund-list-table tbody td strong { font-size:13px; }
+  .blue-workbench.compact-home .fund-list-table tbody td small { font-size:11px; }
+  .blue-workbench.compact-home #fund-pagination { position:static; border:0; background:transparent; padding:12px 0; justify-content:center; flex-wrap:wrap; }
+  .blue-workbench .fund-pagination button { min-height:37px; }
+  .blue-workbench .site-data-notes { padding:13px 14px; }
+  .blue-workbench footer { margin:0 16px; padding:15px 0 22px; flex-wrap:wrap; gap:4px; }
+  .blue-workbench .fund-page,.blue-workbench.decision-detail .fund-page { padding-top:17px; }
+  .blue-workbench.decision-detail .fund-page-hero { padding:8px 0 20px; margin-bottom:14px; gap:14px; }
+  .blue-workbench.decision-detail .fund-page-hero h1 { font-size:25px; }
+  .blue-workbench.decision-detail .hero-facts { flex-wrap:wrap; gap:15px 26px; }
+  .blue-workbench.decision-detail .hero-facts dd { font-size:14px; }
+  .blue-workbench .research-navigation-mode > span { flex-basis:100%; font-size:10px; }
+  .blue-workbench.decision-detail .fund-tab-nav:not(.single-subtab) { position:static; margin-bottom:16px; }
+  .blue-workbench.decision-detail .fund-tab-nav.all-functions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .blue-workbench.decision-detail .fund-tab-nav.all-functions button { font-size:11px; min-height:39px; padding:7px 3px; }
+  .blue-workbench .research-decision-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .blue-workbench .research-decision-metrics > div { padding:14px; }
+  .blue-workbench .research-decision-metrics strong { font-size:23px; }
+  .blue-workbench :is(.subpanel,.research-overview-grid .subpanel,.history-metric,.simulation-metrics .research-metric,.simulation-method) { padding:15px; }
+  .blue-workbench .research-overview-grid { grid-template-columns:1fr; gap:14px; }
+  .blue-workbench .research-conclusion { padding:11px 13px; }
+  .blue-workbench .research-conclusion p { font-size:13px; }
+  .blue-workbench .history-controls label { min-width:0; }
+  .blue-workbench .history-controls :is(input,select) { min-width:0; width:100%; }
+  .blue-workbench .simulation-tabs button { min-height:40px; padding:8px 10px; font-size:11px; }
+  .blue-workbench .model-coverage { overflow-wrap:anywhere; }
+  .blue-workbench .simulation-metrics { grid-template-columns:1fr; }
+  .blue-workbench .data-boundary { padding:17px; }
+}
+/* Secondary analysis modules, including the embedded pure-bond reference. */
+.blue-workbench .pb-scope {
+  --ink:#203046; --muted:#66798e; --line:#e1e8f1; --paper:#f3f6fa;
+  --navy:#24457b; --teal:#3264d5; --teal-soft:#edf2fc;
+  --shadow:0 3px 14px #20304606;
+  background:transparent; font-family:inherit; scroll-behavior:auto;
+}
+.blue-workbench .panel-intro,.blue-workbench .pb-scope .panel-intro { padding:20px 23px; gap:24px; margin-top:0; border:1px solid #dde6f4; border-radius:10px; background:#edf3fd; color:#355782; }
+.blue-workbench .panel-intro h2,.blue-workbench .pb-scope .panel-intro h2 { font-family:inherit; font-size:23px; font-weight:600; }
+.blue-workbench .panel-intro .eyebrow,.blue-workbench .pb-scope .panel-intro .eyebrow { color:#7a94bc; font-size:10px; }
+.blue-workbench .panel-intro > p,.blue-workbench .pb-scope .panel-intro > p { color:#7086a4; font-size:12px; line-height:1.8; }
+.blue-workbench .pb-scope .subpanel { padding:20px; border-color:var(--line); border-radius:10px; background:#fff; }
+.blue-workbench .pb-scope .subpanel h3 { font-family:inherit; color:#3a5477; font-size:15px; font-weight:600; }
+.blue-workbench .pb-scope .rmetric,.blue-workbench .research-metric { background:#fff; border-color:var(--line); border-radius:8px; }
+.blue-workbench .pb-scope .rmetric strong,.blue-workbench .research-metric strong { color:#45658f; }
+.blue-workbench .research-table th,.blue-workbench .pb-scope .rt th { background:#f7f9fc; color:#778aa2; }
+.blue-workbench .research-table td,.blue-workbench .pb-scope .rt td { border-color:#edf1f6; }
+.blue-workbench .pb-scope .auto-note { color:#59769c; font-size:13px; background:#f0f5fd; border-radius:7px; }
+.blue-workbench .pb-scope .data-boundary { color:#5b7394; background:#f8fafe; border:1px solid var(--line); border-radius:10px; }
+.blue-workbench .pb-scope .data-boundary h3 { color:#536f95; font-family:inherit; font-size:16px; }
+.blue-workbench .pb-scope .data-boundary p { color:#7b8da5; font-size:12px; }
+.blue-workbench .pb-scope .data-boundary .eyebrow { color:#7792b9; }
+.blue-workbench .pb-scope .fund-tab-panel { animation:none; }
+@media(max-width:760px) {
+  .blue-workbench .panel-intro,.blue-workbench .pb-scope .panel-intro { flex-direction:column; align-items:stretch; padding:17px; gap:10px; }
+  .blue-workbench .panel-intro h2,.blue-workbench .pb-scope .panel-intro h2 { font-size:21px; }
+  .blue-workbench .panel-intro > p,.blue-workbench .pb-scope .panel-intro > p { text-align:left; font-size:11px; }
+  .blue-workbench .pb-scope .subpanel { padding:15px; }
+  .blue-workbench .pb-scope .metric-grid-in { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .blue-workbench .pb-scope .cmp-input { min-width:0; flex:1 1 160px; }
+}
+/* Desktop QA: reserve full numeric column widths; never overlap the next date. */
+@media (min-width:761px) {
+  .blue-workbench.compact-home .fund-list-table.active-equity-mode { min-width:1480px; }
+  .blue-workbench .active-equity-mode .size-filter-heading { width:105px; }
+  .blue-workbench .active-equity-mode .sortable-period-heading { width:102px; }
+  .blue-workbench .active-equity-mode .sortable-period-heading:has([data-sort-key="ytd"]) { width:128px; }
+  .blue-workbench .active-equity-mode .equity-stock-heading { width:112px; }
+  .blue-workbench .active-equity-mode .profile-filter-heading { width:180px; }
+  .blue-workbench .active-equity-mode .sector-filter-heading { width:140px; }
+  .blue-workbench .active-equity-mode .industry-filter-heading { width:176px; }
+  .blue-workbench.compact-home .fund-list-table.active-equity-mode .period-cell { white-space:nowrap; overflow-wrap:normal; word-break:normal; }
+  .blue-workbench.compact-home .fund-list-table.active-equity-mode .period-cell :is(strong,small) { white-space:nowrap; overflow-wrap:normal; word-break:normal; }
+  .blue-workbench.compact-home .fund-list-table.active-equity-mode .period-cell small { font-size:11px; }
+  .blue-workbench .active-equity-mode .sortable-period-heading :is(span,button) { white-space:nowrap; }
+}
+/* Secondary text stays readable on white, including methodology and data dates. */
+.blue-workbench .method-note,.blue-workbench .model-coverage,.blue-workbench .research-risk :is(p,li),
+.blue-workbench .research-signal span,.blue-workbench .research-signal small,
+.blue-workbench .research-decision-metrics span,.blue-workbench .research-decision-metrics small,
+.blue-workbench .research-freshness,.blue-workbench .subpanel-heading > span,
+.blue-workbench .data-boundary li,.blue-workbench .pb-scope .data-boundary p,
+.blue-workbench .panel-intro > p,.blue-workbench .pb-scope .panel-intro > p,
+.blue-workbench.compact-home .fund-list-table td small { color:#5e738e; }
+.blue-workbench .pb-scope .method-note,.blue-workbench .pb-scope .subpanel-heading span { color:#5e738e; }
+/* Keep one visible page title so navigation does not consume the first screen. */
+.blue-workbench.compact-home .workspace-intro { display:none; }
+.blue-workbench.compact-home .category-hub { padding-top:24px; padding-bottom:18px; }
+.blue-workbench.compact-home #samples #fund-list-title { font-size:25px; line-height:1.4; }
+.blue-workbench.compact-home #samples > .section-heading { margin-bottom:16px; }
+@media(max-width:760px) {
+ .blue-workbench.compact-home .category-hub { padding-top:17px; padding-bottom:17px; }
+ .blue-workbench.compact-home #samples #fund-list-title { font-size:22px; }
+}

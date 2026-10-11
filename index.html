@@ -10,9 +10,9 @@
     <title>财富产品部-基金研究系统看板</title>
     <link rel="preconnect" href="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" crossorigin />
     <link rel="dns-prefetch" href="//fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" />
-    <link rel="stylesheet" href="styles.css?v=8fa309fe7151" />
+    <link rel="stylesheet" href="styles.css?v=5d025cc3ed41" />
   </head>
-  <body class="compact-home workbench">
+  <body class="compact-home workbench blue-workbench">
     <header class="site-header">
       <a class="brand" href="#top" aria-label="返回首页">
         <span class="brand-mark">研</span>
@@ -26,6 +26,18 @@
         <a href="#samples">基金列表</a>
       </nav>
     </header>
+
+    <aside class="research-sidebar" aria-label="研究目录">
+      <p class="sidebar-label">研究目录</p>
+        <div class="category-tabs" role="tablist" aria-orientation="vertical" aria-label="基金分类">
+          <button class="active" data-category="all" role="tab" aria-selected="true">全部</button>
+          <button data-category="active-equity" role="tab" aria-selected="false">主观权益基金</button>
+          <button data-category="pure-bond" role="tab" aria-selected="false">纯债基金</button>
+          <button data-category="hybrid-bond" role="tab" aria-selected="false">一级债基/二级债基</button>
+          <button data-category="convertible-bond" role="tab" aria-selected="false">转债基金</button>
+        </div>
+      <div class="sidebar-note"><span class="sidebar-note-mark" aria-hidden="true"></span><strong>从筛选到深入研究</strong><p>披露数据与模型估计<br>分别呈现，交叉核对。</p><a href="#notes">数据说明与解读边界 ↗</a></div>
+    </aside>
 
     <main id="top">
       <div hidden aria-hidden="true"><span id="fund-count"></span><span id="completed-category-label"></span><span id="completed-category-note"></span></div>
@@ -53,13 +65,6 @@
             aria-expanded="false"
           />
           <div id="fund-search-suggestions" class="fund-search-suggestions" role="listbox" aria-label="基金联想结果" hidden></div>
-        </div>
-        <div class="category-tabs" role="tablist" aria-label="基金分类">
-          <button class="active" data-category="all" role="tab" aria-selected="true">全部</button>
-          <button data-category="active-equity" role="tab" aria-selected="false">主观权益基金</button>
-          <button data-category="pure-bond" role="tab" aria-selected="false">纯债基金</button>
-          <button data-category="hybrid-bond" role="tab" aria-selected="false">一级债基/二级债基</button>
-          <button data-category="convertible-bond" role="tab" aria-selected="false">转债基金</button>
         </div>
         <select id="mobile-category" class="mobile-only-control" aria-label="基金分类"><option value="all">全部基金</option><option value="active-equity">主观权益</option><option value="pure-bond">纯债基金</option><option value="hybrid-bond">一级/二级债</option><option value="convertible-bond">转债基金</option></select>
       </section>
@@ -105,6 +110,7 @@
 
         <p id="fund-list-methodology" class="method-note home-classification-note">净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。</p>
 
+        <p class="table-scroll-hint">左右滚动查看完整指标 <span aria-hidden="true">↔</span></p>
         <div id="table-top-scroll" class="table-top-scroll" tabindex="0" role="region" aria-label="表格顶部横向滚动"><div></div></div>
         <div class="fund-list-wrap" aria-live="polite" tabindex="0" role="region" aria-label="基金指标表，左右滚动查看全部列">
           <table class="fund-list-table">
@@ -132,6 +138,6 @@
     <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_catalog.js" defer></script>
     <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_classification_summary.js" defer></script>
     <script src="research-core.js?v=d53181142b2d" defer></script>
-    <script src="app.js?v=702f804652cf" defer></script>
+    <script src="app.js?v=587ed42ab759" defer></script>
   </body>
 </html>

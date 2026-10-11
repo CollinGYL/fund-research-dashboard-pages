@@ -10,10 +10,10 @@
     <title>基金详细分析 · 财富产品部-基金研究系统看板</title>
     <link rel="preconnect" href="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" crossorigin />
     <link rel="dns-prefetch" href="//fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" />
-    <link rel="stylesheet" href="styles.css?v=8fa309fe7151" />
+    <link rel="stylesheet" href="styles.css?v=5d025cc3ed41" />
     <link rel="stylesheet" href="pure-bond-reference.css?v=c88ab8454792" />
   </head>
-  <body class="workbench">
+  <body class="workbench blue-workbench">
     <header class="site-header">
       <a class="brand" href="index.html" aria-label="返回研究库首页">
         <span class="brand-mark">研</span>
@@ -28,6 +28,18 @@
       </nav>
     </header>
 
+    <aside class="research-sidebar detail-sidebar" aria-label="研究目录">
+      <p class="sidebar-label">研究目录</p>
+      <nav class="sidebar-links" aria-label="基金分类研究目录">
+        <a href="index.html?category=all#samples">全部基金</a>
+        <a href="index.html?category=active-equity#samples">主观权益基金</a>
+        <a href="index.html?category=pure-bond#samples">纯债基金</a>
+        <a href="index.html?category=hybrid-bond#samples">一级债基/二级债基</a>
+        <a href="index.html?category=convertible-bond#samples">转债基金</a>
+      </nav>
+      <div class="sidebar-note"><span class="sidebar-note-mark" aria-hidden="true"></span><strong>基金详细研究</strong><p>净值、披露与模型<br>使用各自可得日期。</p><a href="index.html#notes">数据说明与解读边界 ↗</a></div>
+    </aside>
+
     <main id="fund-page" class="fund-page section-shell" aria-live="polite">
       <p class="loading-state">正在加载基金研究数据…</p>
     </main>
@@ -40,6 +52,6 @@
     <div id="tt" class="tooltip" aria-hidden="true"></div>
     <script src="pure-bond-reference.js?v=62f5b190ea61" defer></script>
     <script src="research-core.js?v=d53181142b2d" defer></script>
-    <script src="fund.js?v=b972427b6671" defer></script>
+    <script src="fund.js?v=b5a8a4a06eb4" defer></script>
   </body>
 </html>

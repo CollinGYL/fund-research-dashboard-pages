@@ -70,6 +70,7 @@ let classificationNameCache = {};
 let suggestedFunds = [];
 let activeSuggestionIndex = -1;
 let stockClassificationPromise = null;
+let stockClassificationError = null;
 let activeEquityProfilesPromise = null;
 let activeEquityProfileFilter = "all";
 let researchSummaryPromise = null;
@@ -211,6 +212,13 @@ function classificationDirectionButton(level) {
 }
 
 function classificationHeader(kind) {
+  if (!window.FUND_STOCK_CLASSIFICATION) {
+    const label = kind === "sector" ? "板块权重" : "行业权重";
+    const loading = Boolean(stockClassificationPromise);
+    const action = loading ? "正在载入…" : stockClassificationError ? "重试载入排序" : "载入权重排序";
+    const note = stockClassificationError ? escapeHtml(stockClassificationError.message) : "需要时载入完整权重";
+    return `<th class="table-filter-heading"><span>${label}</span><button type="button" class="table-header-select" data-load-classification${loading ? " disabled" : ""}>${action}</button><small>${note}</small></th>`;
+  }
   if (kind === "sector") {
     const selectedName = classificationRankState.level === "sector" ? classificationRankState.name : "";
     const names = classificationNames("sector");
@@ -547,7 +555,7 @@ function filteredFunds() {
 
 function updateClassificationRankControl(resetName = false) {
   if (resetName) classificationRankState.name = "";
-  if (activeCategory !== "active-equity" || !classificationRankState.name) return;
+  if (activeCategory !== "active-equity" || !classificationRankState.name || !window.FUND_STOCK_CLASSIFICATION) return;
   if (!classificationNames(classificationRankState.level).includes(classificationRankState.name)) classificationRankState.name = "";
 }
 
@@ -618,6 +626,20 @@ function ensureResearchSummary() {
 
 function renderFunds() {
   const request = ++listRenderRequest;
+  // A restored weight sort needs complete weights; the homepage summary only
+  // contains each fund's largest category and cannot produce a valid ranking.
+  if (activeCategory === 'active-equity' && classificationRankState.name && !window.FUND_STOCK_CLASSIFICATION) {
+    if (!stockClassificationError) requestStockClassification();
+    saveListQuery();
+    renderListHead();
+    renderDecisionControls();
+    resultCount.textContent = stockClassificationError ? '权重排序暂不可用，可重试或切换收益排序' : '正在载入权重排序…';
+    const message = stockClassificationError ? `${escapeHtml(stockClassificationError.message)} <button type="button" data-load-classification>重试</button>` : '正在载入完整板块、行业权重，随后恢复所选排序…';
+    grid.innerHTML = `<tr><td colspan="${listHead.querySelectorAll('th').length}" class="empty-state fund-search-empty">${message}</td></tr>`;
+    pagination.innerHTML = '';
+    document.querySelector('#fund-pagination-top').innerHTML = '';
+    return;
+  }
   if (needsResearchSummary() && window.FUND_RESEARCH_SUMMARY?.catalog_generated_at !== catalog?.generated_at) {
     saveListQuery();
     renderListHead();
@@ -841,17 +863,43 @@ function ensureStockClassification() {
   if (stockClassificationPromise) return stockClassificationPromise;
   stockClassificationPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      script.remove();
+      error ? reject(error) : resolve(window.FUND_STOCK_CLASSIFICATION);
+    };
+    const timer = setTimeout(() => finish(new Error("股票分类数据加载超时，请重试")), 20000);
     script.src = "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_classification.js";
-    script.onload = () => window.FUND_STOCK_CLASSIFICATION
-      ? resolve(window.FUND_STOCK_CLASSIFICATION)
-      : reject(new Error("股票分类数据未生成有效内容"));
-    script.onerror = () => reject(new Error("股票分类数据加载失败"));
+    script.onload = () => finish(window.FUND_STOCK_CLASSIFICATION?.funds
+      ? null : new Error("股票分类数据未生成有效内容"));
+    script.onerror = () => finish(new Error("股票分类数据加载失败，请重试"));
     document.head.appendChild(script);
   }).catch((error) => {
     stockClassificationPromise = null;
     throw error;
   });
   return stockClassificationPromise;
+}
+
+function requestStockClassification() {
+  if (stockClassificationPromise) return stockClassificationPromise;
+  stockClassificationError = null;
+  const loading = ensureStockClassification();
+  loading.then(() => {
+    classificationNameCache = {};
+    if (activeCategory === "active-equity") {
+      updateClassificationRankControl();
+      renderFunds();
+    }
+  }, (error) => {
+    stockClassificationError = error;
+    if (activeCategory === "active-equity") renderFunds();
+  });
+  return loading;
 }
 
 function ensureActiveEquityProfiles() {
@@ -888,7 +936,7 @@ document.querySelectorAll("[data-category]").forEach((button) => button.addEvent
   updateListCopy();
   renderFunds();
   if (activeCategory === "active-equity") {
-    Promise.all([ensureStockClassification(), ensureActiveEquityProfiles()]).then(() => {
+    ensureActiveEquityProfiles().then(() => {
       classificationNameCache = {};
       if (activeCategory === "active-equity") renderFunds();
     }).catch((error) => {
@@ -937,7 +985,7 @@ Promise.all([
   updateListCopy();
   renderFunds();
   requestAnimationFrame(() => window.scrollTo({top:Math.max(0, Math.min(20000, Number(initialListQuery.get('scroll'))||0)), behavior:'instant'}));
-  if(activeCategory==='active-equity') Promise.all([ensureStockClassification(),ensureActiveEquityProfiles()]).then(()=>{classificationNameCache={};updateClassificationRankControl();renderFunds();}).catch(error=>{resultCount.textContent=`扩展数据加载失败：${error.message}`;});
+  if(activeCategory==='active-equity') ensureActiveEquityProfiles().then(()=>{if(activeCategory==='active-equity') renderFunds();}).catch(error=>{if(activeCategory==='active-equity') resultCount.textContent=`扩展数据加载失败：${error.message}`;});
 }).catch((error) => {
   resultCount.textContent = "";
   grid.innerHTML = `<tr><td class="empty-state fund-search-empty">${escapeHtml(error.message)}</td></tr>`;
@@ -1041,6 +1089,8 @@ document.addEventListener('change', event => {
   currentPage = 1; renderFunds();
 });
 document.addEventListener('click', event => {
+  const classificationLoad = event.target.closest('[data-load-classification]');
+  if (classificationLoad && !classificationLoad.disabled) { requestStockClassification(); renderFunds(); return; }
   if (event.target.id === 'retry-research-summary') { researchSummaryError = null; renderFunds(); return; }
   if (event.target.id === 'mobile-filter-toggle') { const open=document.body.classList.toggle('mobile-filters-open');event.target.setAttribute('aria-expanded',String(open)); }
   const view = event.target.closest('[data-view]');

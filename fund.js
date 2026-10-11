@@ -13,6 +13,9 @@ const STOCK_PRICE_UPDATE_SHARD_COUNT = 64;
 const pureBondResearchPromises = new Map();
 const PURE_BOND_RESEARCH_SHARD_COUNT = 64;
 const pureBondReferenceAssetPromises = new Map();
+const pureBondReferenceReadyCodes = new Set();
+const genericDetailPromises = new Map();
+let deepSamplePromise = null;
 const dashboardAssetPromises = new Map();
 const profileDetailPromises = new Map();
 const equityModelAssetPromises = new Map();
@@ -74,9 +77,19 @@ function loadPureBondReferenceAsset(relativePath, ready) {
   if (pureBondReferenceAssetPromises.has(relativePath)) return pureBondReferenceAssetPromises.get(relativePath);
   const promise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      script.remove();
+      error ? reject(error) : resolve();
+    };
+    const timer = setTimeout(() => finish(new Error(`${relativePath} 加载超时，请重试`)), 20000);
     script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${relativePath}?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => ready() ? resolve() : reject(new Error(`${relativePath} 未生成有效内容`));
-    script.onerror = () => reject(new Error(`${relativePath} 加载失败`));
+    script.onload = () => ready() ? finish() : finish(new Error(`${relativePath} 未生成有效内容`));
+    script.onerror = () => finish(new Error(`${relativePath} 加载失败，请重试`));
     document.head.appendChild(script);
   }).catch((error) => {
     pureBondReferenceAssetPromises.delete(relativePath);
@@ -95,12 +108,16 @@ async function loadPureBondReferenceBundle(code) {
     ["pb_shared/peer_dist_2001010302000000.js", () => Boolean(window.PEER_DIST?.["2001010302000000"])],
     ["pb_shared/pb_durkf_missing.js", () => Boolean(window.DURKF_MISS)],
   ];
-  await Promise.all(shared.map(([path, ready]) => loadPureBondReferenceAsset(path, ready)));
-  await loadPureBondReferenceAsset(`pb_funds/${code}.js`, () => Boolean(window.FUND_STORE?.[code]));
+  // These assets are independent JSON assignments. Start them together while
+  // preserving required reference data and optional correlation/duration data.
   await Promise.all([
+    ...shared.map(([path, ready]) => loadPureBondReferenceAsset(path, ready)),
+    loadPureBondReferenceAsset(`pb_funds/${code}.js`, () => Boolean(window.FUND_STORE?.[code])),
     loadPureBondReferenceAsset(`pb_corr/${code}.js`, () => Boolean(window.CORR_SNAP?.[code])).catch(() => null),
     loadPureBondReferenceAsset(`pb_durkf/${code}.js`, () => Boolean(window.DURKF_STORE?.[code])).catch(() => null),
   ]);
+  // A cached fund object alone does not prove the shared reference bundle loaded.
+  pureBondReferenceReadyCodes.add(code);
   return window.FUND_STORE?.[code] || null;
 }
 
@@ -689,7 +706,10 @@ function bindNavChartZoom(points, fundName, benchmarkName, root = document) {
   const selectedTrack = range?.querySelector(".dual-range-track span");
   if (!shell || !plot || !startInput || !endInput || points.length < 2) return;
   const minimumSpan = Math.min(4, points.length - 1);
-  const draw = (changed = "") => {
+  let pendingFrame = null;
+  let renderedStart = -1;
+  let renderedEnd = -1;
+  const updateRange = (changed = "") => {
     let start = Number(startInput.value);
     let end = Number(endInput.value);
     if (end - start < minimumSpan) {
@@ -703,14 +723,35 @@ function bindNavChartZoom(points, fundName, benchmarkName, root = document) {
       range.style.setProperty("--range-start", `${start / max * 100}%`);
       range.style.setProperty("--range-end", `${end / max * 100}%`);
     }
-    const selected = points.slice(start, end + 1);
-    plot.innerHTML = renderNavChart(rebaseNavPoints(selected), fundName, benchmarkName);
     if (startDate) startDate.textContent = points[start].date;
     if (endDate) endDate.textContent = points[end].date;
-    bindPerformanceChartHover(rebaseNavPoints(selected), fundName, benchmarkName, plot);
   };
-  startInput.addEventListener("input", () => draw("start"));
-  endInput.addEventListener("input", () => draw("end"));
+  const draw = () => {
+    pendingFrame = null;
+    if (shell.isConnected === false) return;
+    const start = Number(startInput.value);
+    const end = Number(endInput.value);
+    if (start === renderedStart && end === renderedEnd) return;
+    // Normalize the selected range once so the chart and hover use identical values.
+    const selected = rebaseNavPoints(points.slice(start, end + 1));
+    plot.innerHTML = renderNavChart(selected, fundName, benchmarkName);
+    bindPerformanceChartHover(selected, fundName, benchmarkName, plot);
+    renderedStart = start;
+    renderedEnd = end;
+  };
+  const scheduleDraw = (changed = "") => {
+    updateRange(changed);
+    if (pendingFrame === null) pendingFrame = requestAnimationFrame(draw);
+  };
+  const flushDraw = (changed = "") => {
+    updateRange(changed);
+    if (pendingFrame !== null) cancelAnimationFrame(pendingFrame);
+    draw();
+  };
+  startInput.addEventListener("input", () => scheduleDraw("start"));
+  endInput.addEventListener("input", () => scheduleDraw("end"));
+  startInput.addEventListener("change", () => flushDraw("start"));
+  endInput.addEventListener("change", () => flushDraw("end"));
   selectedTrack?.addEventListener("pointerdown", (event) => {
     const bounds = range.querySelector(".dual-range-track").getBoundingClientRect();
     const initialX = event.clientX;
@@ -724,9 +765,10 @@ function bindNavChartZoom(points, fundName, benchmarkName, root = document) {
       const nextStart = Math.max(0, Math.min(max - width, initialStart + shift));
       startInput.value = String(nextStart);
       endInput.value = String(nextStart + width);
-      draw();
+      scheduleDraw();
     };
     const stop = () => {
+      flushDraw();
       selectedTrack.removeEventListener("pointermove", move);
       selectedTrack.removeEventListener("pointerup", stop);
       selectedTrack.removeEventListener("pointercancel", stop);
@@ -738,9 +780,9 @@ function bindNavChartZoom(points, fundName, benchmarkName, root = document) {
   reset?.addEventListener("click", () => {
     startInput.value = "0";
     endInput.value = String(points.length - 1);
-    draw();
+    flushDraw();
   });
-  draw();
+  flushDraw();
 }
 
 function bindPerformanceChartHover(points, fundName, benchmarkName, root = document) {
@@ -6015,7 +6057,7 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
 
 function renderPureBondReferenceFund(fund, detail, currentDuration) {
   const reference = window.FUND_STORE?.[fund.code];
-  if (!reference || !window.__PB) return false;
+  if (!pureBondReferenceReadyCodes.has(fund.code) || !reference || !window.__PB) return false;
   refreshPureBondReferenceData(reference, fund, detail, currentDuration);
   document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
   document.body.classList.remove("pure-bond-reference-page");
@@ -6134,10 +6176,12 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
     <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span><span class="tag">份额已合并</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
+    ${detail?.pure_bond_reference_error ? `<p class="simulation-warning" role="status">纯债详细分析数据加载失败，已显示通用研究报告。${escapeHTML(detail.pure_bond_reference_error)} <button type="button" class="button" data-pure-bond-retry>重新加载完整分析</button></p>` : ""}
     <section class="fund-page-metrics">${overviewMetrics}</section>
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
     <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
     <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>${navSource}；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>披露持仓是报告期快照，不代表实时持仓；研究结果不构成投资建议。</li></ul></section>`;
+  page.querySelector("[data-pure-bond-retry]")?.addEventListener("click", () => window.location.reload());
   const loadTab = createGenericTabLoader(fund, detail);
   prepareResearchOverview(fund, detail);
   bindTabs(loadTab);
@@ -6202,15 +6246,31 @@ function normalizeGenericHoldingHistory(raw) {
 
 function loadGenericDetail(code) {
   if (window.FUND_DETAIL_DATA?.[code]) return Promise.resolve(window.FUND_DETAIL_DATA[code]);
-  return new Promise((resolve) => {
+  if (genericDetailPromises.has(code)) return genericDetailPromises.get(code);
+  const promise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      script.remove();
+      error ? reject(error) : resolve(window.FUND_DETAIL_DATA[code]);
+    };
+    const timer = setTimeout(() => finish(new Error(`${code} 净值详情加载超时，请重试`)), 20000);
     script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/funds/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    // 单个按基金拆分的连续序列缺失时，仍使用全量目录和公共数据渲染详情页。
-    // 不能让一条可选数据失败阻断基金基础信息、收益回撤和持仓模块。
-    script.onload = () => resolve(window.FUND_DETAIL_DATA?.[code] || null);
-    script.onerror = () => resolve(null);
+    script.onload = () => window.FUND_DETAIL_DATA?.[code]
+      ? finish()
+      : finish(new Error(`${code} 净值详情未生成有效内容，请重试`));
+    script.onerror = () => finish(new Error(`${code} 净值详情加载失败，请重试`));
     document.head.appendChild(script);
+  }).catch((error) => {
+    genericDetailPromises.delete(code);
+    throw error;
   });
+  genericDetailPromises.set(code, promise);
+  return promise;
 }
 
 function loadDeepSampleData() {
@@ -6223,15 +6283,30 @@ function loadDeepSampleData() {
     });
   }
   if (window.FUND_DEEP_SAMPLE_DATA) return Promise.resolve(window.FUND_DEEP_SAMPLE_DATA);
-  return new Promise((resolve, reject) => {
+  if (deepSamplePromise) return deepSamplePromise;
+  deepSamplePromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
+    let settled = false;
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      script.remove();
+      error ? reject(error) : resolve(window.FUND_DEEP_SAMPLE_DATA);
+    };
+    const timer = setTimeout(() => finish(new Error("深度样本数据加载超时，请重试")), 20000);
     script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/deep_samples.js?v=${DASHBOARD_DATA_VERSION}`;
     script.onload = () => window.FUND_DEEP_SAMPLE_DATA
-      ? resolve(window.FUND_DEEP_SAMPLE_DATA)
-      : reject(new Error("深度样本数据脚本未生成有效内容"));
-    script.onerror = () => reject(new Error("深度样本数据加载失败"));
+      ? finish()
+      : finish(new Error("深度样本数据脚本未生成有效内容"));
+    script.onerror = () => finish(new Error("深度样本数据加载失败，请重试"));
     document.head.appendChild(script);
+  }).catch((error) => {
+    deepSamplePromise = null;
+    throw error;
   });
+  return deepSamplePromise;
 }
 
 function loadHoldingCharacteristicDates(dates) {
@@ -6517,7 +6592,8 @@ function bindGenericBrinson(brinson) {
 }
 
 function showError(message) {
-  page.innerHTML = `<div class="page-error"><h1>无法打开基金分析</h1><p>${escapeHTML(message)}</p><a class="button button-primary" href="index.html#samples">返回基金列表</a></div>`;
+  page.innerHTML = `<div class="page-error"><h1>无法打开基金分析</h1><p>${escapeHTML(message)}</p><button type="button" class="button button-primary" data-page-retry>重新加载</button><a class="button" href="index.html#samples">返回基金列表</a></div>`;
+  page.querySelector("[data-page-retry]")?.addEventListener("click", () => window.location.reload());
 }
 
 if (!fundId && !fundCode) {
@@ -6561,7 +6637,10 @@ if (!fundId && !fundCode) {
       let pureBondDuration = null;
       if (catalogFund.category === "pure-bond") {
         const [, currentDuration] = await Promise.all([
-          loadPureBondReferenceBundle(catalogFund.code).catch(() => null),
+          loadPureBondReferenceBundle(catalogFund.code).catch((error) => {
+            genericDetail.pure_bond_reference_error = error.message;
+            return null;
+          }),
           loadPureBondKalmanDuration(catalogFund.code).catch(() => null),
         ]);
         pureBondDuration = currentDuration;
