@@ -466,14 +466,21 @@ function currentManagerTenureStart(managers = []) {
   return starts.at(-1) || null;
 }
 
-function renderTable(headers, rows, extraClass = "") {
-  return `
+function renderTable(headers, rows, extraClass = "", previewRows = 0) {
+  const table = (visibleRows) => `
     <div class="research-table-wrap ${extraClass}">
       <table class="research-table">
         <thead><tr>${headers.map((header) => `<th>${escapeHTML(header)}</th>`).join("")}</tr></thead>
-        <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody>
+        <tbody>${visibleRows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody>
       </table>
     </div>`;
+  // Explicit opt-in only: matrices and short comparison tables keep their full layout.
+  if (!Number.isInteger(previewRows) || previewRows <= 0 || rows.length <= previewRows) return table(rows);
+  const remaining = rows.length - previewRows;
+  return `<div class="research-table-preview" data-table-total="${rows.length}" data-table-preview="${previewRows}" style="--research-table-columns:${headers.length}">
+    ${table(rows.slice(0, previewRows))}
+    <details class="research-table-more"><summary><span class="table-more-closed">已显示 ${previewRows} / ${rows.length} 行 · 展开其余 ${remaining} 行</span><span class="table-more-open">已显示全部 ${rows.length} 行 · 收起为 ${previewRows} 行</span></summary>${table(rows.slice(previewRows))}</details>
+  </div>`;
 }
 
 function chartTickIndexes(length, maxTicks = 7) {
@@ -1449,7 +1456,7 @@ function renderAssets(analysis) {
         <p class="method-note">季度前十大用于高频观察；完整持仓集中度仅使用半年报/年报全部持仓计算，两者不混合拼接。</p>
     </article>
     <article class="subpanel chart-subpanel"><div class="subpanel-heading"><h3>季度前十大集中度趋势</h3><span>占基金净值</span></div>${renderMiniLineChart(concentrationHistory, [{ key: "top10_concentration", label: "前十大集中度", color: "#0b7774", width: 3 }], "季度前十大持仓集中度变化")}</article>
-    <article class="subpanel"><div class="subpanel-heading"><h3>季度资产配置轨迹</h3><span>报告期与公告日分开展示，避免前视</span></div>${renderTable(["报告期", "净资产", "股票", "港股", "债券", "现金", "公告日"], assetRows)}</article>`;
+    <article class="subpanel"><div class="subpanel-heading"><h3>季度资产配置轨迹</h3><span>报告期与公告日分开展示，避免前视</span></div>${renderTable(["报告期", "净资产", "股票", "港股", "债券", "现金", "公告日"], assetRows, "", 8)}</article>`;
 }
 
 function renderIndustryDistribution(period, dimension, selectedIndustry, sortDirection = "desc") {
@@ -3145,14 +3152,14 @@ function reconstructionPanel(data, options) {
   const label=k=>options.view==='stocks'?(data.stock_names[k]||k):k;
   const segment=data.segments[chosen.segment];
   const currentRows=Object.entries(chosen.groups).sort((a,b)=>b[1]-a[1]);
-  const table=renderTable([options.view==='stocks'?'候选股票':'行业',`估计${basisLabel}`],currentRows.map(([k,v])=>[`${escapeHTML(label(k))}${options.view==='stocks'?`<small>${escapeHTML(k)}</small>`:''}`,pct(v,2)]),'table-scroll');
+  const table=renderTable([options.view==='stocks'?'候选股票':'行业',`估计${basisLabel}`],currentRows.map(([k,v])=>[`${escapeHTML(label(k))}${options.view==='stocks'?`<small>${escapeHTML(k)}</small>`:''}`,pct(v,2)]),'table-scroll',10);
   const maxSeam=Math.max(0,...data.seams.map(x=>x.stock_and_bucket_half_l1_pp));
   return `<div class="simulation-head"><div><h2>持仓模拟 <span class="tag">连续轨迹 · 研究版</span></h2><p>个股状态估计，行业堆叠展示；历史重建与右端逐日估计同轴，不能当作实时预测或真实交易记录。</p></div></div><div class="profile-date-strip"><span>可得轨迹 <strong>${escapeHTML(data.start)} 至 ${escapeHTML(data.end)}</strong></span><span>Smoother 至 <strong>${escapeHTML(data.smoother_end||data.end)}</strong></span>${data.filter_start?`<span>Filter 起点 <strong>${data.filter_start}</strong></span>`:''}</div>
     ${data.filter_start?`<p class="method-note">图下蓝绿色标带：Smoother；金色标带：Filter（事后重放）。以 ${data.filter_start} 完整持仓初始化，信息可得日为 ${escapeHTML(data.filter_available)}；之后按每日行情和净值向前估计，没有用右侧后续收益回修前日权重。</p>`:`<p class="simulation-warning">右端 Filter 尚未接续：${escapeHTML(data.extension_issue||'暂无合格接续数据')}。仅显示实际已有历史，不填补缺口。</p>`}
     ${data.filter_seam_pp>5?`<p class="simulation-warning">边界修订较大：6月末Smoother估计与Filter披露初值相差 ${num(data.filter_seam_pp,2)} 个百分点（股票＋行业桶half-L1）。图上保留跳变，应先核对这一接缝，不能解读为当天真实调仓。</p>`:''}
     <article class="subpanel"><div class="history-controls"><label>堆叠维度 <select data-reconstruction-control="view" aria-label="堆叠维度">${[['1','中信一级行业'],['2','中信二级行业'],['3','中信三级行业'],['stocks','个股前十']].map(([k,v])=>`<option value="${k}"${options.view===k?' selected':''}>${v}</option>`).join('')}</select></label><label>历史范围 <select data-reconstruction-control="range" aria-label="历史范围">${[['1','最近1年轨迹'],['3','最近3年轨迹'],['5','最近5年轨迹'],['all','全部可得轨迹']].map(([k,v])=>`<option value="${k}"${options.range===k?' selected':''}>${v}</option>`).join('')}</select></label>${options.view!=='stocks'?`<label>图例 <select data-reconstruction-control="count" aria-label="行业图例数量"><option value="12"${options.count!=='all'?' selected':''}>主要12类＋其他</option><option value="all"${options.count==='all'?' selected':''}>全部行业</option></select></label>`:''}<label>查看日期 <input type="date" data-reconstruction-control="date" aria-label="重建查看日期" min="${data.start}" max="${data.end}" value="${chosen.date}"></label></div>
     <div class="history-controls">${simulationBasisControl(basis)}<span class="method-note">${basis==='equity'?'分母为全部股票资产，含未识别权益；不按前十或已显示行业归一。':'保留总股票仓位的变化；分母为基金净资产。'}</span></div>${reconstructionStackChart(data,points,keys,options.view,chosen.date,basis)}<p class="method-note">色带为每日模型估计；“全”细柱为完整持仓真值，“季”细柱仅为季度前十真值。行业季度柱是下限，不是整个行业仓位；公告日只在提示中说明，横坐标是报告日。个股前十按所选区间平均占基金净资产权重固定，切换分母不换图例；其余股票与未识别权益分开。${basis==='equity'?'披露柱使用真实股票总仓位作分母；“季*”表示当期分母缺失，仅标日期，不以模型或前十合计替代。':''}</p></article>
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>${chosen.date} · ${options.view==='stocks'?'个股模拟明细':'行业模拟明细'} <span class="tag">${reconstructionMethod(segment)}</span></h3><span>${basis==='equity'&&!(chosen.equity>0)?'无有效股票仓位，股票市值口径不适用':`合计 ${pct(Object.values(chosen.groups).reduce((a,b)=>a+b,0),1)}，${basisLabel}`}；股票总仓位 ${pct(chosen.equity,1)}（占基金净资产）</span></div></div><details${currentRows.length<=35?' open':''}><summary>查看全部${currentRows.length}项模型估计</summary>${table}</details><details><summary>本段实际披露日期与输入</summary>${renderTable(['报告日','信息可得日','披露范围'],segment.disclosures.map(d=>[d.report_date,d.announcement_date,d.full?'完整持仓':'季度前十（局部真值）']),'table-scroll')}</details></article>
+    <article class="subpanel"><div class="subpanel-heading"><div><h3>${chosen.date} · ${options.view==='stocks'?'个股模拟明细':'行业模拟明细'} <span class="tag">${reconstructionMethod(segment)}</span></h3><span>${basis==='equity'&&!(chosen.equity>0)?'无有效股票仓位，股票市值口径不适用':`合计 ${pct(Object.values(chosen.groups).reduce((a,b)=>a+b,0),1)}，${basisLabel}`}；股票总仓位 ${pct(chosen.equity,1)}（占基金净资产）</span></div></div>${table}<details><summary>本段实际披露日期与输入</summary>${renderTable(['报告日','信息可得日','披露范围'],segment.disclosures.map(d=>[d.report_date,d.announcement_date,d.full?'完整持仓':'季度前十（局部真值）']),'table-scroll')}</details></article>
     <details class="simulation-method"><summary>研究边界、分段接缝与数据缺口</summary><p>沿用冻结股票＋行业桶研究核心与Q/P/R；历史运行Smoother并融合区间季报，右端只运行同一核心的前向Filter，不调用反向平滑。原试点Filter采用另一既有初始化方案，其留档、对照与验真仍独立保留，不将本轮接续当成调参改善。</p><p>历史分段最大接缝修订为${maxSeam.toFixed(2)}个百分点（股票＋行业桶half-L1）。${data.filter_start?`本次Filter以完整披露重新初始化权重与冻结初始协方差，与Smoother末端差 ${num(data.filter_seam_pp,2)} 个百分点；保留这次边界修订，不用插值抹平。`:''}同轴不表示协方差无缝延续，也不代表准确率。</p><p>信息截止 ${escapeHTML(data.as_of)}。不把6月30日持仓冒充8月31日持仓；后来才公开的锚点使这段Filter属于事后重放，不是当时已留档预测。候选池仍以该完整披露为准，池外新股只能留在未识别权益。二/三级无法拆分的行业桶保留“未细分”。</p><p>此图已吸收可得披露与净值，其贴合程度不是独立持仓验证。原始行情和分类未逐日版本化；无校准的95%区间不展示。</p>${data.issues.length?`<p>未生成历史区间：${data.issues.map(x=>`${escapeHTML(x.start)}—${escapeHTML(x.end)}：${escapeHTML(x.reason)}`).join('；')}</p>`:'<p>该基金所选历史段均通过行情覆盖、权重守恒和协方差检查。</p>'}</details>`;
 }
 
@@ -3292,7 +3299,7 @@ function fullFilterComparison(historical,daily,options,error='') {
     <div class="history-controls"><label>历史范围 <select data-reconstruction-control="range" aria-label="上下对照历史范围">${[['all','全部可得轨迹'],['1','最近1年'],['3','最近3年'],['5','最近5年']].map(([v,l])=>`<option value="${v}"${options.range===v?' selected':''}>${l}</option>`).join('')}</select></label><label>查看日期 <input type="date" data-reconstruction-control="date" aria-label="上下对照日期" min="${start}" max="${end}" value="${date}"></label></div>
     <article class="subpanel" data-comparison-chart="smoother"><h3>Smoother · 历史平滑</h3><p class="method-note">上图沿用股票与行业状态；未单独建模的港股、债券不解释为零仓位。</p>${coverageNote(topData,upper)}${chart(topData,upper,'Smoother')}</article>
     <article class="subpanel" data-comparison-chart="filter"><h3>Filter · 全程逐日估计</h3>${coverageNote(bottomData,lower)}${chart(bottomData,lower,'Filter')}<p class="method-note">计算截止 ${escapeHTML(daily.end)}，本基金最近有效日 ${escapeHTML(lower.at(-1)?.date||'无')}；债券固定在堆叠最上层。信息版本边界独立分段，不跨缺口连线，早期无可得锚点的区间留空。港股和债券为指数汇总状态。</p></article>
-    <article class="subpanel"><h3>${date} · 行业 / 资产对照</h3><p>实际估计日期：Smoother ${a?.date||'该日无有效估计'}；Filter ${b?.date||'该日无有效估计'}。灰色区间没有有效轨迹，不沿用缺口前的估计；区间内非交易日取最近可得日。</p>${renderTable(['行业 / 资产','Smoother','Filter'],keys.map(k=>[escapeHTML(k),a?(['港股','债券'].includes(k)&&!Object.hasOwn(a.groups,k)?'—':pct(a.groups[k]||0,2)):'—',b?pct(b.groups[k]||0,2):'—']),'table-scroll')}</article>
+    <article class="subpanel"><h3>${date} · 行业 / 资产对照</h3><p>实际估计日期：Smoother ${a?.date||'该日无有效估计'}；Filter ${b?.date||'该日无有效估计'}。灰色区间没有有效轨迹，不沿用缺口前的估计；区间内非交易日取最近可得日。</p>${renderTable(['行业 / 资产','Smoother','Filter'],keys.map(k=>[escapeHTML(k),a?(['港股','债券'].includes(k)&&!Object.hasOwn(a.groups,k)?'—':pct(a.groups[k]||0,2)):'—',b?pct(b.groups[k]||0,2):'—']),'table-scroll',12)}</article>
     <details class="simulation-method"><summary>数据覆盖与未生成区间</summary><p><strong>Smoother：</strong>${escapeHTML(smootherIssues.map(comparisonIssueText).join('；')||'已生成历史区间无记录异常；末端平滑须等待后续完整披露，不能用 Filter 冒充 Smoother。')}</p><p><strong>Filter：</strong>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'无记录输入异常。')}</p></details>`;
 }
 
@@ -4810,7 +4817,7 @@ function genericAssetPanel(fund, detail, holdingHistory, kalmanDuration = null) 
     </div>` : ""}
     ${active && holdingHistory ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>持股重仓集中度</h3><span>季度前十大与半年报/年报完整持仓分别计算</span></div></div><section class="research-metric-grid metric-four">${metric("最新季度前十大", pct(latestQuarterly.top10, 1))}${metric("完整持仓前十大", pct(latestFull.top10, 1))}${metric("完整持仓前二十", pct(latestFull.top20, 1))}${metric("前二十以外长尾", pct(Math.max(0, latestFull.total - latestFull.top20), 1))}</section><p class="method-note">季度前十大用于高频跟踪；完整持仓只使用半年报/年报全部披露股票，两者不拼接。</p></article><article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>季度前十大集中度趋势</h3><span>占基金净值</span></div></div>${quarterlyConcentration.length ? renderMiniLineChart(quarterlyConcentration, [{ key: "top10_concentration", label: "前十大集中度", color: "#0b7774", width: 3 }], "季度前十大持仓集中度变化") : '<p class="empty-copy">暂无持仓集中度历史。</p>'}</article>` : ""}
     <article class="subpanel"><div class="subpanel-heading"><div><h3>最新资产分布</h3><span>按净资产比例；超过100%可能来自杠杆</span></div></div>${renderBarList(allocation)}</article>
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>${active ? "季度资产配置轨迹" : "历史配置、杠杆与久期"}</h3><span>${active ? '全部可得报告期' : '最近二十个报告期'}</span></div></div>${active ? renderTable(["报告期", "规模", "股票", "港股", "债券", "基金投资", "现金", "公告日"], history.slice().reverse().map((item) => [item.report_date, money(item.net_asset), pct(item.stock_to_nav, 1), pct(item.hk_stock_to_nav, 1), pct(item.bond_to_nav, 1), pct(item.fund_to_nav, 1), pct(item.cash_to_nav, 1), item.announcement_date || "—"])) : renderTable(["报告期", "规模", "股票", "债券", "基金投资", "现金", "转债", "杠杆", "久期"], history.slice(-20).reverse().map((item) => { const duration = (detail?.duration_history || []).find((value) => value.date === item.report_date); return [item.report_date, money(item.net_asset), pct(item.stock_to_nav, 1), pct(item.bond_to_nav, 1), pct(item.fund_to_nav, 1), pct(item.cash_to_nav, 1), pct(item.convertible_bond_to_nav, 1), isFiniteValue(item.leverage) ? `${num(item.leverage, 2)}x` : "—", isFiniteValue(duration?.duration) ? `${num(duration.duration, 2)}年` : "—"]; }))}</article>`;
+    <article class="subpanel"><div class="subpanel-heading"><div><h3>${active ? "季度资产配置轨迹" : "历史配置、杠杆与久期"}</h3><span>${active ? '全部可得报告期' : '最近二十个报告期'}</span></div></div>${active ? renderTable(["报告期", "规模", "股票", "港股", "债券", "基金投资", "现金", "公告日"], history.slice().reverse().map((item) => [item.report_date, money(item.net_asset), pct(item.stock_to_nav, 1), pct(item.hk_stock_to_nav, 1), pct(item.bond_to_nav, 1), pct(item.fund_to_nav, 1), pct(item.cash_to_nav, 1), item.announcement_date || "—"]), "", 8) : renderTable(["报告期", "规模", "股票", "债券", "基金投资", "现金", "转债", "杠杆", "久期"], history.slice(-20).reverse().map((item) => { const duration = (detail?.duration_history || []).find((value) => value.date === item.report_date); return [item.report_date, money(item.net_asset), pct(item.stock_to_nav, 1), pct(item.bond_to_nav, 1), pct(item.fund_to_nav, 1), pct(item.cash_to_nav, 1), pct(item.convertible_bond_to_nav, 1), isFiniteValue(item.leverage) ? `${num(item.leverage, 2)}x` : "—", isFiniteValue(duration?.duration) ? `${num(duration.duration, 2)}年` : "—"]; }), "", 8)}</article>`;
 }
 
 function genericBondHistoryTable(period, compact = false) {
@@ -5012,7 +5019,7 @@ function genericBondPanel(fund, bondHistory, detail) {
         ], "券种结构连续变化")}</article>
         <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>前五大债券集中度</h3><span>重仓债券合计占净值</span></div></div>${renderMiniLineChart(concentrationHistory, [{ key: "concentration", label: "前五大集中度", color: "#0a7c78", width: 3 }], "前五大债券集中度变化")}</article>
       </div>
-      <article class="subpanel"><div class="subpanel-heading"><div><h3>重仓债券换手跟踪</h3><span>仅覆盖披露重仓券，不等于完整组合换手率</span></div></div>${turnoverRows.length ? renderTable(["报告期", "新进", "加仓", "减仓", "退出披露"], turnoverRows) : '<p class="empty-copy">暂无连续重仓债券披露。</p>'}</article>
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>重仓债券换手跟踪</h3><span>仅覆盖披露重仓券，不等于完整组合换手率</span></div></div>${turnoverRows.length ? renderTable(["报告期", "新进", "加仓", "减仓", "退出披露"], turnoverRows, "", 8) : '<p class="empty-copy">暂无连续重仓债券披露。</p>'}</article>
       <div class="research-grid two-column-grid">
         <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>披露持仓换手代理</h3><span>单期 / 滚动4Q · 统一前五大口径</span></div></div>${turnoverProxyChart(turnoverProxyHistory, "换手代理")}</article>
         <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>可转债换手代理</h3><span>前五大中可转债 · 单期 / 滚动4Q</span></div></div>${turnoverProxyChart(convertibleTurnoverHistory, "转债换手代理")}</article>
@@ -5249,8 +5256,8 @@ function genericRebalancingPanel(fund, detail, holdingHistory, multiIndexAnalysi
     <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>股票与现金仓位监控</h3><span>报告期披露</span></div></div>${assetHistory.length ? renderMiniLineChart(assetHistory, [{ key: "stock_to_nav", label: "股票仓位", color: "#0b7774", width: 3 }, { key: "cash_to_nav", label: "现金仓位", color: "#c5913d", width: 2.5 }], "股票与现金仓位变化") : '<p class="empty-copy">暂无资产配置历史。</p>'}</article>
     ${fund.category === "active-equity" ? `<div class="research-grid two-column-grid"><article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>季度前十大集中度</h3><span>占基金净值</span></div></div>${concentrationHistory.length ? renderMiniLineChart(concentrationHistory, [{ key: "top10_concentration", label: "前十大集中度", color: "#0b7774", width: 3 }], "季度前十大集中度变化") : '<p class="empty-copy">暂无集中度历史。</p>'}</article><article class="subpanel"><div class="subpanel-heading"><div><h3>核心持仓稳定性</h3><span>前十大名单重合与披露权重变化</span></div></div><section class="research-metric-grid metric-two">${metric("平均名单重合", pct(averageJaccard, 1))}${metric("最新名单重合", pct(latestStability?.jaccard, 1), latestStability ? `${latestStability.common}只共同持有` : "")}${metric("最新披露权重变化", pct(latestStability?.weightChange, 1))}</section><p class="method-note">披露权重变化同时受交易和股价涨跌影响，不等于真实换手率。</p></article></div><article class="subpanel"><div class="subpanel-heading"><div><h3>成长价值风格</h3><span>基金月度收益与成长/价值指数相关性</span></div></div><div id="generic-style-correlation-output">${genericStyleCorrelationContent(fund)}</div></article>` : ""}
     ${renderDeepSampleSizeStyle(fund, detail)}
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>季度前十大名单变化</h3><span>近二十个披露期</span></div></div>${transitions.length ? renderTable(["报告期", "披露数", "合计权重", "新进前十", "退出前十"], transitions) : '<p class="empty-copy">暂无可比持仓历史。</p>'}</article>
-    <article class="subpanel" data-deep-capability="quarter-transitions"><div class="subpanel-heading"><h3>逐期调仓轨迹 · 全部名单与权重变化</h3><span>季度前十大分别比较，不混入同日完整持仓</span></div>${renderTable(['区间', '名单重合', '共同持有', '新出现名称 / 代码', '未列前十名称 / 代码', '披露权重变化'], holdingTransitionRows(holdingHistory))}<p class="method-note">保留每个可比区间的完整名单，不只截取前五只；未列前十不等于卖出，权重变化不等于成交或真实换手率。</p></article>
+    <article class="subpanel"><div class="subpanel-heading"><div><h3>季度前十大名单变化</h3><span>近二十个披露期</span></div></div>${transitions.length ? renderTable(["报告期", "披露数", "合计权重", "新进前十", "退出前十"], transitions, "", 8) : '<p class="empty-copy">暂无可比持仓历史。</p>'}</article>
+    <article class="subpanel" data-deep-capability="quarter-transitions"><div class="subpanel-heading"><h3>逐期调仓轨迹 · 全部名单与权重变化</h3><span>季度前十大分别比较，不混入同日完整持仓</span></div>${renderTable(['区间', '名单重合', '共同持有', '新出现名称 / 代码', '未列前十名称 / 代码', '披露权重变化'], holdingTransitionRows(holdingHistory), "", 8)}<p class="method-note">保留每个可比区间的完整名单，不只截取前五只；未列前十不等于卖出，权重变化不等于成交或真实换手率。</p></article>
     <p class="method-note">净值及宽基对比可在“业绩表现”查看；未进入历史指数成分的数据不推断大小盘归属。</p>`;
 }
 
@@ -5707,7 +5714,7 @@ function documentYear(item) {
 function renderDocumentResults(documents, filters) {
   const normalize = s => String(s || '').replace(/中期报告|半年度报告|半年报/g,'半年报').replace(/\s/g,'').toLowerCase();
   const result=documents.filter(x=>(!filters.Type || documentType(x)===filters.Type) && (!filters.Year || documentYear(x)===filters.Year) && normalize(x.title+' '+x.publish_date).includes(normalize(filters.Query)));
-  return `<p class="method-note">找到 ${result.length} 份 · 本基金已索引 ${documents.length} 份</p>${result.length?renderTable(['公告日期','报告','原文'], result.map(item=>[escapeHTML(item.publish_date || '—'),escapeHTML(item.title),safeDocumentUrl(item.pdf_url)?`<a class="button button-secondary" href="${escapeHTML(safeDocumentUrl(item.pdf_url))}" target="_blank" rel="noopener noreferrer">查看PDF原文</a>`:'链接待核验']),'holdings-table-wrap'):'<p class="empty-copy">当前索引没有匹配结果。可清空年份或关键词；这不代表基金未发布该报告。</p>'}`;
+  return `<p class="method-note">找到 ${result.length} 份 · 本基金已索引 ${documents.length} 份</p>${result.length?renderTable(['公告日期','报告','原文'], result.map(item=>[escapeHTML(item.publish_date || '—'),escapeHTML(item.title),safeDocumentUrl(item.pdf_url)?`<a class="button button-secondary" href="${escapeHTML(safeDocumentUrl(item.pdf_url))}" target="_blank" rel="noopener noreferrer">查看PDF原文</a>`:'链接待核验']),'holdings-table-wrap',10):'<p class="empty-copy">当前索引没有匹配结果。可清空年份或关键词；这不代表基金未发布该报告。</p>'}`;
 }
 
 function legacyDocumentsPanel(fund, fundDocuments) {
@@ -5724,7 +5731,7 @@ function legacyDocumentsPanel(fund, fundDocuments) {
   });
   return `
     <div class="panel-intro"><div><p class="eyebrow">DISCLOSURES</p><h2>公告与定期报告原文</h2></div><p>按基金主体合并份额，展示已索引的季度报告、中期/半年度报告和年度报告。</p></div>
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>最近定期报告</h3><span>${documents.length ? `已索引 ${documents.length} 份` : "等待增量索引"}</span></div></div>${rows.length ? renderTable(["披露日期", "报告", "原文"], rows, "holdings-table-wrap") : '<p class="empty-copy">该基金的定期报告尚未进入本地增量索引。</p>'}<p class="method-note">元数据来自公开基金公告聚合接口，链接指向公开PDF原文；本地不批量复制PDF。若链接失效，应回到基金管理人网站或证监会基金电子披露平台核验。</p></article>`;
+    <article class="subpanel"><div class="subpanel-heading"><div><h3>最近定期报告</h3><span>${documents.length ? `已索引 ${documents.length} 份` : "等待增量索引"}</span></div></div>${rows.length ? renderTable(["披露日期", "报告", "原文"], rows, "holdings-table-wrap", 10) : '<p class="empty-copy">该基金的定期报告尚未进入本地增量索引。</p>'}<p class="method-note">元数据来自公开基金公告聚合接口，链接指向公开PDF原文；本地不批量复制PDF。若链接失效，应回到基金管理人网站或证监会基金电子披露平台核验。</p></article>`;
 }
 
 function genericTabLoadingPanel(label) {

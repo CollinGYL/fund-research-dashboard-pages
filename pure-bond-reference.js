@@ -959,10 +959,10 @@ function bondTable(period){
     if(b.sub==="是")  t+=`<span class="btag" style="background:#e7ddf3;color:#5b3f8a">次级</span>`;
     return t;
   };
-  let h=`<div class="rt-wrap"><table class="rt"><thead><tr><th>债券代码</th><th>债券名称</th><th>券种</th>`+
+  const head=`<div class="rt-wrap"><table class="rt"><thead><tr><th>债券代码</th><th>债券名称</th><th>券种</th>`+
     `<th>剩余期限</th><th>评级</th><th>主体类型</th><th>发行人</th><th>市值占净值</th><th>环比</th></tr></thead><tbody>`;
-  period.bonds.forEach(b=>{
-    h+=`<tr><td style="font-family:ui-monospace,Consolas">${esc(b.code)}</td>`+
+  const rows=period.bonds.map(b=>
+    `<tr><td style="font-family:ui-monospace,Consolas">${esc(b.code)}</td>`+
       `<td>${esc(b.name||"—")}</td>`+
       `<td>${esc(b.btype||b.sectype||"—")}</td>`+
       `<td>${b.ptm==null?"—":NN(b.ptm,2)+" 年"}</td>`+
@@ -970,11 +970,16 @@ function bondTable(period){
       `<td style="font-size:11px">${nat(b)}</td>`+
       `<td style="font-size:11px;color:var(--muted)">${esc(b.issuer||"—")}</td>`+
       `<td><b>${NN(b.wt,2)}%</b></td>`+
-      `<td style="color:var(--muted);font-size:11px">${esc(b.chg||"—")}</td></tr>`;
-  });
+      `<td style="color:var(--muted);font-size:11px">${esc(b.chg||"—")}</td></tr>`
+  );
   const miss=period.attr_miss?`<b>本页有 ${period.attr_miss} 条持仓未匹配到个券属性</b>（属性列显示「—」）；全样本命中率：持仓行 99.82%、按权重 99.85%，未命中集中在 2024 年后新券。`:"";
-  h+=`</tbody></table></div>`+(miss?`<div class="method-note">${miss}</div>`:"");
-  return h;
+  const tail=`</tbody></table></div>`;
+  // Some historical disclosures contain many rows; retain every row on expansion.
+  const previewRows=8;
+  const table=values=>head+values.join("")+tail;
+  const h=rows.length<=previewRows?table(rows):
+    `<div class="research-table-preview" data-table-total="${rows.length}" data-table-preview="${previewRows}" style="--research-table-columns:9">${table(rows.slice(0,previewRows))}<details class="research-table-more"><summary><span class="table-more-closed">展开其余 ${rows.length-previewRows} 条持仓（本期共 ${rows.length} 条）</span><span class="table-more-open">收起明细，仅显示前 ${previewRows} 条持仓</span></summary>${table(rows.slice(previewRows))}</details></div>`;
+  return h+(miss?`<div class="method-note">${miss}</div>`:"");
 }
 
 const CWL={"1m":"近1月","2m":"近2月","3m":"近3月","6m":"近6月","ytd":"今年以来","1y":"近1年","3y":"近3年","5y":"近5年","all":"成立以来"};

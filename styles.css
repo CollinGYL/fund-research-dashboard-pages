@@ -2109,3 +2109,101 @@ html:has(.blue-workbench) { scroll-padding-top:88px; scroll-behavior:auto; }
  .blue-workbench.compact-home .category-hub { padding-top:17px; padding-bottom:17px; }
  .blue-workbench.compact-home #samples #fund-list-title { font-size:22px; }
 }
+
+/* Compact the existing blue workbench without changing data, columns or chart geometry. */
+.blue-workbench.compact-home .category-hub { padding-top:16px; padding-bottom:12px; }
+.blue-workbench.compact-home #samples > .section-heading { margin-bottom:10px; }
+.blue-workbench.compact-home .list-toolbar { padding-bottom:10px; gap:10px; }
+.blue-workbench .list-status-row { min-height:34px; gap:4px 12px; }
+.blue-workbench.compact-home .search-result-count { margin:5px 0; }
+.blue-workbench .list-sort-state { margin:4px 0; }
+.blue-workbench .selected-filters:not(:empty) { margin-bottom:5px; }
+.blue-workbench .home-classification-note { margin-bottom:5px; }
+.blue-workbench .table-scroll-hint { margin-top:4px; }
+.blue-workbench .fund-profile-chip-grid { gap:3px; }
+.blue-workbench .fund-profile-chip-grid span { padding:3px 5px; }
+.blue-workbench .fund-row-details { margin-top:2px; }
+.blue-workbench .fund-page,.blue-workbench.decision-detail .fund-page { padding-top:16px; }
+.blue-workbench.decision-detail .back-link { margin-bottom:6px; }
+.blue-workbench.decision-detail .fund-page-hero { padding-top:8px; padding-bottom:15px; margin-bottom:12px; }
+.blue-workbench .research-navigation-mode { margin-bottom:7px; }
+.blue-workbench.decision-detail .fund-tab-nav:not(.single-subtab) { padding:5px; margin-bottom:10px; }
+.blue-workbench.decision-detail .fund-tab-content { margin-top:0; }
+.blue-workbench .fund-tab-panel,.blue-workbench .pb-scope .fund-tab-panel { padding-top:8px; }
+.blue-workbench .simulation-tabs { margin:8px 0 12px; }
+.blue-workbench .simulation-metrics,.blue-workbench .history-metric-grid { margin:14px 0; }
+.blue-workbench .history-controls { margin-bottom:12px; }
+.blue-workbench .research-freshness { padding:9px 0; }
+.blue-workbench .research-decision-metrics { margin-bottom:14px; }
+.blue-workbench .research-decision-metrics > div { padding:14px 16px; }
+.blue-workbench .research-overview-grid { gap:14px; }
+.blue-workbench :is(.subpanel,.research-overview-grid .subpanel,.history-metric,.simulation-metrics .research-metric,.simulation-method),
+.blue-workbench .pb-scope .subpanel { padding:16px; }
+.blue-workbench .subpanel,.blue-workbench .pb-scope .subpanel { margin-top:12px; }
+.blue-workbench .subpanel-heading,.blue-workbench .pb-scope .subpanel-heading { margin-bottom:12px; }
+.blue-workbench .research-signal { padding:10px 0; }
+.blue-workbench .research-metric-grid { margin-top:12px; }
+.blue-workbench .panel-intro,.blue-workbench .pb-scope .panel-intro { padding:16px 20px; }
+.blue-workbench .research-table-more { margin:8px 0 0; border:1px solid #dce6f3; border-radius:7px; background:#f7f9fd; }
+.blue-workbench .research-table-more > summary { min-height:38px; padding:9px 12px; color:#386297; font-size:12px; line-height:1.6; cursor:pointer; }
+.blue-workbench .research-table-more[open] > summary { border-bottom:1px solid #dce6f3; }
+.blue-workbench .research-table-more .table-more-open { display:none; }
+.blue-workbench .research-table-more[open] .table-more-closed { display:none; }
+.blue-workbench .research-table-more[open] .table-more-open { display:inline; }
+@media(min-width:761px) {
+  .blue-workbench.compact-home .fund-list-table thead th { padding-block:10px; }
+  .blue-workbench.compact-home .fund-list-table td { padding-block:9px; }
+  .blue-workbench.compact-home .fund-list-table.active-equity-mode :is(th,td) { padding-block:8px; }
+  .blue-workbench .active-equity-mode .fund-profile-chip-grid span { padding:3px 4px; }
+  .blue-workbench .active-equity-mode .fund-profile-chip-grid b { margin-bottom:1px; }
+  .blue-workbench .active-equity-mode .metric-sort-controls { gap:2px; margin-top:4px; }
+}
+@media(min-width:1100px) {
+  .blue-workbench.compact-home main#top { position:relative; }
+  .blue-workbench.compact-home .category-hub { position:absolute; top:16px; right:32px; width:360px; padding:0; }
+  .blue-workbench.compact-home .home-search-box { max-width:none; flex-basis:0; }
+  .blue-workbench.compact-home .home-search-box input { height:42px; min-height:42px; }
+  .blue-workbench.compact-home #samples { padding-top:16px; }
+  .blue-workbench.compact-home #samples > .section-heading { display:block; }
+  .blue-workbench.compact-home #samples #fund-list-title { padding-right:390px; font-size:24px; }
+  .blue-workbench.compact-home #fund-list-description { max-width:none; margin-top:14px; }
+}
+@media(min-width:1100px) and (max-width:1180px) {
+  .blue-workbench.compact-home .category-hub { right:24px; width:320px; }
+  .blue-workbench.compact-home #samples #fund-list-title { padding-right:344px; }
+}
+@media(max-width:760px) {
+  .blue-workbench.compact-home .category-hub { padding-top:12px; padding-bottom:11px; }
+  .blue-workbench.compact-home #samples > .section-heading { margin-bottom:10px; }
+  .blue-workbench.compact-home .list-toolbar { gap:8px; padding-bottom:9px; }
+  .blue-workbench .list-status-row { padding:5px 0; gap:3px 10px; }
+  .blue-workbench .list-sort-state { margin:2px 0 4px; }
+  .blue-workbench.compact-home .fund-list-table thead th { padding:8px 10px; }
+  .blue-workbench.compact-home .fund-list-table td { padding:8px 10px; }
+  .blue-workbench.compact-home .fund-list-table tbody td:first-child { padding:10px; }
+  .blue-workbench.compact-home .fund-list-table tbody td::before { margin-bottom:2px; }
+  .blue-workbench.compact-home #fund-pagination { padding:8px 0; }
+  .blue-workbench .fund-page,.blue-workbench.decision-detail .fund-page { padding-top:12px; }
+  .blue-workbench.decision-detail .fund-page-hero { padding-bottom:13px; gap:12px; }
+  .blue-workbench .research-decision-metrics > div { padding:12px; }
+  .blue-workbench :is(.subpanel,.research-overview-grid .subpanel,.history-metric,.simulation-metrics .research-metric,.simulation-method),
+  .blue-workbench .pb-scope .subpanel { padding:13px; }
+  .blue-workbench .panel-intro,.blue-workbench .pb-scope .panel-intro { padding:14px; }
+  .blue-workbench .research-table-more > summary { min-height:40px; }
+}
+/* Keep opt-in preview/expanded tables aligned; untouched tables retain their layout. */
+.blue-workbench .research-table-preview :is(.research-table,.rt) {
+  table-layout:fixed; width:100%;
+  min-width:max(610px,calc(var(--research-table-columns,6) * 104px));
+}
+.blue-workbench .research-table-preview :is(.research-table,.rt) th { white-space:normal; overflow-wrap:break-word; }
+.blue-workbench .research-table-more > :is(.research-table-wrap,.rt-wrap) { border-width:0; border-radius:0 0 6px 6px; }
+
+/* Asset concentration is four short numeric metrics, also in the deep-sample two-column variant. */
+@media(min-width:360px) and (max-width:760px) {
+  .blue-workbench #panel-assets .research-metric-grid.metric-four,
+  .blue-workbench #panel-assets .research-metric-grid.metric-two:has(> .research-metric:nth-child(4)):not(:has(> :nth-child(5))) {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+}
