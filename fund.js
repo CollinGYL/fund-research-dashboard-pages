@@ -3076,7 +3076,7 @@ function reconstructionColor(label) {
   return colors[hash%colors.length];
 }
 
-function reconstructionStackChart(data, points, keys, view, selectedDate, basis='nav') {
+function reconstructionStackChart(data, points, keys, view, selectedDate, basis='nav', showLegend=true) {
   if(!points.length) return '<p class="empty-copy">所选范围没有通过数据质量检查的轨迹。</p>';
   const width=window.innerWidth<=600?420:960, left=48, right=width-15, bottom=280, top=32;
   const first=Date.parse(data.axis_start||points[0].date),last=Date.parse(data.axis_end||points.at(-1).date),other=view==='stocks'?'其余已识别股票':'其他已识别行业';
@@ -3124,7 +3124,7 @@ function reconstructionStackChart(data, points, keys, view, selectedDate, basis=
     const a=Math.max(left,x(g.start)),b=Math.min(right,x(g.end)),w=Math.min(right-a,Math.max(2,b-a));
     return `<g data-coverage-gap="${g.kind}" data-gap-start="${g.start}" data-gap-end="${g.end}"><title>${escapeHTML(g.start)} — ${escapeHTML(g.end)}：${escapeHTML(g.label)}</title><rect x="${a}" y="${top}" width="${w}" height="${bottom-top}" fill="#e9eef3" opacity=".86"/><line x1="${a}" x2="${a}" y1="${top}" y2="${bottom}" stroke="#8a99aa" stroke-dasharray="3 4"/>${w>85?`<text x="${a+w/2}" y="${top+28}" text-anchor="middle" fill="#576879">${escapeHTML(g.label)}</text>`:''}</g>`;
   }).join('');
-  return `<svg class="reconstruction-chart" viewBox="0 0 ${width} ${showFilter?352:320}" role="img" aria-label="每日持仓同轴堆叠，Smoother与Filter分段标注，${simulationBasisLabel(basis)}，完整与季度局部真值按报告日标注"><title>色带是模型估计，细柱是披露真值；${simulationBasisLabel(basis)}；不跨数据缺口连线</title>${grid}${coverage}${paths}${truth}${methodBand}<line x1="${x(selectedDate)}" x2="${x(selectedDate)}" y1="${top}" y2="${bottom}" stroke="#17324d" stroke-width="1.5"/>${ticks}</svg><div class="reconstruction-legend">${labels.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(view==='stocks'?(data.stock_names[k]||k):k)}</span>`).join('')}</div>`;
+  return `<svg class="reconstruction-chart" viewBox="0 0 ${width} ${showFilter?352:320}" role="img" aria-label="每日持仓同轴堆叠，Smoother与Filter分段标注，${simulationBasisLabel(basis)}，完整与季度局部真值按报告日标注"><title>色带是模型估计，细柱是披露真值；${simulationBasisLabel(basis)}；不跨数据缺口连线</title>${grid}${coverage}${paths}${truth}${methodBand}<line x1="${x(selectedDate)}" x2="${x(selectedDate)}" y1="${top}" y2="${bottom}" stroke="#17324d" stroke-width="1.5"/>${ticks}</svg>${showLegend?`<div class="reconstruction-legend">${labels.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(view==='stocks'?(data.stock_names[k]||k):k)}</span>`).join('')}</div>`:''}`;
 }
 
 function reconstructionPanel(data, options) {
@@ -3154,7 +3154,7 @@ function reconstructionPanel(data, options) {
   const currentRows=Object.entries(chosen.groups).sort((a,b)=>b[1]-a[1]);
   const table=renderTable([options.view==='stocks'?'候选股票':'行业',`估计${basisLabel}`],currentRows.map(([k,v])=>[`${escapeHTML(label(k))}${options.view==='stocks'?`<small>${escapeHTML(k)}</small>`:''}`,pct(v,2)]),'table-scroll',10);
   const maxSeam=Math.max(0,...data.seams.map(x=>x.stock_and_bucket_half_l1_pp));
-  return `<div class="simulation-head"><div><h2>持仓模拟 <span class="tag">连续轨迹 · 研究版</span></h2><p>个股状态估计，行业堆叠展示；历史重建与右端逐日估计同轴，不能当作实时预测或真实交易记录。</p></div></div><div class="profile-date-strip"><span>可得轨迹 <strong>${escapeHTML(data.start)} 至 ${escapeHTML(data.end)}</strong></span><span>Smoother 至 <strong>${escapeHTML(data.smoother_end||data.end)}</strong></span>${data.filter_start?`<span>Filter 起点 <strong>${data.filter_start}</strong></span>`:''}</div>
+  return `<div class="simulation-head"><div><h2>细行业与个股 · 历史接续 <span class="tag">独立旧研究结果</span></h2><p>查看二、三级行业和候选个股；此处使用旧接续结果，截止日期可能较早，不与“每日估计与复盘”的逐日 Filter 混用。</p></div></div><div class="profile-date-strip"><span>可得轨迹 <strong>${escapeHTML(data.start)} 至 ${escapeHTML(data.end)}</strong></span><span>Smoother 至 <strong>${escapeHTML(data.smoother_end||data.end)}</strong></span>${data.filter_start?`<span>Filter 起点 <strong>${data.filter_start}</strong></span>`:''}</div>
     ${data.filter_start?`<p class="method-note">图下蓝绿色标带：Smoother；金色标带：Filter（事后重放）。以 ${data.filter_start} 完整持仓初始化，信息可得日为 ${escapeHTML(data.filter_available)}；之后按每日行情和净值向前估计，没有用右侧后续收益回修前日权重。</p>`:`<p class="simulation-warning">右端 Filter 尚未接续：${escapeHTML(data.extension_issue||'暂无合格接续数据')}。仅显示实际已有历史，不填补缺口。</p>`}
     ${data.filter_seam_pp>5?`<p class="simulation-warning">边界修订较大：6月末Smoother估计与Filter披露初值相差 ${num(data.filter_seam_pp,2)} 个百分点（股票＋行业桶half-L1）。图上保留跳变，应先核对这一接缝，不能解读为当天真实调仓。</p>`:''}
     <article class="subpanel"><div class="history-controls"><label>堆叠维度 <select data-reconstruction-control="view" aria-label="堆叠维度">${[['1','中信一级行业'],['2','中信二级行业'],['3','中信三级行业'],['stocks','个股前十']].map(([k,v])=>`<option value="${k}"${options.view===k?' selected':''}>${v}</option>`).join('')}</select></label><label>历史范围 <select data-reconstruction-control="range" aria-label="历史范围">${[['1','最近1年轨迹'],['3','最近3年轨迹'],['5','最近5年轨迹'],['all','全部可得轨迹']].map(([k,v])=>`<option value="${k}"${options.range===k?' selected':''}>${v}</option>`).join('')}</select></label>${options.view!=='stocks'?`<label>图例 <select data-reconstruction-control="count" aria-label="行业图例数量"><option value="12"${options.count!=='all'?' selected':''}>主要12类＋其他</option><option value="all"${options.count==='all'?' selected':''}>全部行业</option></select></label>`:''}<label>查看日期 <input type="date" data-reconstruction-control="date" aria-label="重建查看日期" min="${data.start}" max="${data.end}" value="${chosen.date}"></label></div>
@@ -3172,14 +3172,15 @@ async function loadEquityEventP(code) {
 }
 
 function eventPPanel(data,index,selectedDate='') {
-  const intro=`<div class="simulation-head"><div><h2>Event-P · 港股＋债券 <span class="tag">全量历史回测</span></h2><p>覆盖 ${num(index?.requested,0)} 只主动权益基金，其中 ${num(index?.available,0)} 只具有可评分端点；截至 ${escapeHTML(index?.end||'2026-06-30')}，不是当前持仓。</p></div></div>`;
+  const intro=`<div class="simulation-head simulation-view-intro"><div><h2>披露期误差检验（Event-P）</h2><p>完整持仓披露后，核对同一报告期的模型估计。本页仅展示${escapeHTML(data?.name||'当前基金')}。</p><p class="method-note">整套回测数据集覆盖 ${num(index?.requested,0)} 只主动权益基金，其中 ${num(index?.available,0)} 只具有可评分端点；截至 ${escapeHTML(index?.end||'2026-06-30')}，不是当前持仓。</p></div></div>`;
   const boundary='<p class="method-note">按披露可得日向前回放，后续完整持仓仅作同报告期对照。行情使用现有历史数据，未逐日留档，因此不是当时保存的实盘预测。港股和债券分别使用单一指数状态，不能还原其中的个股、个券。</p>';
   if(!data?.endpoints?.length) return intro+`<article class="subpanel"><p>${escapeHTML(data?.issues?.map(x=>typeof x==='string'?x:x.reason).join('；')||'本基金没有有效回测端点。')}</p>${boundary}</article>`;
   const e=data.endpoints.find(x=>x.report===selectedDate)||data.endpoints.at(-1);
   const rows=e.names.map((name,i)=>[name,e.truth[i],e.legacy_industry[i],e.multi_industry[i]]);
   rows.push(['港股',e.true_hk,e.legacy_hk,e.multi_hk],['债券',e.true_bond,e.legacy_bond,e.multi_bond]);
+  rows.sort((left,right)=>Math.max(Number(right[1])||0,Number(right[3])||0)-Math.max(Number(left[1])||0,Number(left[3])||0));
   const errors=(key)=>50*e.truth.reduce((sum,w,i)=>sum+Math.abs(w-e[key][i]),0);
-  return intro+`<article class="subpanel"><div class="history-controls"><label>完整披露报告期 <select data-eventp-date>${data.endpoints.map(x=>`<option value="${escapeHTML(x.report)}"${x===e?' selected':''}>${escapeHTML(x.report)}</option>`).join('')}</select></label><span>估计日 ${escapeHTML(e.day)} · 披露可得日 ${escapeHTML(e.available)}</span></div>${boundary}<p>A股行业 half-L1：旧版 ${num(errors('legacy_industry'),2)} → 新版 ${num(errors('multi_industry'),2)} 个百分点（越低越好）；不是准确率。</p><div class="table-scroll"><table class="simulation-table"><thead><tr><th>资产／行业</th><th>完整披露</th><th>旧版估计</th><th>新版估计</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${escapeHTML(r[0])}</td>${r.slice(1).map(w=>`<td>${pct(w,2)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="method-note">均占基金净资产，未按股票仓位归一；旧版没有港股／债券状态，所以这两项为零。债券披露缺失时留空。模型允许总状态不超过105%，不能把剩余部分直接当作已核实现金。</p><details class="simulation-method"><summary>数据缺口（${data.issues.length}项）</summary><p>${data.issues.length?data.issues.map(x=>escapeHTML(typeof x==='string'?x:[x.start,x.end,x.reason].filter(Boolean).join(' · '))).join('<br>'):'未记录区间缺口。'}</p></details></article>`;
+  return intro+`<article class="subpanel"><div class="history-controls"><label>完整披露报告期 <select data-eventp-date>${data.endpoints.map(x=>`<option value="${escapeHTML(x.report)}"${x===e?' selected':''}>${escapeHTML(x.report)}</option>`).join('')}</select></label><span>估计日 ${escapeHTML(e.day)} · 披露可得日 ${escapeHTML(e.available)}</span></div><p>A股行业误差（half-L1）：原A股模型 ${num(errors('legacy_industry'),2)} → 含港股/债券模型 ${num(errors('multi_industry'),2)} 个百分点。各A股行业仓位绝对差之和的一半，越低越好，不是准确率。</p><p class="method-note">逐项按完整披露或含港股/债券模型中的较高仓位排序；均占基金净资产。</p>${renderTable(['资产／行业','完整披露','原A股模型','含港股/债券模型'],rows.map(r=>[escapeHTML(r[0]),...r.slice(1).map(w=>pct(w,2))]),'table-scroll',12)}<p class="method-note">原A股模型未设置港股／债券状态，两项显示为零不表示基金真实未持有。债券披露缺失时留空。模型总状态上限为105%，剩余部分不直接当作已核实现金。</p><details class="simulation-method"><summary>检验口径与数据缺口（${data.issues.length}项）</summary>${boundary}<p>${data.issues.length?data.issues.map(x=>escapeHTML(typeof x==='string'?x:[x.start,x.end,x.reason].filter(Boolean).join(' · '))).join('<br>'):'未记录区间缺口。'}</p></details></article>`;
 }
 
 function validateFullFilterDaily(data, code) {
@@ -3293,26 +3294,34 @@ function fullFilterComparison(historical,daily,options,error='') {
   topData.coverage_gaps=comparisonCoverage(history,referenceDates,start,end,'smoother',hasUnbuiltTail?'':historical?.end,smootherIssues);
   bottomData.coverage_gaps=comparisonCoverage(valid,referenceDates,start,end,'filter',daily.end,daily.issues||[]);
   const coverageNote=(data,points)=>`<p class="model-coverage">可得轨迹 <strong>${escapeHTML(points[0]?.date||'无')} — ${escapeHTML(points.at(-1)?.date||'无')}</strong>${data.coverage_gaps.length?` · ${data.coverage_gaps.map(g=>`${escapeHTML(g.start)} — ${escapeHTML(g.end)}：${escapeHTML(g.label)}`).join('；')}`:' · 所选范围无已识别缺段'}</p>`;
-  const chart=(data,points,label)=>points.length?reconstructionStackChart(data,points,keys,'1',date,'nav').replace('每日持仓同轴堆叠，Smoother与Filter分段标注',label+' 独立时间轴逐日持仓'):`<p class="empty-copy">${label} 无合格数据，保留缺口。</p>`;
+  const chart=(data,points,label)=>points.length?reconstructionStackChart(data,points,keys,'1',date,'nav',false).replace('每日持仓同轴堆叠，Smoother与Filter分段标注',label+' 独立时间轴逐日持仓'):`<p class="empty-copy">${label} 无合格数据，保留缺口。</p>`;
   const a=comparisonPoint(upper,date,topData.coverage_gaps),b=comparisonPoint(lower,date,bottomData.coverage_gaps);
-  return `<h2>Smoother / Filter · 上下对照</h2><p class="method-note">两张独立时间轴，日期范围与刻度完全一致；颜色一致，均占基金净资产。上图为事后平滑，下图为逐日 Event-P Filter（港股＋债券版）历史回放。初始化及状态不同，不能把两图差异全部归因于平滑；不是实时留档预测。</p>
+  // The chart keeps a stable legend order. The date table prioritizes that day's weights.
+  const tablePoint=b||a;
+  const tableKeys=tablePoint?[...keys].sort((left,right)=>(tablePoint.groups[right]||0)-(tablePoint.groups[left]||0)):keys;
+  const tableOrder=b?'按所选日期可得的 Filter 仓位由高到低':a?'Filter 无有效值，按可得的 Smoother 仓位由高到低':'该日两种模型均无有效值，保留行业名称与缺失标记';
+  const legendKeys=[...keys.filter(k=>k!=='债券'),'其他已识别行业',...(keys.includes('债券')?['债券']:[])];
+  const sharedLegend=`<details class="simulation-shared-legend"><summary>查看行业颜色 · 两图共用（${legendKeys.length}项）</summary><div class="reconstruction-legend">${legendKeys.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(k)}</span>`).join('')}</div></details>`;
+  return `<div class="simulation-view-intro"><h2>每日估计与历史复盘</h2><p>上图使用后续披露复盘历史，下图按逐日可得信息回放；两者都是模型估计，不是实时披露持仓。</p></div>
     <div class="history-controls"><label>历史范围 <select data-reconstruction-control="range" aria-label="上下对照历史范围">${[['all','全部可得轨迹'],['1','最近1年'],['3','最近3年'],['5','最近5年']].map(([v,l])=>`<option value="${v}"${options.range===v?' selected':''}>${l}</option>`).join('')}</select></label><label>查看日期 <input type="date" data-reconstruction-control="date" aria-label="上下对照日期" min="${start}" max="${end}" value="${date}"></label></div>
-    <article class="subpanel" data-comparison-chart="smoother"><h3>Smoother · 历史平滑</h3><p class="method-note">上图沿用股票与行业状态；未单独建模的港股、债券不解释为零仓位。</p>${coverageNote(topData,upper)}${chart(topData,upper,'Smoother')}</article>
-    <article class="subpanel" data-comparison-chart="filter"><h3>Filter · 全程逐日估计</h3>${coverageNote(bottomData,lower)}${chart(bottomData,lower,'Filter')}<p class="method-note">计算截止 ${escapeHTML(daily.end)}，本基金最近有效日 ${escapeHTML(lower.at(-1)?.date||'无')}；债券固定在堆叠最上层。信息版本边界独立分段，不跨缺口连线，早期无可得锚点的区间留空。港股和债券为指数汇总状态。</p></article>
-    <article class="subpanel"><h3>${date} · 行业 / 资产对照</h3><p>实际估计日期：Smoother ${a?.date||'该日无有效估计'}；Filter ${b?.date||'该日无有效估计'}。灰色区间没有有效轨迹，不沿用缺口前的估计；区间内非交易日取最近可得日。</p>${renderTable(['行业 / 资产','Smoother','Filter'],keys.map(k=>[escapeHTML(k),a?(['港股','债券'].includes(k)&&!Object.hasOwn(a.groups,k)?'—':pct(a.groups[k]||0,2)):'—',b?pct(b.groups[k]||0,2):'—']),'table-scroll',12)}</article>
-    <details class="simulation-method"><summary>数据覆盖与未生成区间</summary><p><strong>Smoother：</strong>${escapeHTML(smootherIssues.map(comparisonIssueText).join('；')||'已生成历史区间无记录异常；末端平滑须等待后续完整披露，不能用 Filter 冒充 Smoother。')}</p><p><strong>Filter：</strong>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'无记录输入异常。')}</p></details>`;
+    ${sharedLegend}<p class="method-note">两图日期范围、刻度和行业颜色一致，均占基金净资产。色带是模型估计；细柱标记披露：“全”为完整持仓，“季”为前十大局部持仓，不能代表整个行业仓位。</p>
+    <article class="subpanel" data-comparison-chart="smoother"><h3>历史复盘 · Smoother</h3><p class="method-note">使用后续披露复盘；若末端标记“等待后续完整披露”，需等披露后才能重建。其他灰区按缺口提示判断；日更进展看下图及其有效日期。港股、债券未单独建模时不解释为零仓位。</p>${coverageNote(topData,upper)}${chart(topData,upper,'Smoother')}</article>
+    <article class="subpanel" data-comparison-chart="filter"><h3>逐日估计 · Filter</h3>${coverageNote(bottomData,lower)}${chart(bottomData,lower,'Filter')}<p class="method-note">计算截止 ${escapeHTML(daily.end)}，本基金最近有效日 ${escapeHTML(lower.at(-1)?.date||'无')}；债券固定在堆叠最上层。信息版本边界独立分段，不跨缺口连线，早期无可得锚点的区间留空。港股和债券为指数汇总状态。</p></article>
+    <article class="subpanel"><h3>${date} · 行业 / 资产明细</h3><p class="method-note">${tableOrder}；显示前12项，可展开全部。</p><p>实际估计日期：Smoother ${a?.date||'该日无有效估计'}；Filter ${b?.date||'该日无有效估计'}。灰色区间没有有效轨迹，不沿用缺口前的估计；区间内非交易日取最近可得日。</p>${renderTable(['行业 / 资产','历史复盘 Smoother','逐日估计 Filter'],tableKeys.map(k=>[escapeHTML(k),a?(['港股','债券'].includes(k)&&!Object.hasOwn(a.groups,k)?'—':pct(a.groups[k]||0,2)):'—',b?pct(b.groups[k]||0,2):'—']),'table-scroll',12)}</article>
+    <details class="simulation-method"><summary>方法边界、数据覆盖与未生成区间</summary><p>上图为历史平滑，下图为 Event-P（港股＋债券版）逐日回放。初始化及状态不同，不能把两图差异全部归因于平滑；历史数据未逐日留档，不作为当时已保存的实盘预测。</p><p><strong>Smoother：</strong>${escapeHTML(smootherIssues.map(comparisonIssueText).join('；')||'已生成历史区间无记录异常；末端平滑须等待后续完整披露，不能用 Filter 冒充 Smoother。')}</p><p><strong>Filter：</strong>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'无记录输入异常。')}</p></details>`;
 }
 
 function bindCombinedEquitySimulation(target, current=null, historical=null, historicalError='', eventp=null, eventpError='', code=fundCode) {
   const params=new URLSearchParams(location.search);
   let mode=['comparison','eventp','history','current'].includes(params.get('simMode')) ? params.get('simMode') : 'comparison';
   let eventpDate=params.get('eventpDate')||'';
+  let researchToolsOpen=['history','current'].includes(mode);
   // Each model owns its loading state: a failed legacy pilot must not hide the daily Filter.
   const state = (value=null, error='') => ({value,error,pending:false});
   const resources = {current:state(current),smoother:state(historical,historicalError),history:state(historical,historicalError),eventp:state(eventp,eventpError),daily:state()};
   const loaders = {current:()=>loadEquitySimulation(code),smoother:()=>loadEquityReconstruction(code,false),history:()=>loadEquityReconstruction(code),eventp:()=>loadEquityEventP(code),daily:()=>loadFullFilterDaily(code)};
   const dependencies = {comparison:['smoother','daily'],eventp:['eventp'],history:['history'],current:['current']};
-  const labels = {current:'原试点',smoother:'Smoother',history:'连续轨迹',eventp:'Event-P',daily:'每日 Filter'};
+  const labels = {current:'旧试点',smoother:'历史复盘',history:'历史接续',eventp:'披露验证',daily:'逐日估计'};
   const options={view:['1','2','3','stocks'].includes(params.get('historyView'))?params.get('historyView'):'1',range:['1','3','5','all'].includes(params.get('historyRange'))?params.get('historyRange'):'all',count:params.get('historyCount')==='all'?'all':'12',date:params.get('historyDate')||'',basis:params.get('simBasis')==='equity'?'equity':'nav'};
   const ensure = (key, retry=false) => {
     const item=resources[key];
@@ -3333,21 +3342,22 @@ function bindCombinedEquitySimulation(target, current=null, historical=null, his
     const eventp=resources.eventp.value;
     const daily=resources.daily.value;
     const meta=history?.index?.funds?.[code];
-    target.innerHTML=`<div class="simulation-tabs" role="group" aria-label="持仓研究模型"><button data-model-mode="comparison" class="${mode==='comparison'?'active':''}" aria-pressed="${mode==='comparison'}">Smoother / Filter 上下对照</button><button data-model-mode="eventp" class="${mode==='eventp'?'active':''}" aria-pressed="${mode==='eventp'}">Event-P · 全量回测</button><button data-model-mode="history" class="${mode==='history'?'active':''}" aria-pressed="${mode==='history'}">连续轨迹 · Smoother → Filter</button><button data-model-mode="current" class="${mode==='current'?'active':''}" aria-pressed="${mode==='current'}">原试点对照与验真</button></div><div data-model-content></div>`;
+    target.innerHTML=`<p class="simulation-hub-guide">日常查看配置与历史变化；完整持仓披露后，再检验估计误差。</p><div class="simulation-hub-primary simulation-tabs" role="group" aria-label="持仓研究模型"><button type="button" data-model-mode="comparison" class="simulation-hub-option ${mode==='comparison'?'active':''}" aria-pressed="${mode==='comparison'}"><span>每日估计与复盘</span><small class="simulation-hub-option-note">逐日行业配置与历史复盘对照</small></button><button type="button" data-model-mode="eventp" class="simulation-hub-option ${mode==='eventp'?'active':''}" aria-pressed="${mode==='eventp'}"><span>披露验证</span><small class="simulation-hub-option-note">披露后检验模型误差</small></button></div><details class="simulation-research-tools" data-research-tools${researchToolsOpen?' open':''}><summary>更多研究工具</summary><p class="method-note">独立研究口径，不与上方逐日估计混用。历史接续更新范围可能较短，旧试点以自身截止日期为准。</p><div class="simulation-tabs" role="group" aria-label="其他研究工具"><button type="button" data-model-mode="history" class="${mode==='history'?'active':''}" aria-pressed="${mode==='history'}">细行业与个股 · 历史接续</button><button type="button" data-model-mode="current" class="${mode==='current'?'active':''}" aria-pressed="${mode==='current'}">旧试点 · 无调仓对照</button></div><p class="method-note">历史接续可查看二、三级行业和候选个股；旧试点保留无调仓对照与披露后验真。请分别查看各自截止日期。</p></details><div data-model-content></div>`;
     const body=target.querySelector('[data-model-content]');
     if(mode==='comparison') {
       body.innerHTML=resources.daily.error ? errorPanel('daily') : fullFilterComparison(historical?.data,daily,{...options,smootherIssues:historical?.index?.funds?.[code]?.issues||[]});
       if(resources.smoother.pending) body.innerHTML='<p class="empty-copy" role="status">Smoother 历史正在加载；每日 Filter 独立加载。</p>'+body.innerHTML;
       if(resources.smoother.error) body.innerHTML=errorPanel('smoother')+body.innerHTML;
     } else if(resources[mode].error) body.innerHTML=errorPanel(mode);
-    else if(mode==='eventp') body.innerHTML=eventp?.index?eventPPanel(eventp.data,eventp.index,eventpDate):'<p class="empty-copy" role="status">正在加载 Event-P 全量回测…</p>';
+    else if(mode==='eventp') body.innerHTML=eventp?.index?eventPPanel(eventp.data,eventp.index,eventpDate):'<p class="empty-copy" role="status">正在加载披露期验证…</p>';
     else if(mode==='history') {
       body.innerHTML=history?.data?reconstructionPanel(history.data,options):`<article class="subpanel"><h2>历史持仓重建</h2><p>${resources.history.pending ? '正在加载连续轨迹…' : escapeHTML(meta?.issues?.map(x=>x.reason).join('；') || '本基金尚无合格历史重建轨迹，不生成虚构轨迹。')}</p><p class="method-note">历史重建与当前Filter覆盖范围独立。</p></article>`;
       if(history?.data?.extension_issue) body.innerHTML+='<button type="button" class="text-button" data-model-retry="history">重新加载接续段</button>';
     } else if(current) bindEquitySimulation(body,current.data,current.index);
     else body.innerHTML='<p class="empty-copy" role="status">正在加载原试点对照…</p>';
     target.querySelector('[data-eventp-date]')?.addEventListener('change',e=>{eventpDate=e.target.value;update();});
-    target.querySelectorAll('[data-model-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.modelMode;options.basis=new URLSearchParams(location.search).get('simBasis')==='equity'?'equity':'nav';update();}));
+    target.querySelector('[data-research-tools]')?.addEventListener('toggle',event=>{if(event.currentTarget.isConnected!==false)researchToolsOpen=event.currentTarget.open;});
+    target.querySelectorAll('[data-model-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.modelMode;if(['history','current'].includes(mode))researchToolsOpen=true;options.basis=new URLSearchParams(location.search).get('simBasis')==='equity'?'equity':'nav';update();}));
     target.querySelectorAll('[data-model-retry]').forEach(b=>b.addEventListener('click',()=>{ensure(b.dataset.modelRetry,true);render();}));
     target.querySelectorAll('[data-reconstruction-control]').forEach(c=>c.addEventListener('change',()=>{options[c.dataset.reconstructionControl]=c.value;update();}));
     if(mode==='history') target.querySelector('[data-simulation-basis]')?.addEventListener('change',e=>{options.basis=e.target.value==='equity'?'equity':'nav';update();});
@@ -3401,7 +3411,7 @@ function equitySimulationPanel(data, index, selectedDate, view, selectedIndustry
     const evidenceLabel = kind => kind === 'frozen_before_disclosure' ? '实际披露前留档' : kind === 'frozen_before_availability_actual_announcement_unverified' ? '可得日前留档，实际公告日待核验' : '事后补算';
     content = `<article class="subpanel"><h3>完整披露后的验真</h3>${evaluations.length ? table(['报告期','证据类型','行业误差↓','无调仓行业误差↓','具名股票误差↓'],evaluations.map(e=>`<tr><td>${escapeHTML(e.report_date)}</td><td>${evidenceLabel(e.evaluation_kind)}</td><td>${num(e.industry_half_l1_pp,1)}个百分点</td><td>${num(e.passive_industry_half_l1_pp,1)}个百分点</td><td>${num(e.stock_half_l1_pp,1)}个百分点</td></tr>`).join('')) : '<p class="simulation-warning">本批试点尚无同报告日的完整披露验证结果，暂不展示准确率或胜率。</p>'}
       <ol class="simulation-validation"><li>每日估计生成后，保留首次记录及输入版本；数据修订不能覆盖旧预测。</li><li>完整持仓公告后，用<strong>同一报告日</strong>的旧估计与真实持仓比较。季报前十大不能验真整个组合。</li><li>检查行业/股票误差、新股召回和无调仓对照，再更新未来画像；不回填旧预测。</li></ol><p class="method-note">误差采用 half-L1：各项仓位差绝对值合计的一半，越低越好。例如两个行业分别偏离 +5 和 -5 个百分点，误差为 5 个百分点。季度/半年末快照不能证明每天真实交易路径。</p></article>
-      <article class="subpanel"><h3>历史补算与 Smoother 的边界</h3><p>当前图表是从最近公开锚点补算的每日 Filter 路径，不代表每一天都在当时留档。网页暂不混入使用后续完整持仓的 Smoother；此前研究结果也不计入本批在线成绩。</p><p class="method-note">首次留档：${escapeHTML(data.freeze.recorded_at.replace('T',' ').slice(0,19))}；记录估计日：${escapeHTML(data.as_of)}。${data.freeze.revision_since_first_freeze ? '输入发生修订，本页为重算展示，首次留档仍保留用于验真。' : '后续每个新增估计日单独留档。'}</p></article>`;
+      <article class="subpanel"><h3>历史补算与 Smoother 的边界</h3><p>当前图表是从最近公开锚点补算的每日 Filter 路径，不代表每一天都在当时留档。本试点不混入使用后续完整持仓的 Smoother；网站“每日估计与复盘”另有双图展示，其研究结果不计入本试点在线成绩。</p><p class="method-note">首次留档：${escapeHTML(data.freeze.recorded_at.replace('T',' ').slice(0,19))}；记录估计日：${escapeHTML(data.as_of)}。${data.freeze.revision_since_first_freeze ? '输入发生修订，本页为重算展示，首次留档仍保留用于验真。' : '后续每个新增估计日单独留档。'}</p></article>`;
   } else {
     content = `<article class="subpanel"><div class="simulation-chart-toolbar"><h3>行业每日轨迹</h3><label>行业 <select data-simulation-industry>${names.map(name=>`<option value="${escapeHTML(name)}" ${name === industry ? 'selected' : ''}>${escapeHTML(name)}</option>`).join('')}</select></label></div>
       <div class="simulation-legend"><span class="estimated">模型估计</span><span class="passive">无调仓对照</span><span class="disclosed">${escapeHTML(data.anchor.report_date)} 披露锚点水平参照</span></div>${simulationLineChart(pointRows,industry,anchorWeight(data.anchor.industry[industry] || 0),basis)}
