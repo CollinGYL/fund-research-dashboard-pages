@@ -2368,3 +2368,8 @@ html:has(.blue-workbench) { scroll-padding-top:88px; scroll-behavior:auto; }
 
 .blue-workbench .daily-explorer-chart .reconstruction-chart { min-height:0; margin:12px 0; }
 .blue-workbench .daily-explorer-chart .reconstruction-chart text { font-size:14px; }
+
+/* The Campisi summary keeps its explicit navy background; light-card text
+   overrides above must not reduce contrast inside this dark card. */
+.blue-workbench .pb-scope .data-boundary[style*="background:var(--navy)"] :is(h3,.eyebrow) { color:#fff; }
+.blue-workbench .pb-scope .data-boundary[style*="background:var(--navy)"] p:not(.eyebrow) { color:#e7efff; }
