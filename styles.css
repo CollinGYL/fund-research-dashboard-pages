@@ -2276,3 +2276,95 @@ html:has(.blue-workbench) { scroll-padding-top:88px; scroll-behavior:auto; }
 
 .blue-workbench .simulation-research-tools .simulation-tabs button { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:3px; min-width:0; min-height:44px; text-align:left; white-space:normal; overflow-wrap:break-word; }
 .blue-workbench .simulation-research-tools > p { margin:0; padding:0 12px 11px; color:#647a96; font-size:11px; line-height:1.7; }
+
+/* Plain-language guidance and compact no-result states for the paired holdings charts. */
+.blue-workbench .simulation-reading-guide {
+  margin:10px 0 14px; padding:10px 13px; border-left:3px solid #93b3ea;
+  border-radius:0 6px 6px 0; background:#edf3fb; color:#496583; font-size:12px; line-height:1.8;
+}
+.blue-workbench .simulation-reading-guide p { margin:0; }
+.blue-workbench .simulation-chart-description { margin:0 0 10px; color:#586f8a; font-size:12px; line-height:1.8; }
+.blue-workbench .simulation-empty-card {
+  margin:8px 0 0; padding:12px 14px; border:1px solid #e1e8f1; border-radius:7px;
+  background:#f7f9fc; color:#5c7089; font-size:12px; line-height:1.8; text-align:left;
+}
+.blue-workbench .simulation-empty-card :is(h3,h4,strong) { color:#405e81; }
+.blue-workbench .simulation-empty-card :is(h3,h4,p) { margin:0; }
+.blue-workbench .simulation-empty-card p + p { margin-top:4px; }
+.blue-workbench .simulation-empty-card .text-button { margin-top:6px; }
+.blue-workbench .simulation-date-note { margin:8px 0; color:#627892; font-size:12px; line-height:1.8; overflow-wrap:anywhere; }
+.blue-workbench .simulation-method { margin-top:12px; border:1px solid #dfe7f3; border-radius:7px; background:#fff; }
+.blue-workbench .simulation-method > summary { padding:10px 13px; color:#526f94; font-size:12px; cursor:pointer; }
+.blue-workbench .simulation-method[open] > summary { border-bottom:1px solid #e7edf5; }
+.blue-workbench .simulation-method > :not(summary) { margin-left:13px; margin-right:13px; }
+.blue-workbench .simulation-method > summary:focus-visible { outline:3px solid #91b2fa; outline-offset:3px; }
+.blue-workbench .simulation-method p,.blue-workbench .simulation-method li { color:#5e738e; font-size:12px; line-height:1.8; overflow-wrap:anywhere; }
+@media(max-width:760px) {
+ .blue-workbench .simulation-reading-guide { padding:9px 11px; }
+ .blue-workbench .simulation-empty-card { padding:10px 11px; }
+}
+
+.blue-workbench [data-comparison-chart] > h3 { margin:0 0 7px; }
+
+/* Daily holdings explorer: one chart, explicit date controls and searchable allocations. */
+.blue-workbench .daily-explorer { min-width:0; }
+.blue-workbench .daily-explorer-head { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:6px 18px; margin:0 0 12px; }
+.blue-workbench .daily-explorer-head h2 { margin:0; color:#315477; font-size:21px; line-height:1.5; }
+.blue-workbench .daily-explorer-head p { margin:4px 0 0; color:#637893; font-size:12px; line-height:1.7; }
+.blue-workbench .daily-explorer-controls { display:flex; flex-wrap:wrap; align-items:flex-end; gap:9px; padding:12px 14px; border:1px solid #dde7f5; border-radius:8px; background:#fff; }
+.blue-workbench .daily-explorer-controls label { display:flex; flex-direction:column; gap:4px; color:#627994; font-size:11px; }
+.blue-workbench .daily-explorer :is(select,input[type="date"],input[type="search"]) { min-width:0; max-width:100%; height:36px; padding:6px 10px; border:1px solid #ccdbee; border-radius:6px; color:#345575; background:#fff; font:inherit; font-size:12px; }
+.blue-workbench .daily-explorer-controls button,.blue-workbench .daily-explorer-chart button { height:36px; padding:6px 12px; border:1px solid #ccdbee; border-radius:6px; color:#3b6091; background:#f8faff; font:inherit; font-size:12px; cursor:pointer; }
+.blue-workbench .daily-explorer button:hover:not(:disabled) { border-color:#91b1df; background:#edf4ff; }
+.blue-workbench .daily-explorer button:disabled { opacity:.42; cursor:default; }
+.blue-workbench .daily-explorer :is(button,input,select,summary):focus-visible { outline:3px solid #93b6ed; outline-offset:2px; }
+.blue-workbench .daily-explorer-date { margin:9px 0 12px; color:#587391; font-size:12px; line-height:1.75; }
+.blue-workbench .daily-explorer-date strong { color:#2e598c; }
+.blue-workbench .daily-explorer-layout { display:grid; grid-template-columns:minmax(0,1.65fr) minmax(260px,1fr); align-items:start; gap:12px; }
+.blue-workbench .daily-explorer-layout > .subpanel { min-width:0; margin:0; padding:15px; }
+.blue-workbench .daily-explorer-layout h3 { margin:0 0 8px; font-size:15px; color:#395b7c; }
+.blue-workbench .daily-explorer-chart .history-controls { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 7px; }
+.blue-workbench .daily-explorer-chart svg { display:block; width:100%; height:auto; touch-action:pan-y; cursor:crosshair; }
+.blue-workbench .daily-explorer-chart :is(.method-note,.simulation-date-note) { font-size:11px; line-height:1.75; }
+.blue-workbench .daily-explorer-search { display:flex; flex-direction:column; gap:5px; margin:8px 0; color:#647b97; font-size:11px; }
+.blue-workbench .daily-explorer-search input { width:100%; }
+.blue-workbench .daily-allocation-list { max-height:354px; overflow:auto; overscroll-behavior:contain; padding:2px 5px 2px 2px; scrollbar-gutter:stable; }
+.blue-workbench .daily-allocation-row { position:relative; display:grid; grid-template-columns:minmax(0,1fr) 68px; align-items:center; gap:8px; width:100%; min-height:39px; margin:0 0 4px; padding:7px 9px; border:1px solid transparent; border-radius:5px; color:#405e7d; background:#f8fafd; font:inherit; font-size:12px; text-align:left; cursor:pointer; overflow:hidden; }
+.blue-workbench .daily-allocation-row > :not(.daily-allocation-bar) { position:relative; z-index:1; }
+.blue-workbench .daily-allocation-row.active,.blue-workbench .daily-allocation-row[aria-pressed="true"] { background:#edf3ff; border-color:#8facdb; color:#234f8e; }
+.blue-workbench .daily-allocation-bar { position:absolute; left:0; top:0; bottom:0; max-width:100%; opacity:.24; background:#7598d3; }
+.blue-workbench .daily-allocation-value { justify-self:end; font-variant-numeric:tabular-nums; font-weight:600; color:#315986; }
+.blue-workbench .daily-industry-chart text { font-size:15px; fill:#68809b; font-family:inherit; }
+.blue-workbench .daily-explorer .simulation-reading-guide { margin-top:10px; padding:8px 11px; font-size:11px; }
+@media(max-width:1050px) {
+ .blue-workbench .daily-explorer-layout { grid-template-columns:minmax(0,1fr); }
+ .blue-workbench .daily-allocation-list { max-height:310px; }
+}
+@media(max-width:600px) {
+ .blue-workbench .daily-explorer-head h2 { font-size:19px; }
+ .blue-workbench .daily-explorer-controls { gap:8px; padding:10px; }
+ .blue-workbench .daily-explorer-controls label { flex:1 1 120px; }
+ .blue-workbench .daily-explorer-controls :is(button,select,input) { height:40px; }
+ .blue-workbench .daily-explorer-controls button { flex:1 1 auto; padding:6px 9px; }
+ .blue-workbench .daily-explorer-layout > .subpanel { padding:12px; }
+ .blue-workbench .daily-allocation-row { min-height:42px; }
+ .blue-workbench .daily-explorer-chart select { max-width:100%; }
+}
+
+.blue-workbench .daily-date-buttons { display:flex; flex-wrap:wrap; gap:6px; }
+.blue-workbench .daily-chart-controls { display:flex; flex-wrap:wrap; align-items:flex-end; gap:8px; margin-bottom:12px; }
+.blue-workbench .daily-chart-controls label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#627994; }
+.blue-workbench .daily-allocation-list { list-style:none; margin:8px 0 0; padding:0; }
+.blue-workbench .daily-allocation-list > li { margin:0; padding:0; }
+.blue-workbench .daily-allocation-row > .daily-allocation-track { position:absolute; inset:0; z-index:0; pointer-events:none; }
+.blue-workbench .daily-allocation-name { display:flex; align-items:center; gap:8px; min-width:0; }
+.blue-workbench .daily-allocation-name i { flex:0 0 7px; width:7px; height:7px; border-radius:50%; }
+.blue-workbench .daily-search-count { margin:6px 0; color:#768aa3; font-size:11px; }
+@media(max-width:760px) {
+ .blue-workbench .daily-date-buttons { flex:1 1 100%; }
+ .blue-workbench .daily-chart-controls { align-items:end; }
+ .blue-workbench .daily-chart-controls label { flex:1 1 130px; }
+}
+
+.blue-workbench .daily-explorer-chart .reconstruction-chart { min-height:0; margin:12px 0; }
+.blue-workbench .daily-explorer-chart .reconstruction-chart text { font-size:14px; }

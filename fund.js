@@ -3076,9 +3076,9 @@ function reconstructionColor(label) {
   return colors[hash%colors.length];
 }
 
-function reconstructionStackChart(data, points, keys, view, selectedDate, basis='nav', showLegend=true) {
+function reconstructionStackChart(data, points, keys, view, selectedDate, basis='nav', showLegend=true, chartOptions={}) {
   if(!points.length) return '<p class="empty-copy">所选范围没有通过数据质量检查的轨迹。</p>';
-  const width=window.innerWidth<=600?420:960, left=48, right=width-15, bottom=280, top=32;
+  const width=chartOptions.width||(window.innerWidth<=600?420:960), left=48, right=width-15, bottom=280, top=32;
   const first=Date.parse(data.axis_start||points[0].date),last=Date.parse(data.axis_end||points.at(-1).date),other=view==='stocks'?'其余已识别股票':'其他已识别行业';
   const x=d=>left+(Date.parse(d)-first)/Math.max(1,last-first)*(right-left), y=v=>bottom-v/1.05*(bottom-top);
   const labels=[...keys.filter(k=>k!=='债券'),other,...(keys.includes('债券')?['债券']:[])];
@@ -3269,11 +3269,29 @@ function comparisonIssueText(issue) {
 }
 
 function fullFilterComparison(historical,daily,options,error='') {
-  if(!daily) return `<p class="empty-copy">${escapeHTML(error||'正在加载逐日 Filter 轨迹…')}</p>`;
-  const valid=daily.segments||[],history=historical?.segments?.filter(s=>s.method!=='filter')||[];
-  const availableDates=[...history.flatMap(s=>s.dates),...valid.flatMap(s=>s.dates)].filter(d=>d<=daily.end).sort();
-  if(!availableDates.length)return `<p class="empty-copy">暂无可展示的历史轨迹：${escapeHTML(daily.summary?.reason||'数据不足')}</p>`;
-  const end=daily.end,begin=availableDates[0];
+  const valid=daily?.segments||[],history=historical?.segments?.filter(s=>s.method!=='filter')||[];
+  const smootherIssues=historical?.issues||options.smootherIssues||[];
+  const historyDates=history.flatMap(s=>s.dates).sort(),dailyDates=valid.flatMap(s=>s.dates).sort();
+  const intro='<div class="simulation-view-intro"><h2>基金的钱大致投向了哪里？</h2><p>上图用后来公布的持仓回看过去，下图按每一天已公布的资料逐日估计。两图都是估计，不是基金实时公布的持仓。</p></div>';
+  const emptyChart=method=>{
+    const isHistory=method==='smoother',label=isHistory?'历史复盘':'每日估计',dates=isHistory?historyDates:dailyDates;
+    const pending=isHistory?options.smootherPending:options.dailyPending;
+    const failure=isHistory?options.smootherError:(options.dailyError||error);
+    let state='unavailable',message=`这只基金暂时没有${label}结果。`;
+    if(pending){state='loading';message=`正在加载${label}，请稍候…`;}
+    else if(failure){state='error';message=`${label}没有加载成功，可以重新试一次。`;}
+    else if(dates.length){state='out-of-range';message=`当前时间范围内没有${label}。已有结果为 ${dates[0]} 至 ${dates.at(-1)}，可选择“全部历史”查看。`;}
+    else if(isHistory){
+      const reasons=smootherIssues.map(comparisonIssueText).join('；');
+      if(reasons.includes('包含港股或其他非A股')&&reasons.includes('未验证跨市场收益')) message='历史复盘暂未覆盖这类含港股／其他非A股持仓的基金，可先查看下方每日估计。';
+    }
+    return `<div class="simulation-empty-card" data-model-state="${state}"${state==='loading'?' role="status"':state==='error'?' role="alert"':''}><p>${escapeHTML(message)}</p>${failure?`<button type="button" class="text-button" data-model-retry="${isHistory?'smoother':'daily'}">重新加载${label}</button><details class="simulation-method"><summary>查看加载失败原因</summary><p>${escapeHTML(failure)}</p></details>`:''}</div>`;
+  };
+  const targetEnd=daily?.end||historical?.end||'';
+  const availableDates=[...historyDates,...dailyDates].filter(d=>!targetEnd||d<=targetEnd).sort();
+  const issueDetails=()=>`<details class="simulation-method"><summary>${options.smootherPending||options.dailyPending?'查看数据加载状态':options.smootherError||options.dailyError||error?'查看加载情况与说明':'查看没有结果的原因'}</summary><p><strong>历史复盘：</strong>${escapeHTML(smootherIssues.map(comparisonIssueText).join('；')||(options.smootherPending?'正在加载，暂不能判断。':options.smootherError?'数据未能加载，请重试。':'尚无结果，未提供具体原因。'))}</p><p><strong>每日估计：</strong>${escapeHTML((daily?.issues||[]).map(comparisonIssueText).join('；')||daily?.summary?.reason||(options.dailyPending?'正在加载，暂不能判断。':options.dailyError||error?'数据未能加载，请重试。':'尚无结果，未提供具体原因。'))}</p></details>`;
+  if(!availableDates.length) return `${intro}<article class="subpanel" data-comparison-chart="smoother"><h3>历史复盘：事后回看</h3>${emptyChart('smoother')}</article><article class="subpanel" data-comparison-chart="filter"><h3>每日估计：跟踪近期变化</h3>${emptyChart('filter')}</article>${daily?.end?`<p class="simulation-date-note">本次数据截止 ${escapeHTML(daily.end)}。没有结果不表示仓位为 0。</p>`:''}${issueDetails()}`;
+  const end=targetEnd||availableDates.at(-1),begin=availableDates[0];
   const start=options.range==='all'?begin:(()=>{const d=new Date(end);d.setUTCFullYear(d.getUTCFullYear()-Number(options.range));return [begin,d.toISOString().slice(0,10)].sort().at(-1);})();
   const date=options.date&&options.date>=start&&options.date<=end?options.date:end;
   const topData={...historical,segments:history,axis_start:start,axis_end:end,filter_start:null};
@@ -3286,43 +3304,143 @@ function fullFilterComparison(historical,daily,options,error='') {
   // NAV may contain weekend report valuations. Only index-observed sessions
   // are additional calendar evidence; do not fetch extra assets just for this.
   const marketDates=new Set((window.FUND_COMMON_BENCHMARKS?.benchmarks?.['000906.SH']?.series||[]).map(row=>row[0]));
-  const navDates=(window.FUND_DETAIL_DATA?.[daily.code]?.nav||[]).map(row=>row[0]).filter(d=>d>=start&&d<=end&&marketDates.has(d));
+  const navDates=(window.FUND_DETAIL_DATA?.[daily?.code||historical?.code]?.nav||[]).map(row=>row[0]).filter(d=>d>=start&&d<=end&&marketDates.has(d));
   const referenceDates=[...new Set([...availableDates,...navDates])].sort();
-  const smootherIssues=historical?.issues||options.smootherIssues||[];
-  const lastHistorical=history.flatMap(s=>s.dates).sort().at(-1);
+  const lastHistorical=historyDates.at(-1);
   const hasUnbuiltTail=smootherIssues.some(issue=>issue.end>lastHistorical||issue.start>=lastHistorical);
   topData.coverage_gaps=comparisonCoverage(history,referenceDates,start,end,'smoother',hasUnbuiltTail?'':historical?.end,smootherIssues);
-  bottomData.coverage_gaps=comparisonCoverage(valid,referenceDates,start,end,'filter',daily.end,daily.issues||[]);
-  const coverageNote=(data,points)=>`<p class="model-coverage">可得轨迹 <strong>${escapeHTML(points[0]?.date||'无')} — ${escapeHTML(points.at(-1)?.date||'无')}</strong>${data.coverage_gaps.length?` · ${data.coverage_gaps.map(g=>`${escapeHTML(g.start)} — ${escapeHTML(g.end)}：${escapeHTML(g.label)}`).join('；')}`:' · 所选范围无已识别缺段'}</p>`;
-  const chart=(data,points,label)=>points.length?reconstructionStackChart(data,points,keys,'1',date,'nav',false).replace('每日持仓同轴堆叠，Smoother与Filter分段标注',label+' 独立时间轴逐日持仓'):`<p class="empty-copy">${label} 无合格数据，保留缺口。</p>`;
+  bottomData.coverage_gaps=comparisonCoverage(valid,referenceDates,start,end,'filter',daily?.end||'',daily?.issues||[]);
+  const coverageNote=(data,points)=>{
+    if(!points.length)return '';
+    const pending=data.coverage_gaps.find(g=>g.kind==='pending');
+    const missing=data.coverage_gaps.some(g=>g.kind!=='pending');
+    return `<p class="simulation-date-note">图中结果：${escapeHTML(points[0].date)} 至 ${escapeHTML(points.at(-1).date)}。${pending?` ${escapeHTML(pending.start)} 起尚未复盘，需要后续公布的完整持仓。`:''}${missing?' 灰色部分暂时没有结果，不表示仓位为 0。':''}</p>`;
+  };
+  const chart=(data,points,label)=>points.length?reconstructionStackChart(data,points,keys,'1',date,'nav',false).replace('每日持仓同轴堆叠，Smoother与Filter分段标注',label+' 独立时间轴逐日持仓'):emptyChart(label==='Smoother'?'smoother':'filter');
   const a=comparisonPoint(upper,date,topData.coverage_gaps),b=comparisonPoint(lower,date,bottomData.coverage_gaps);
   // The chart keeps a stable legend order. The date table prioritizes that day's weights.
   const tablePoint=b||a;
   const tableKeys=tablePoint?[...keys].sort((left,right)=>(tablePoint.groups[right]||0)-(tablePoint.groups[left]||0)):keys;
-  const tableOrder=b?'按所选日期可得的 Filter 仓位由高到低':a?'Filter 无有效值，按可得的 Smoother 仓位由高到低':'该日两种模型均无有效值，保留行业名称与缺失标记';
+  const tableOrder=b?'按“每日估计”的占比从高到低排列':a?(options.dailyPending?'每日估计正在加载，暂按历史复盘的占比排列':options.dailyError||error?'每日估计加载失败，暂按历史复盘的占比排列':'这一天没有每日估计，暂按历史复盘的占比排列'):'这一天两图都没有结果，“—”表示未能估计，不是 0';
+  const historyStatusDate=a?.date||(options.smootherPending?'正在加载':options.smootherError?'加载失败':'这一天没有结果');
+  const dailyStatusDate=b?.date||(options.dailyPending?'正在加载':options.dailyError||error?'加载失败':'这一天没有结果');
   const legendKeys=[...keys.filter(k=>k!=='债券'),'其他已识别行业',...(keys.includes('债券')?['债券']:[])];
-  const sharedLegend=`<details class="simulation-shared-legend"><summary>查看行业颜色 · 两图共用（${legendKeys.length}项）</summary><div class="reconstruction-legend">${legendKeys.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(k)}</span>`).join('')}</div></details>`;
-  return `<div class="simulation-view-intro"><h2>每日估计与历史复盘</h2><p>上图使用后续披露复盘历史，下图按逐日可得信息回放；两者都是模型估计，不是实时披露持仓。</p></div>
-    <div class="history-controls"><label>历史范围 <select data-reconstruction-control="range" aria-label="上下对照历史范围">${[['all','全部可得轨迹'],['1','最近1年'],['3','最近3年'],['5','最近5年']].map(([v,l])=>`<option value="${v}"${options.range===v?' selected':''}>${l}</option>`).join('')}</select></label><label>查看日期 <input type="date" data-reconstruction-control="date" aria-label="上下对照日期" min="${start}" max="${end}" value="${date}"></label></div>
-    ${sharedLegend}<p class="method-note">两图日期范围、刻度和行业颜色一致，均占基金净资产。色带是模型估计；细柱标记披露：“全”为完整持仓，“季”为前十大局部持仓，不能代表整个行业仓位。</p>
-    <article class="subpanel" data-comparison-chart="smoother"><h3>历史复盘 · Smoother</h3><p class="method-note">使用后续披露复盘；若末端标记“等待后续完整披露”，需等披露后才能重建。其他灰区按缺口提示判断；日更进展看下图及其有效日期。港股、债券未单独建模时不解释为零仓位。</p>${coverageNote(topData,upper)}${chart(topData,upper,'Smoother')}</article>
-    <article class="subpanel" data-comparison-chart="filter"><h3>逐日估计 · Filter</h3>${coverageNote(bottomData,lower)}${chart(bottomData,lower,'Filter')}<p class="method-note">计算截止 ${escapeHTML(daily.end)}，本基金最近有效日 ${escapeHTML(lower.at(-1)?.date||'无')}；债券固定在堆叠最上层。信息版本边界独立分段，不跨缺口连线，早期无可得锚点的区间留空。港股和债券为指数汇总状态。</p></article>
-    <article class="subpanel"><h3>${date} · 行业 / 资产明细</h3><p class="method-note">${tableOrder}；显示前12项，可展开全部。</p><p>实际估计日期：Smoother ${a?.date||'该日无有效估计'}；Filter ${b?.date||'该日无有效估计'}。灰色区间没有有效轨迹，不沿用缺口前的估计；区间内非交易日取最近可得日。</p>${renderTable(['行业 / 资产','历史复盘 Smoother','逐日估计 Filter'],tableKeys.map(k=>[escapeHTML(k),a?(['港股','债券'].includes(k)&&!Object.hasOwn(a.groups,k)?'—':pct(a.groups[k]||0,2)):'—',b?pct(b.groups[k]||0,2):'—']),'table-scroll',12)}</article>
-    <details class="simulation-method"><summary>方法边界、数据覆盖与未生成区间</summary><p>上图为历史平滑，下图为 Event-P（港股＋债券版）逐日回放。初始化及状态不同，不能把两图差异全部归因于平滑；历史数据未逐日留档，不作为当时已保存的实盘预测。</p><p><strong>Smoother：</strong>${escapeHTML(smootherIssues.map(comparisonIssueText).join('；')||'已生成历史区间无记录异常；末端平滑须等待后续完整披露，不能用 Filter 冒充 Smoother。')}</p><p><strong>Filter：</strong>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'无记录输入异常。')}</p></details>`;
+  const sharedLegend=`<details class="simulation-shared-legend"><summary>查看颜色代表的行业或资产（${legendKeys.length}项）</summary><div class="reconstruction-legend">${legendKeys.map(k=>`<span><i style="background:${reconstructionColor(k)}"></i>${escapeHTML(k)}</span>`).join('')}</div></details>`;
+  const gaps=data=>data.coverage_gaps.map(g=>`${g.start} 至 ${g.end}：${g.label}`).join('；')||'当前范围未发现缺少结果的时段。';
+  return `${intro}
+    <div class="history-controls"><label>时间范围 <select data-reconstruction-control="range" aria-label="上下对照历史范围">${[['all','全部历史'],['1','最近1年'],['3','最近3年'],['5','最近5年']].map(([v,l])=>`<option value="${v}"${options.range===v?' selected':''}>${l}</option>`).join('')}</select></label><label>明细日期（图中竖线） <input type="date" data-reconstruction-control="date" aria-label="上下对照日期" min="${start}" max="${end}" value="${date}"></label></div>
+    <p class="simulation-reading-guide">同一种颜色表示同一行业或资产，色带越厚，占比越大。例如估计为 20%，表示模型认为基金每 100 元净资产中，约有 20 元投向这一类。两图的日期和刻度相同，可以上下对照。</p>${sharedLegend}
+    <article class="subpanel" data-comparison-chart="smoother"><h3>历史复盘：事后回看</h3><p class="simulation-chart-description">用后来公布的持仓，回头估计过去的配置。</p>${coverageNote(topData,upper)}${chart(topData,upper,'Smoother')}</article>
+    <article class="subpanel" data-comparison-chart="filter"><h3>每日估计：跟踪近期变化</h3><p class="simulation-chart-description">按每一天已公布的资料，估计当时的配置。${daily?.end?`本次数据截止 ${escapeHTML(daily.end)}。`:''}</p>${coverageNote(bottomData,lower)}${chart(bottomData,lower,'Filter')}</article>
+    <article class="subpanel"><h3>${date} · 配置明细</h3><p class="method-note">${tableOrder}；共 ${tableKeys.length} 项${tableKeys.length>12?'，先显示 12 项，可展开查看全部':''}。</p><p class="simulation-date-note">对应结果日期：历史复盘 ${historyStatusDate}；每日估计 ${dailyStatusDate}。休市日显示最近一个有结果的日期；缺数据的时段仍留空。</p>${renderTable(['行业 / 资产','历史复盘','每日估计'],tableKeys.map(k=>[escapeHTML(k),a?(['港股','债券'].includes(k)&&!Object.hasOwn(a.groups,k)?'—':pct(a.groups[k]||0,2)):'—',b?pct(b.groups[k]||0,2):'—']),'table-scroll',12)}</article>
+    <details class="simulation-method"><summary>怎么看披露标记、空白和计算方法？</summary><p>色带是估计，细柱是基金公布的持仓：“全”表示完整披露，“季”只包含季报前十大持仓，不能当作全部持仓。所有比例都占基金净资产，债券显示在最上层；“—”和图中没有结果的时段不表示零仓位。</p><p>历史复盘使用 Smoother；每日估计使用 Event-P Filter（港股＋债券版）。两种方法的起点和可估计资产不同，图中差异不全是后来披露造成的。港股和债券只估计总体占比，不能还原其中的个股、个券；历史复盘未单独估计的港股和债券显示为“—”。历史行情没有逐日留档，这些结果不等于当时已保存的实盘预测。</p><p><strong>历史复盘未显示的日期：</strong>${escapeHTML(options.smootherPending?'历史复盘仍在加载，暂不能判断。':options.smootherError?'历史复盘加载失败，请重试。':gaps(topData))}</p><p><strong>每日估计未显示的日期：</strong>${escapeHTML(options.dailyPending?'每日估计仍在加载，暂不能判断。':options.dailyError||error?'每日估计加载失败，请重试。':gaps(bottomData))}</p><p><strong>历史复盘的具体说明：</strong>${escapeHTML(smootherIssues.map(comparisonIssueText).join('；')||(options.smootherPending?'正在加载，暂不能判断。':options.smootherError?'数据未能加载，请重试。':!historyDates.length?'没有可用结果，未提供具体原因。':'未记录其他异常。'))}</p><p><strong>每日估计的具体说明：</strong>${escapeHTML((daily?.issues||[]).map(comparisonIssueText).join('；')||daily?.summary?.reason||(options.dailyPending?'正在加载，暂不能判断。':options.dailyError||error?'数据未能加载，请重试。':!dailyDates.length?'没有可用结果，未提供具体原因。':'未记录其他异常。'))}</p></details>`;
+}
+
+function dailyFilterViewModel(daily,options={}) {
+  const cache=dailyFilterViewModel.pointCache ||= new WeakMap();
+  let all=cache.get(daily);
+  if(!all){
+    all=daily.segments.flatMap((segment,s)=>segment.dates.map((date,i)=>({date,segment:s,groups:Object.fromEntries(daily.names.map((name,k)=>[name,segment.weights[i][k]]))}))).sort((a,b)=>a.date.localeCompare(b.date)||a.segment-b.segment);
+    for(let i=1;i<all.length;i++) if(all[i].date===all[i-1].date && daily.names.some(name=>all[i].groups[name]!==all[i-1].groups[name])) throw new Error(`同一日期 ${all[i].date} 有不同估计，暂时无法确定应显示哪组结果。`);
+    cache.set(daily,all);
+  }
+  const dates=[...new Set(all.map(p=>p.date))],end=daily.end,begin=dates[0]||end;
+  let range=['all','1','3','5'].includes(options.range)?options.range:'1';
+  let start=range==='all'?begin:(()=>{const d=new Date(end);d.setUTCFullYear(d.getUTCFullYear()-Number(range));return [begin,d.toISOString().slice(0,10)].sort().at(-1);})();
+  if(options.autoRange&&dates.length&&dates.at(-1)<start){range='all';start=begin;}
+  const points=all.filter(p=>p.date>=start&&p.date<=end),visibleDates=[...new Set(points.map(p=>p.date))];
+  const selected=options.date&&options.date>=start&&options.date<=end?options.date:visibleDates.at(-1)||end;
+  const marketDates=new Set((window.FUND_COMMON_BENCHMARKS?.benchmarks?.['000906.SH']?.series||[]).map(row=>row[0]));
+  const navDates=(window.FUND_DETAIL_DATA?.[daily.code]?.nav||[]).map(row=>row[0]).filter(d=>d>=start&&d<=end&&marketDates.has(d));
+  const gaps=comparisonCoverage(daily.segments,[...new Set([...dates,...navDates])].sort(),start,end,'filter',end,daily.issues||[]);
+  const point=comparisonPoint(points,selected,gaps);
+  const totals={};points.forEach(p=>daily.names.forEach(name=>{totals[name]=(totals[name]||0)+p.groups[name];}));
+  const keys=[...daily.names].sort((a,b)=>(totals[b]||0)-(totals[a]||0));
+  const industry=daily.names.includes(options.industry)?options.industry:'';
+  return {start,end,range,dates,visibleDates,points,gaps,selected,point,keys,industry,previous:visibleDates.filter(d=>d<selected).at(-1)||'',next:visibleDates.find(d=>d>selected)||'',latest:dates.at(-1)||''};
+}
+
+function dailyIndustryChart(view,name) {
+  const width=window.innerWidth<=760?420:720,left=48,right=width-15,top=32,bottom=280;
+  const first=Date.parse(view.start),last=Date.parse(view.end),x=date=>left+(Date.parse(date)-first)/Math.max(1,last-first)*(right-left);
+  const high=Math.max(.05,Math.ceil(Math.max(0,...view.points.map(p=>Number.isFinite(p.groups[name])?p.groups[name]:0))*20)/20),y=value=>bottom-value/high*(bottom-top);
+  let previous=null;
+  const path=view.points.map(p=>{
+    const value=p.groups[name];if(!Number.isFinite(value)){previous=null;return '';}
+    const connected=previous&&previous.segment===p.segment&&!view.gaps.some(g=>g.start>previous.date&&g.end<p.date);
+    const command=`${connected?'L':'M'}${x(p.date).toFixed(1)},${y(value).toFixed(1)}`;previous=p;return command;
+  }).join(' ');
+  const grid=[0,.25,.5,.75,1].map(t=>`<line x1="${left}" x2="${right}" y1="${y(t*high)}" y2="${y(t*high)}" stroke="#dce5ea"/><text x="40" y="${y(t*high)+4}" text-anchor="end">${num(t*high*100,1)}%</text>`).join('');
+  const gaps=view.gaps.map(g=>`<g data-coverage-gap="${g.kind}" data-gap-start="${g.start}" data-gap-end="${g.end}"><title>${g.start} 至 ${g.end}：没有可用估计</title><rect x="${x(g.start)}" y="${top}" width="${Math.max(2,x(g.end)-x(g.start))}" height="${bottom-top}" fill="#e9eef3" opacity=".86"/></g>`).join('');
+  const tickCount=width===420?3:6,ticks=Array.from({length:tickCount},(_,i)=>{const t=first+(last-first)*i/(tickCount-1);return `<text x="${left+(right-left)*i/(tickCount-1)}" y="307" text-anchor="${i===0?'start':i===tickCount-1?'end':'middle'}">${new Date(t).toISOString().slice(0,10)}</text>`;}).join('');
+  const value=view.point?.groups[name];
+  const selected=Number.isFinite(value)?`<circle cx="${x(view.point.date)}" cy="${y(value)}" r="4.5" fill="${reconstructionColor(name)}"><title>${view.point.date} ${escapeHTML(name)}：${pct(value,4)}</title></circle>`:'';
+  return `<svg class="daily-industry-chart reconstruction-chart" viewBox="0 0 ${width} 320" role="img" aria-label="${escapeHTML(name)}占基金净资产的每日估计"><title>${escapeHTML(name)}每日估计；缺数据或不同披露阶段之间不连线</title>${grid}${gaps}<path data-daily-industry-path="${escapeHTML(name)}" d="${path}" fill="none" stroke="${reconstructionColor(name)}" stroke-width="2.5"/><line x1="${x(view.selected)}" x2="${x(view.selected)}" y1="${top}" y2="${bottom}" stroke="#17324d" stroke-width="1.2"/>${selected}${ticks}</svg>`;
+}
+
+function dailyFilterPanel(daily,options={},error='') {
+  const intro='<div class="daily-explorer-head"><div><h2>每日配置估计</h2><p>选择日期看配置，点选行业看变化。以下都是模型估计，不是基金实时公布的持仓。</p></div></div>';
+  if(!daily) return `<section class="daily-explorer">${intro}<div class="simulation-empty-card daily-explorer-empty" data-model-state="${error?'error':options.pending?'loading':'unavailable'}" role="${error?'alert':'status'}"><p>${error?'每日估计没有加载成功，可以重新试一次。':options.pending?'正在加载每日估计，请稍候…':'这只基金暂时没有每日估计结果。'}</p>${error?`<button type="button" class="text-button" data-model-retry="daily">重新加载每日估计</button><details class="simulation-method"><summary>查看加载失败原因</summary><p>${escapeHTML(error)}</p></details>`:''}</div></section>`;
+  let view;
+  try{view=dailyFilterViewModel(daily,options);}catch(invalid){return `<section class="daily-explorer">${intro}<div class="simulation-empty-card daily-explorer-empty" data-model-state="invalid" role="alert"><p>日期数据存在冲突，暂时无法展示。</p><p>${escapeHTML(invalid.message)}</p></div></section>`;}
+  const issueText=(daily.issues||[]).map(comparisonIssueText).join('；')||daily.summary?.reason||'未提供具体原因。';
+  if(!view.dates.length)return `<section class="daily-explorer">${intro}<div class="simulation-empty-card daily-explorer-empty" data-model-state="unavailable"><p>这只基金暂时没有每日估计结果，不表示仓位为 0。</p><p>本次数据截止 ${escapeHTML(daily.end)}。</p><details class="simulation-method"><summary>查看没有结果的原因</summary><p>${escapeHTML(issueText)}</p></details></div></section>`;
+  const chartData={segments:daily.segments.map(s=>({...s,method:'filter',disclosures:[]})),stock_names:{},axis_start:view.start,axis_end:view.end,coverage_gaps:view.gaps};
+  const chart=view.points.length?(view.industry?dailyIndustryChart(view,view.industry):reconstructionStackChart(chartData,view.points,view.keys,'1',view.selected,'nav',false,{width:window.innerWidth<=760?420:720}).replace(/aria-label="[^"]*"/, 'aria-label="每日行业与资产估计，占基金净资产；缺数据不连线"').replace(/<title>[^<]*<\/title>/, '<title>色带是每日行业与资产估计，占基金净资产；缺数据不连线</title>')):'<div class="simulation-empty-card daily-explorer-empty" data-model-state="out-of-range"><p>这段时间没有每日估计，可选择“全部历史”查看已有结果。</p></div>';
+  const rows=[...daily.names].sort((a,b)=>view.point?view.point.groups[b]-view.point.groups[a]:0),search=String(options.search||''),query=search.trim().toLocaleLowerCase();
+  const matching=rows.filter(name=>name.toLocaleLowerCase().includes(query)).length;
+  const displayWeight=value=>value>0&&value<.0001?pct(value,4):pct(value,2);
+  const ranking=rows.map(name=>{const value=view.point?.groups[name],hasValue=Number.isFinite(value),selected=view.industry===name;return `<li data-daily-row="${escapeHTML(name)}"${name.toLocaleLowerCase().includes(query)?'':' hidden'}><button type="button" class="daily-allocation-row${selected?' active':''}" data-daily-industry="${escapeHTML(name)}" aria-pressed="${selected}" aria-label="${escapeHTML(name)}，${hasValue?pct(value,4):'没有结果'}，查看走势"><span class="daily-allocation-name"><i style="background:${reconstructionColor(name)}" aria-hidden="true"></i>${escapeHTML(name)}</span><span class="daily-allocation-track" aria-hidden="true">${hasValue?`<i class="daily-allocation-bar" style="width:${Math.max(0,Math.min(100,value*100))}%;background:${reconstructionColor(name)}"></i>`:''}</span><strong class="daily-allocation-value" title="${hasValue?pct(value,4):'没有结果'}" data-daily-value="${hasValue?value:''}">${hasValue?displayWeight(value):'—'}</strong></button></li>`;}).join('');
+  const value=view.industry&&view.point?view.point.groups[view.industry]:null;
+  const dateText=view.point?`正在查看 <strong>${escapeHTML(view.selected)}</strong>${view.point.date!==view.selected?`，对应最近一次结果 <strong>${escapeHTML(view.point.date)}</strong>`:''}`:`<strong>${escapeHTML(view.selected)}</strong> 没有可用估计；“—”不表示仓位为 0`;
+  return `<section class="daily-explorer">${intro}<p class="simulation-date-note">最近有结果的日期：<strong>${view.latest}</strong>${daily.end!==view.latest?`；此后暂缺估计，数据检查至 ${escapeHTML(daily.end)}`:''}。</p>
+    <div class="daily-explorer-controls"><label>时间范围 <select data-daily-range>${[['1','最近1年'],['3','最近3年'],['5','最近5年'],['all','全部历史']].map(([key,label])=>`<option value="${key}"${view.range===key?' selected':''}>${label}</option>`).join('')}</select></label><label>查看日期 <input type="date" data-daily-date min="${view.start}" max="${view.end}" value="${view.selected}"></label><div class="daily-date-buttons"><button type="button" data-daily-date-step="previous" data-daily-target-date="${view.previous}" aria-label="上一个有估计的日期"${view.previous?'':' disabled'}>上一日</button><button type="button" data-daily-date-step="next" data-daily-target-date="${view.next}" aria-label="下一个有估计的日期"${view.next?'':' disabled'}>下一日</button><button type="button" data-daily-date-step="latest" data-daily-target-date="${view.latest}" data-daily-target-range="${view.latest<view.start?'all':''}">最新</button></div></div>
+    <p class="daily-explorer-date" role="status">${dateText}。</p><div class="daily-explorer-layout"><article class="subpanel daily-explorer-chart"><div class="daily-chart-controls"><button type="button" data-daily-industry="" class="text-button${view.industry?'':' active'}" aria-pressed="${!view.industry}">整体配置</button><label>查看行业走势 <select data-daily-industry-select><option value="">整体配置</option>${daily.names.map(name=>`<option value="${escapeHTML(name)}"${name===view.industry?' selected':''}>${escapeHTML(name)}</option>`).join('')}</select></label></div><h3>${view.industry?`${escapeHTML(view.industry)}${Number.isFinite(value)?` · ${displayWeight(value)}`:''}`:'配置随时间的变化'}</h3><p class="simulation-chart-description">${view.industry?'纵轴是该行业或资产占基金净资产的比例。':'色带越厚，占比越大；估计为 20%，相当于每 100 元基金净资产约有 20 元投向这一类。债券在最上层。'}</p><div data-daily-chart>${chart}</div><p class="method-note">点图查看日期，也可用上方日期按钮。灰色或空白处没有结果，前后不会直接连线。</p></article>
+    <article class="subpanel daily-explorer-ranking"><h3>${view.point?`${view.point.date} · 配置明细`:'该日暂无配置明细'}</h3><p class="method-note">按占比从高到低排列，点击一行查看走势，向下滚动可查全部。</p><label class="daily-explorer-search">查找行业或资产 <input type="search" data-daily-search value="${escapeHTML(search)}" placeholder="例如：电子、医药、港股、债券" autocomplete="off"></label><p class="daily-search-count" data-daily-search-count role="status">显示 ${matching} / ${rows.length} 项，可滚动查看全部</p><ul class="daily-allocation-list" aria-label="当日配置，可滚动查看全部行业">${ranking}</ul><p class="empty-copy" data-daily-search-empty${matching?' hidden':''}>没有匹配的行业或资产，可缩短关键词。</p></article></div>
+    <details class="simulation-method"><summary>查看估计方法和没有结果的原因</summary><p>使用 Event-P Filter 逐日估计，比例均占基金净资产，没有重新归一到100%。港股和债券只估计总体比例，不能还原个股、个券。不同披露阶段分别计算，缺数据的时段不沿用旧值。休市日可对应最近一次有结果的日期。历史数据没有逐日留档，这些结果不等于当时保存的实盘预测。</p><p>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'未记录其他异常。')}</p></details></section>`;
+}
+
+function bindDailyFilterExplorer(target,daily,options,onChange) {
+  target.querySelector('[data-daily-range]')?.addEventListener('change',event=>onChange({range:event.target.value}));
+  target.querySelector('[data-daily-date]')?.addEventListener('change',event=>{if(event.target.value)onChange({date:event.target.value});});
+  target.querySelectorAll('[data-daily-date-step]').forEach(button=>button.addEventListener('click',()=>{if(button.dataset.dailyTargetDate)onChange({date:button.dataset.dailyTargetDate,...(button.dataset.dailyTargetRange?{range:button.dataset.dailyTargetRange}:{})});}));
+  target.querySelectorAll('[data-daily-industry]').forEach(button=>button.addEventListener('click',()=>onChange({industry:button.dataset.dailyIndustry})));
+  target.querySelector('[data-daily-industry-select]')?.addEventListener('change',event=>onChange({industry:event.target.value}));
+  target.querySelector('[data-daily-search]')?.addEventListener('input',event=>{
+    const search=event.target.value,query=search.trim().toLocaleLowerCase(),rows=[...target.querySelectorAll('[data-daily-row]')];let visible=0;
+    rows.forEach(row=>{row.hidden=!row.dataset.dailyRow.toLocaleLowerCase().includes(query);if(!row.hidden)visible++;});
+    const count=target.querySelector('[data-daily-search-count]'),empty=target.querySelector('[data-daily-search-empty]');
+    if(count)count.textContent=`显示 ${visible} / ${rows.length} 项，可滚动查看全部`;
+    if(empty)empty.hidden=visible>0;
+    onChange({search},false); // Keep the input node, caret and IME composition intact.
+  });
+  const svg=target.querySelector('[data-daily-chart]')?.querySelector('svg');
+  if(!svg||!daily)return;
+  svg.addEventListener('click',event=>{
+    const matrix=svg.getScreenCTM();if(!matrix)return;
+    const cursor=svg.createSVGPoint();cursor.x=event.clientX;cursor.y=event.clientY;
+    const local=cursor.matrixTransform(matrix.inverse()),width=svg.viewBox.baseVal.width,left=48,right=width-15;
+    if(local.x<left||local.x>right||local.y<32||local.y>280)return;
+    const view=dailyFilterViewModel(daily,options),stamp=Date.parse(view.start)+(local.x-left)/(right-left)*(Date.parse(view.end)-Date.parse(view.start));
+    const day=new Date(Math.round(stamp/86400000)*86400000).toISOString().slice(0,10);
+    const date=view.gaps.some(g=>day>=g.start&&day<=g.end)?day:view.visibleDates.reduce((best,d)=>!best||Math.abs(Date.parse(d)-stamp)<Math.abs(Date.parse(best)-stamp)?d:best,'');
+    if(date)onChange({date});
+  });
 }
 
 function bindCombinedEquitySimulation(target, current=null, historical=null, historicalError='', eventp=null, eventpError='', code=fundCode) {
   const params=new URLSearchParams(location.search);
   let mode=['comparison','eventp','history','current'].includes(params.get('simMode')) ? params.get('simMode') : 'comparison';
   let eventpDate=params.get('eventpDate')||'';
-  let researchToolsOpen=['history','current'].includes(mode);
+  let researchToolsOpen=mode!=='comparison';
   // Each model owns its loading state: a failed legacy pilot must not hide the daily Filter.
   const state = (value=null, error='') => ({value,error,pending:false});
-  const resources = {current:state(current),smoother:state(historical,historicalError),history:state(historical,historicalError),eventp:state(eventp,eventpError),daily:state()};
-  const loaders = {current:()=>loadEquitySimulation(code),smoother:()=>loadEquityReconstruction(code,false),history:()=>loadEquityReconstruction(code),eventp:()=>loadEquityEventP(code),daily:()=>loadFullFilterDaily(code)};
-  const dependencies = {comparison:['smoother','daily'],eventp:['eventp'],history:['history'],current:['current']};
-  const labels = {current:'旧试点',smoother:'历史复盘',history:'历史接续',eventp:'披露验证',daily:'逐日估计'};
+  const resources = {current:state(current),history:state(historical,historicalError),eventp:state(eventp,eventpError),daily:state()};
+  const loaders = {current:()=>loadEquitySimulation(code),history:()=>loadEquityReconstruction(code),eventp:()=>loadEquityEventP(code),daily:()=>loadFullFilterDaily(code)};
+  const dependencies = {comparison:['daily'],eventp:['eventp'],history:['history'],current:['current']};
+  const labels = {current:'旧试点',history:'历史接续',eventp:'披露验证',daily:'逐日估计'};
   const options={view:['1','2','3','stocks'].includes(params.get('historyView'))?params.get('historyView'):'1',range:['1','3','5','all'].includes(params.get('historyRange'))?params.get('historyRange'):'all',count:params.get('historyCount')==='all'?'all':'12',date:params.get('historyDate')||'',basis:params.get('simBasis')==='equity'?'equity':'nav'};
+  const dailyOptions={range:['1','3','5','all'].includes(params.get('historyRange'))?params.get('historyRange'):'1',date:params.get('historyDate')||'',industry:params.get('dailyIndustry')||'',search:params.get('dailySearch')||'',autoRange:!params.has('historyRange')&&!params.has('historyDate')};
   const ensure = (key, retry=false) => {
     const item=resources[key];
     if(item.pending || !retry && (item.value || item.error)) return;
@@ -3336,18 +3454,18 @@ function bindCombinedEquitySimulation(target, current=null, historical=null, his
   const ensureMode = () => dependencies[mode].forEach(key=>ensure(key));
   const errorPanel = key => `<article class="subpanel"><p class="empty-copy" role="alert">${escapeHTML(resources[key].error)}</p><button type="button" class="text-button" data-model-retry="${key}">重试${labels[key]}</button></article>`;
   const render=()=>{
-    const historical=resources.smoother.value;
     const history=resources.history.value;
     const current=resources.current.value;
     const eventp=resources.eventp.value;
     const daily=resources.daily.value;
     const meta=history?.index?.funds?.[code];
-    target.innerHTML=`<p class="simulation-hub-guide">日常查看配置与历史变化；完整持仓披露后，再检验估计误差。</p><div class="simulation-hub-primary simulation-tabs" role="group" aria-label="持仓研究模型"><button type="button" data-model-mode="comparison" class="simulation-hub-option ${mode==='comparison'?'active':''}" aria-pressed="${mode==='comparison'}"><span>每日估计与复盘</span><small class="simulation-hub-option-note">逐日行业配置与历史复盘对照</small></button><button type="button" data-model-mode="eventp" class="simulation-hub-option ${mode==='eventp'?'active':''}" aria-pressed="${mode==='eventp'}"><span>披露验证</span><small class="simulation-hub-option-note">披露后检验模型误差</small></button></div><details class="simulation-research-tools" data-research-tools${researchToolsOpen?' open':''}><summary>更多研究工具</summary><p class="method-note">独立研究口径，不与上方逐日估计混用。历史接续更新范围可能较短，旧试点以自身截止日期为准。</p><div class="simulation-tabs" role="group" aria-label="其他研究工具"><button type="button" data-model-mode="history" class="${mode==='history'?'active':''}" aria-pressed="${mode==='history'}">细行业与个股 · 历史接续</button><button type="button" data-model-mode="current" class="${mode==='current'?'active':''}" aria-pressed="${mode==='current'}">旧试点 · 无调仓对照</button></div><p class="method-note">历史接续可查看二、三级行业和候选个股；旧试点保留无调仓对照与披露后验真。请分别查看各自截止日期。</p></details><div data-model-content></div>`;
+    const tools=`<details class="simulation-research-tools" data-research-tools${researchToolsOpen?' open':''}><summary>更多研究工具</summary><div class="simulation-tabs" role="group" aria-label="其他研究工具"><button type="button" data-model-mode="eventp" class="${mode==='eventp'?'active':''}" aria-pressed="${mode==='eventp'}">披露验证</button><button type="button" data-model-mode="history" class="${mode==='history'?'active':''}" aria-pressed="${mode==='history'}">细行业与个股 · 历史接续</button><button type="button" data-model-mode="current" class="${mode==='current'?'active':''}" aria-pressed="${mode==='current'}">旧试点 · 无调仓对照</button></div><p class="method-note">这些是独立的研究结果，方法与截止日期可能不同。披露验证用于核对公布后的实际持仓；历史接续和旧试点保留原研究口径。</p></details>`;
+    target.innerHTML=mode==='comparison'?`<div data-model-content></div>${tools}`:`<button type="button" class="text-button daily-explorer-back" data-model-mode="comparison">返回每日估计</button>${tools}<div data-model-content></div>`;
     const body=target.querySelector('[data-model-content]');
     if(mode==='comparison') {
-      body.innerHTML=resources.daily.error ? errorPanel('daily') : fullFilterComparison(historical?.data,daily,{...options,smootherIssues:historical?.index?.funds?.[code]?.issues||[]});
-      if(resources.smoother.pending) body.innerHTML='<p class="empty-copy" role="status">Smoother 历史正在加载；每日 Filter 独立加载。</p>'+body.innerHTML;
-      if(resources.smoother.error) body.innerHTML=errorPanel('smoother')+body.innerHTML;
+      if(daily&&dailyOptions.autoRange){dailyOptions.range=dailyFilterViewModel(daily,dailyOptions).range;dailyOptions.autoRange=false;}
+      body.innerHTML=dailyFilterPanel(daily,{...dailyOptions,pending:resources.daily.pending},resources.daily.error);
+      bindDailyFilterExplorer(body,daily,dailyOptions,(changes,rerender=true)=>{Object.assign(dailyOptions,changes);if('range' in changes||'date' in changes)dailyOptions.autoRange=false;syncURL();if(rerender)render();});
     } else if(resources[mode].error) body.innerHTML=errorPanel(mode);
     else if(mode==='eventp') body.innerHTML=eventp?.index?eventPPanel(eventp.data,eventp.index,eventpDate):'<p class="empty-copy" role="status">正在加载披露期验证…</p>';
     else if(mode==='history') {
@@ -3357,12 +3475,26 @@ function bindCombinedEquitySimulation(target, current=null, historical=null, his
     else body.innerHTML='<p class="empty-copy" role="status">正在加载原试点对照…</p>';
     target.querySelector('[data-eventp-date]')?.addEventListener('change',e=>{eventpDate=e.target.value;update();});
     target.querySelector('[data-research-tools]')?.addEventListener('toggle',event=>{if(event.currentTarget.isConnected!==false)researchToolsOpen=event.currentTarget.open;});
-    target.querySelectorAll('[data-model-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.modelMode;if(['history','current'].includes(mode))researchToolsOpen=true;options.basis=new URLSearchParams(location.search).get('simBasis')==='equity'?'equity':'nav';update();}));
+    target.querySelectorAll('[data-model-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.modelMode;if(mode!=='comparison')researchToolsOpen=true;options.basis=new URLSearchParams(location.search).get('simBasis')==='equity'?'equity':'nav';update();}));
     target.querySelectorAll('[data-model-retry]').forEach(b=>b.addEventListener('click',()=>{ensure(b.dataset.modelRetry,true);render();}));
     target.querySelectorAll('[data-reconstruction-control]').forEach(c=>c.addEventListener('change',()=>{options[c.dataset.reconstructionControl]=c.value;update();}));
     if(mode==='history') target.querySelector('[data-simulation-basis]')?.addEventListener('change',e=>{options.basis=e.target.value==='equity'?'equity':'nav';update();});
   };
-  const update=()=>{const url=new URL(location.href);url.searchParams.set('simMode',mode);if(eventpDate)url.searchParams.set('eventpDate',eventpDate);for(const [k,v] of Object.entries(options))url.searchParams.set(k==='basis'?'simBasis':'history'+k[0].toUpperCase()+k.slice(1),v);history.replaceState(null,'',url);ensureMode();render();};
+  const syncURL=()=>{
+    const url=new URL(location.href);url.searchParams.set('simMode',mode);if(eventpDate)url.searchParams.set('eventpDate',eventpDate);
+    const active=mode==='comparison'?{...options,range:dailyOptions.range,date:dailyOptions.date}:options;
+    for(const [k,v] of Object.entries(active))url.searchParams.set(k==='basis'?'simBasis':'history'+k[0].toUpperCase()+k.slice(1),v);
+    for(const [key,value] of [['dailyIndustry',dailyOptions.industry],['dailySearch',dailyOptions.search]])value?url.searchParams.set(key,value):url.searchParams.delete(key);
+    history.replaceState(null,'',url);
+  };
+  const update=()=>{syncURL();ensureMode();render();};
+  bindCombinedEquitySimulation.resizeCleanup?.();
+  const narrowScreen=typeof window!=='undefined'&&window.matchMedia?.('(max-width: 760px)');
+  if(narrowScreen?.addEventListener){
+    const resize=()=>{if(target.isConnected===false){narrowScreen.removeEventListener('change',resize);return;}if(mode==='comparison')render();};
+    narrowScreen.addEventListener('change',resize);
+    bindCombinedEquitySimulation.resizeCleanup=()=>narrowScreen.removeEventListener('change',resize);
+  }
   ensureMode();
   render();
 }
@@ -3411,7 +3543,7 @@ function equitySimulationPanel(data, index, selectedDate, view, selectedIndustry
     const evidenceLabel = kind => kind === 'frozen_before_disclosure' ? '实际披露前留档' : kind === 'frozen_before_availability_actual_announcement_unverified' ? '可得日前留档，实际公告日待核验' : '事后补算';
     content = `<article class="subpanel"><h3>完整披露后的验真</h3>${evaluations.length ? table(['报告期','证据类型','行业误差↓','无调仓行业误差↓','具名股票误差↓'],evaluations.map(e=>`<tr><td>${escapeHTML(e.report_date)}</td><td>${evidenceLabel(e.evaluation_kind)}</td><td>${num(e.industry_half_l1_pp,1)}个百分点</td><td>${num(e.passive_industry_half_l1_pp,1)}个百分点</td><td>${num(e.stock_half_l1_pp,1)}个百分点</td></tr>`).join('')) : '<p class="simulation-warning">本批试点尚无同报告日的完整披露验证结果，暂不展示准确率或胜率。</p>'}
       <ol class="simulation-validation"><li>每日估计生成后，保留首次记录及输入版本；数据修订不能覆盖旧预测。</li><li>完整持仓公告后，用<strong>同一报告日</strong>的旧估计与真实持仓比较。季报前十大不能验真整个组合。</li><li>检查行业/股票误差、新股召回和无调仓对照，再更新未来画像；不回填旧预测。</li></ol><p class="method-note">误差采用 half-L1：各项仓位差绝对值合计的一半，越低越好。例如两个行业分别偏离 +5 和 -5 个百分点，误差为 5 个百分点。季度/半年末快照不能证明每天真实交易路径。</p></article>
-      <article class="subpanel"><h3>历史补算与 Smoother 的边界</h3><p>当前图表是从最近公开锚点补算的每日 Filter 路径，不代表每一天都在当时留档。本试点不混入使用后续完整持仓的 Smoother；网站“每日估计与复盘”另有双图展示，其研究结果不计入本试点在线成绩。</p><p class="method-note">首次留档：${escapeHTML(data.freeze.recorded_at.replace('T',' ').slice(0,19))}；记录估计日：${escapeHTML(data.as_of)}。${data.freeze.revision_since_first_freeze ? '输入发生修订，本页为重算展示，首次留档仍保留用于验真。' : '后续每个新增估计日单独留档。'}</p></article>`;
+      <article class="subpanel"><h3>历史补算与 Smoother 的边界</h3><p>当前图表是从最近公开锚点补算的每日 Filter 路径，不代表每一天都在当时留档。本试点不混入使用后续完整持仓的 Smoother；主入口单独提供全程每日估计，其结果不计入本试点在线成绩。</p><p class="method-note">首次留档：${escapeHTML(data.freeze.recorded_at.replace('T',' ').slice(0,19))}；记录估计日：${escapeHTML(data.as_of)}。${data.freeze.revision_since_first_freeze ? '输入发生修订，本页为重算展示，首次留档仍保留用于验真。' : '后续每个新增估计日单独留档。'}</p></article>`;
   } else {
     content = `<article class="subpanel"><div class="simulation-chart-toolbar"><h3>行业每日轨迹</h3><label>行业 <select data-simulation-industry>${names.map(name=>`<option value="${escapeHTML(name)}" ${name === industry ? 'selected' : ''}>${escapeHTML(name)}</option>`).join('')}</select></label></div>
       <div class="simulation-legend"><span class="estimated">模型估计</span><span class="passive">无调仓对照</span><span class="disclosed">${escapeHTML(data.anchor.report_date)} 披露锚点水平参照</span></div>${simulationLineChart(pointRows,industry,anchorWeight(data.anchor.industry[industry] || 0),basis)}
