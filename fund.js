@@ -17,6 +17,7 @@ const pureBondReferenceReadyCodes = new Set();
 const genericDetailPromises = new Map();
 let deepSamplePromise = null;
 const dashboardAssetPromises = new Map();
+const dataScriptPromises = new Map();
 const profileDetailPromises = new Map();
 const equityModelAssetPromises = new Map();
 const DASHBOARD_DATA_VERSION = 'history-v4-' + new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }).replaceAll("-", "");
@@ -38,33 +39,50 @@ const DASHBOARD_GLOBAL_ASSETS = {
   "active_equity_profiles.js": "FUND_ACTIVE_EQUITY_PROFILES",
 };
 
+// A failed connection gets one fresh attempt; malformed content stays an explicit error.
+function loadDataScript(src, label, read, failureMessage = "") {
+  if (dataScriptPromises.has(src)) return dataScriptPromises.get(src);
+  const promise = new Promise((resolve, reject) => {
+    let attempt = 0;
+    const start = () => {
+      attempt += 1;
+      const script = document.createElement("script");
+      let settled = false;
+      const finish = (error, retryable = false) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        script.onload = script.onerror = null;
+        script.remove();
+        if (error) {
+          if (retryable && attempt < 2) return start();
+          reject(error);
+          return;
+        }
+        try { resolve(read()); } catch (invalid) { reject(invalid); }
+      };
+      const timer = setTimeout(() => finish(new Error(`${label} 加载超时，已尝试 ${attempt} 次，请重试`), true), 20000);
+      // A removed script may leave its fetch in flight; give the retry a fresh URL.
+      script.src = attempt === 1 ? src : `${src}${src.includes('?') ? '&' : '?'}_retry=${attempt}-${Date.now()}`;
+      script.onload = () => finish();
+      script.onerror = () => finish(new Error(failureMessage || `${label} 加载失败，已尝试 ${attempt} 次，请检查网络后重试`), true);
+      document.head.appendChild(script);
+    };
+    start();
+  }).finally(() => { dataScriptPromises.delete(src); });
+  dataScriptPromises.set(src, promise);
+  return promise;
+}
+
 function loadDashboardAsset(filename) {
   const globalName = DASHBOARD_GLOBAL_ASSETS[filename];
   if (!globalName) return Promise.reject(new Error(`不允许加载未知公共对象：${filename}`));
   if (window[globalName]) return Promise.resolve(window[globalName]);
   if (dashboardAssetPromises.has(filename)) return dashboardAssetPromises.get(filename);
-  const promise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    let settled = false;
-    const finish = (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      script.onload = script.onerror = null;
-      script.remove();
-      error ? reject(error) : resolve(window[globalName]);
-    };
-    const timer = setTimeout(() => finish(new Error(`${filename} 加载超时，请重试`)), 20000);
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${filename}?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => window[globalName]
-      ? finish()
-      : finish(new Error(`${filename} 未生成有效内容`));
-    script.onerror = () => finish(new Error(`${filename} 加载失败，请重试`));
-    document.head.appendChild(script);
-  }).catch((error) => {
-    dashboardAssetPromises.delete(filename);
-    throw error;
-  });
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${filename}?v=${DASHBOARD_DATA_VERSION}`, filename, () => {
+    if (!window[globalName]) throw new Error(`${filename} 未生成有效内容`);
+    return window[globalName];
+  }).catch((error) => { dashboardAssetPromises.delete(filename); throw error; });
   dashboardAssetPromises.set(filename, promise);
   return promise;
 }
@@ -75,26 +93,9 @@ function loadPureBondReferenceAsset(relativePath, ready) {
   }
   if (ready()) return Promise.resolve();
   if (pureBondReferenceAssetPromises.has(relativePath)) return pureBondReferenceAssetPromises.get(relativePath);
-  const promise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    let settled = false;
-    const finish = (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      script.onload = script.onerror = null;
-      script.remove();
-      error ? reject(error) : resolve();
-    };
-    const timer = setTimeout(() => finish(new Error(`${relativePath} 加载超时，请重试`)), 20000);
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${relativePath}?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => ready() ? finish() : finish(new Error(`${relativePath} 未生成有效内容`));
-    script.onerror = () => finish(new Error(`${relativePath} 加载失败，请重试`));
-    document.head.appendChild(script);
-  }).catch((error) => {
-    pureBondReferenceAssetPromises.delete(relativePath);
-    throw error;
-  });
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${relativePath}?v=${DASHBOARD_DATA_VERSION}`, relativePath, () => {
+    if (!ready()) throw new Error(`${relativePath} 未生成有效内容`);
+  }).catch((error) => { pureBondReferenceAssetPromises.delete(relativePath); throw error; });
   pureBondReferenceAssetPromises.set(relativePath, promise);
   return promise;
 }
@@ -266,14 +267,9 @@ function loadProfileDetails(code) {
   if (!/^\d{6}\.(?:OF|SH|SZ)$/.test(code)) return Promise.reject(new Error("画像基金代码无效"));
   if (window.FUND_PROFILE_DETAILS?.[code]) return Promise.resolve(window.FUND_PROFILE_DETAILS[code]);
   if (profileDetailPromises.has(code)) return profileDetailPromises.get(code);
-  const promise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    const timer = setTimeout(() => { script.remove(); reject(new Error("画像加载超时，请重试")); }, 20000);
-    const finish = (error) => { clearTimeout(timer); error ? reject(error) : resolve(window.FUND_PROFILE_DETAILS[code]); };
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/profile_details/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => finish(window.FUND_PROFILE_DETAILS?.[code] ? null : new Error("画像数据缺失"));
-    script.onerror = () => finish(new Error("画像暂未加载，请重试"));
-    document.head.appendChild(script);
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/profile_details/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, "画像", () => {
+    if (!window.FUND_PROFILE_DETAILS?.[code]) throw new Error("画像数据缺失");
+    return window.FUND_PROFILE_DETAILS[code];
   }).catch(error => { profileDetailPromises.delete(code); throw error; });
   profileDetailPromises.set(code, promise);
   return promise;
@@ -2941,24 +2937,7 @@ function loadEquityModelAsset(directory, globalName, code, label, validate = nul
     catch (_) { delete window[globalName][code]; }
   }
   if (equityModelAssetPromises.has(key)) return equityModelAssetPromises.get(key);
-  const promise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    let settled = false;
-    const finish = (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      script.onload = script.onerror = null;
-      script.remove();
-      if (error) return reject(error);
-      try { resolve(read()); } catch (invalid) { reject(invalid); }
-    };
-    const timer = setTimeout(() => finish(new Error(`${label} 加载超时，请重试`)), 20000);
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${directory}/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => finish();
-    script.onerror = () => finish(new Error(`${label} 加载失败，请检查网络后重试`));
-    document.head.appendChild(script);
-  }).catch(error => {
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${directory}/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, label, read).catch(error => {
     if (window[globalName]) delete window[globalName][code];
     throw error;
   }).finally(() => { equityModelAssetPromises.delete(key); });
@@ -5522,14 +5501,9 @@ function loadCorrelationMetrics(code) {
   }
   const shardName = `shard-${String(hash % CORRELATION_SHARD_COUNT).padStart(3, "0")}`;
   if (correlationMetricsPromises.has(shardName)) return correlationMetricsPromises.get(shardName);
-  const promise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/correlations/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => window.FUND_CORRELATION_METRICS?.funds?.[code]
-      ? resolve(window.FUND_CORRELATION_METRICS)
-      : reject(new Error("相关性数据脚本未生成有效内容"));
-    script.onerror = () => reject(new Error("相关性数据加载失败，请检查网络后重试"));
-    document.head.appendChild(script);
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/correlations/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, "相关性数据", () => {
+    if (!window.FUND_CORRELATION_METRICS?.funds?.[code]) throw new Error("相关性数据脚本未生成有效内容");
+    return window.FUND_CORRELATION_METRICS;
   }).catch((error) => {
     correlationMetricsPromises.delete(shardName);
     throw error;
@@ -6013,8 +5987,10 @@ function createGenericTabLoader(fund, detail) {
     if (id === "correlation") {
       const errors = await loadCorrelationPanelData(fund);
       target.innerHTML = genericCorrelationPanel(fund, errors);
+      const incomplete = Boolean(errors.correlation || errors.profile);
+      if (incomplete) target.innerHTML += '<button type="button" class="button" data-tab-data-retry>重新加载未完成的数据</button>';
       bindGenericCorrelation(fund);
-      return;
+      return !incomplete;
     }
     if (id === "attribution") {
       if (fund.category === "pure-bond") {
@@ -6037,7 +6013,7 @@ function createGenericTabLoader(fund, detail) {
     }
   };
 
-  return async (id) => {
+  return async function loadTab(id) {
     if (loadedTabs.has(id)) return;
     const target = document.querySelector(`[data-panel="${id}"]`);
     if (!target || target.dataset.loading === "true") return;
@@ -6046,10 +6022,12 @@ function createGenericTabLoader(fund, detail) {
     const state = target.querySelector(".empty-copy");
     if (state) state.textContent = "正在加载本页签数据…";
     try {
-      await renderTab(id);
-      loadedTabs.add(id);
+      const complete = await renderTab(id);
+      if (complete !== false) loadedTabs.add(id);
+      else target.querySelector("[data-tab-data-retry]")?.addEventListener("click", () => loadTab(id));
     } catch (error) {
-      target.innerHTML = genericTabLoadingPanel(`${error.message}。再次切换本页签可重试`);
+      target.innerHTML = genericTabLoadingPanel(`${error.message}。可点击重试或再次切换本页签`) + '<button type="button" class="button" data-tab-data-retry>重新加载本页数据</button>';
+      target.querySelector("[data-tab-data-retry]")?.addEventListener("click", () => loadTab(id));
     } finally {
       delete target.dataset.loading;
       target.removeAttribute("aria-busy");
@@ -6225,19 +6203,31 @@ function renderPureBondReferenceFund(fund, detail, currentDuration) {
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
     <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span><span class="tag">份额已合并</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
+    ${detail?.pure_bond_duration_error ? `<p class="simulation-warning" role="status">最新日频久期未能加载，其他数据仍可查看。${escapeHTML(detail.pure_bond_duration_error)} 刷新页面可重试。</p>` : ""}
     <section class="fund-page-metrics">${overviewMetrics}</section>
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
     <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
     <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>披露持仓是报告期快照，不代表实时持仓；研究结果不构成投资建议。</li></ul></section>`;
   const loadedTabs = new Set(["perf", "alloc", "bond", "corr", "campisi"]);
   prepareResearchOverview(fund, detail);
-  bindTabs(async (id) => {
+  const loadDocuments = async (id) => {
     if (id !== "documents" || loadedTabs.has(id)) return;
     const target = document.querySelector('[data-panel="documents"]');
-    if (!target) return;
-    target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
-    loadedTabs.add(id);
-  });
+    if (!target || target.dataset.loading === "true") return;
+    target.dataset.loading = "true";
+    target.setAttribute("aria-busy", "true");
+    try {
+      target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
+      loadedTabs.add(id);
+    } catch (error) {
+      target.innerHTML = genericTabLoadingPanel(error.message) + '<button type="button" class="button" data-tab-data-retry>重新加载公告</button>';
+      target.querySelector("[data-tab-data-retry]")?.addEventListener("click", () => loadDocuments(id));
+    } finally {
+      delete target.dataset.loading;
+      target.removeAttribute("aria-busy");
+    }
+  };
+  bindTabs(loadDocuments);
   bindPureBondReferenceInteractions();
   window.__PB.ensureDurKF(reference.code, () => {
     try { window.__PB.refreshDurKF(); } catch (_error) {}
@@ -6326,6 +6316,7 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
     <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span><span class="tag">份额已合并</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
     ${detail?.pure_bond_reference_error ? `<p class="simulation-warning" role="status">纯债详细分析数据加载失败，已显示通用研究报告。${escapeHTML(detail.pure_bond_reference_error)} <button type="button" class="button" data-pure-bond-retry>重新加载完整分析</button></p>` : ""}
+    ${detail?.pure_bond_duration_error ? `<p class="simulation-warning" role="status">最新日频久期未能加载，其他数据仍可查看。${escapeHTML(detail.pure_bond_duration_error)} 刷新页面可重试。</p>` : ""}
     <section class="fund-page-metrics">${overviewMetrics}</section>
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
     <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
@@ -6396,28 +6387,10 @@ function normalizeGenericHoldingHistory(raw) {
 function loadGenericDetail(code) {
   if (window.FUND_DETAIL_DATA?.[code]) return Promise.resolve(window.FUND_DETAIL_DATA[code]);
   if (genericDetailPromises.has(code)) return genericDetailPromises.get(code);
-  const promise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    let settled = false;
-    const finish = (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      script.onload = script.onerror = null;
-      script.remove();
-      error ? reject(error) : resolve(window.FUND_DETAIL_DATA[code]);
-    };
-    const timer = setTimeout(() => finish(new Error(`${code} 净值详情加载超时，请重试`)), 20000);
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/funds/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => window.FUND_DETAIL_DATA?.[code]
-      ? finish()
-      : finish(new Error(`${code} 净值详情未生成有效内容，请重试`));
-    script.onerror = () => finish(new Error(`${code} 净值详情加载失败，请重试`));
-    document.head.appendChild(script);
-  }).catch((error) => {
-    genericDetailPromises.delete(code);
-    throw error;
-  });
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/funds/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 净值详情`, () => {
+    if (!window.FUND_DETAIL_DATA?.[code]) throw new Error(`${code} 净值详情未生成有效内容，请重试`);
+    return window.FUND_DETAIL_DATA[code];
+  }).catch((error) => { genericDetailPromises.delete(code); throw error; });
   genericDetailPromises.set(code, promise);
   return promise;
 }
@@ -6433,24 +6406,9 @@ function loadDeepSampleData() {
   }
   if (window.FUND_DEEP_SAMPLE_DATA) return Promise.resolve(window.FUND_DEEP_SAMPLE_DATA);
   if (deepSamplePromise) return deepSamplePromise;
-  deepSamplePromise = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    let settled = false;
-    const finish = (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      script.onload = script.onerror = null;
-      script.remove();
-      error ? reject(error) : resolve(window.FUND_DEEP_SAMPLE_DATA);
-    };
-    const timer = setTimeout(() => finish(new Error("深度样本数据加载超时，请重试")), 20000);
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/deep_samples.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => window.FUND_DEEP_SAMPLE_DATA
-      ? finish()
-      : finish(new Error("深度样本数据脚本未生成有效内容"));
-    script.onerror = () => finish(new Error("深度样本数据加载失败，请重试"));
-    document.head.appendChild(script);
+  deepSamplePromise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/deep_samples.js?v=${DASHBOARD_DATA_VERSION}`, "深度样本数据", () => {
+    if (!window.FUND_DEEP_SAMPLE_DATA) throw new Error("深度样本数据脚本未生成有效内容");
+    return window.FUND_DEEP_SAMPLE_DATA;
   }).catch((error) => {
     deepSamplePromise = null;
     throw error;
@@ -6460,14 +6418,9 @@ function loadDeepSampleData() {
 
 function loadHoldingCharacteristicDates(dates) {
   return Promise.all([...new Set(dates.filter(Boolean))].map((date) => {
-      if (window.FUND_HOLDING_CHARACTERISTICS?.[date]) return Promise.resolve();
-      return new Promise((resolve) => {
-        const script = document.createElement("script");
-        script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`;
-        script.onload = script.onerror = () => resolve();
-        document.head.appendChild(script);
-      });
-    }));
+    if (window.FUND_HOLDING_CHARACTERISTICS?.[date]) return Promise.resolve();
+    return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`, `${date} 持仓特征`, () => window.FUND_HOLDING_CHARACTERISTICS?.[date] || null);
+  }));
 }
 
 function hydrateHoldingPeriodCharacteristics(period) {
@@ -6496,13 +6449,7 @@ function loadGenericHoldingHistory(code) {
     return loadHoldingCharacteristicDates(latestDates).then(() => normalizeGenericHoldingHistory(raw));
   };
   if (window.FUND_HOLDING_HISTORY?.[code]) return loadCharacteristics(window.FUND_HOLDING_HISTORY[code]);
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holdings/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => loadCharacteristics(window.FUND_HOLDING_HISTORY?.[code]).then(resolve);
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holdings/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 持仓历史`, () => window.FUND_HOLDING_HISTORY?.[code] || null).then(loadCharacteristics);
 }
 
 function loadGenericStockPrice(code) {
@@ -6513,13 +6460,7 @@ function loadGenericStockPrice(code) {
     if (window.FUND_STOCK_PRICE_SERIES?.[code]) {
       return Promise.resolve(normalize(window.FUND_STOCK_PRICE_SERIES[code]));
     }
-    return new Promise((resolve) => {
-      const script = document.createElement("script");
-      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-      script.onload = () => resolve(normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
-      script.onerror = () => resolve([]);
-      document.head.appendChild(script);
-    });
+    return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 股票行情`, () => normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
   };
   let hash = 2166136261;
   for (let index = 0; index < code.length; index += 1) {
@@ -6535,12 +6476,9 @@ function loadGenericStockPrice(code) {
       normalize({ prices: payload?.prices?.[code] || [] })
     ));
   } else {
-    const shardPromise = new Promise((resolve) => {
-      const script = document.createElement("script");
-      script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_price_updates/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`;
-      script.onload = () => resolve(window.FUND_STOCK_PRICE_UPDATES?.[shardName] || null);
-      script.onerror = () => resolve(null);
-      document.head.appendChild(script);
+    const shardPromise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_price_updates/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, `股票行情增量 ${shardName}`, () => window.FUND_STOCK_PRICE_UPDATES?.[shardName] || null).catch((error) => {
+      stockPriceUpdatePromises.delete(shardName);
+      throw error;
     });
     stockPriceUpdatePromises.set(shardName, shardPromise);
     updatePromise = shardPromise.then((payload) => (
@@ -6568,13 +6506,7 @@ function loadGenericHeavyStockTrends(code, detail) {
     return { ...value, stocks };
   };
   if (window.FUND_HEAVY_STOCK_TRENDS?.[code]) return normalize(window.FUND_HEAVY_STOCK_TRENDS[code]);
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/heavy_stock/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => normalize(window.FUND_HEAVY_STOCK_TRENDS?.[code]).then(resolve);
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/heavy_stock/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 重仓股走势`, () => window.FUND_HEAVY_STOCK_TRENDS?.[code] || null).then(normalize);
 }
 
 function enrichDeepHoldingCharacteristics(analysis) {
@@ -6635,25 +6567,15 @@ function normalizeGenericBondHistory(raw) {
 }
 
 function loadGenericBondHistory(code) {
-  if (window.FUND_BOND_HISTORY?.[code]) return Promise.resolve(normalizeGenericBondHistory(window.FUND_BOND_HISTORY[code]));
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_history/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => resolve(normalizeGenericBondHistory(window.FUND_BOND_HISTORY?.[code]));
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
+  const read = () => { const value = window.FUND_BOND_HISTORY?.[code]; return normalizeGenericBondHistory(value); };
+  if (window.FUND_BOND_HISTORY?.[code]) return Promise.resolve(read());
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_history/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 债券持仓`, read);
 }
 
 function loadPureBondKalmanDuration(code) {
-  if (window.FUND_PURE_BOND_DURATION?.[code]) return Promise.resolve(window.FUND_PURE_BOND_DURATION[code]);
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_duration/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => resolve(window.FUND_PURE_BOND_DURATION?.[code] || null);
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
+  const read = () => { const value = window.FUND_PURE_BOND_DURATION?.[code]; return value || null; };
+  if (window.FUND_PURE_BOND_DURATION?.[code]) return Promise.resolve(read());
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_duration/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 日频久期`, read);
 }
 
 function loadPureBondResearch(code) {
@@ -6665,37 +6587,24 @@ function loadPureBondResearch(code) {
   if (pureBondResearchPromises.has(shard)) {
     return pureBondResearchPromises.get(shard).then(() => window.FUND_PURE_BOND_RESEARCH?.[shard]?.[code] || null);
   }
-  const promise = new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => resolve(window.FUND_PURE_BOND_RESEARCH?.[shard] || null);
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js?v=${DASHBOARD_DATA_VERSION}`, `纯债研究 ${shard}`, () => window.FUND_PURE_BOND_RESEARCH?.[shard] || null).catch((error) => {
+    pureBondResearchPromises.delete(shard);
+    throw error;
   });
   pureBondResearchPromises.set(shard, promise);
   return promise.then(() => window.FUND_PURE_BOND_RESEARCH?.[shard]?.[code] || null);
 }
 
 function loadGenericDocuments(code) {
-  if (window.FUND_DOCUMENTS?.[code]) return Promise.resolve(window.FUND_DOCUMENTS[code]);
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/documents/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => resolve(window.FUND_DOCUMENTS?.[code] || null);
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
+  const read = () => { const value = window.FUND_DOCUMENTS?.[code]; return value || null; };
+  if (window.FUND_DOCUMENTS?.[code]) return Promise.resolve(read());
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/documents/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 公告`, read);
 }
 
 function loadGenericCampisi(code) {
-  if (window.FUND_CAMPISI?.[code]) return Promise.resolve(window.FUND_CAMPISI[code]);
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => resolve(window.FUND_CAMPISI?.[code] || null);
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
+  const read = () => { const value = window.FUND_CAMPISI?.[code]; return value || null; };
+  if (window.FUND_CAMPISI?.[code]) return Promise.resolve(read());
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} Campisi归因`, read);
 }
 
 function normalizeGenericBrinson(raw) {
@@ -6715,25 +6624,15 @@ function normalizeGenericBrinson(raw) {
 }
 
 function loadGenericBrinson(code) {
-  if (window.FUND_BRINSON?.[code]) return Promise.resolve(normalizeGenericBrinson(window.FUND_BRINSON[code]));
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/brinson/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => resolve(normalizeGenericBrinson(window.FUND_BRINSON?.[code]));
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
+  const read = () => { const value = window.FUND_BRINSON?.[code]; return normalizeGenericBrinson(value); };
+  if (window.FUND_BRINSON?.[code]) return Promise.resolve(read());
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/brinson/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} Brinson归因`, read, `${code} Brinson归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
 }
 
 function loadGenericMultiAssetAttribution(code) {
-  if (window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]) return Promise.resolve(window.FUND_MULTI_ASSET_ATTRIBUTION[code]);
-  return new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = `https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`;
-    script.onload = () => resolve(window.FUND_MULTI_ASSET_ATTRIBUTION?.[code] || null);
-    script.onerror = () => resolve(null);
-    document.head.appendChild(script);
-  });
+  const read = () => { const value = window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]; return value || null; };
+  if (window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]) return Promise.resolve(read());
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 多资产归因`, read, `${code} 多资产归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
 }
 
 function bindGenericBrinson(brinson) {
@@ -6790,7 +6689,10 @@ if (!fundId && !fundCode) {
             genericDetail.pure_bond_reference_error = error.message;
             return null;
           }),
-          loadPureBondKalmanDuration(catalogFund.code).catch(() => null),
+          loadPureBondKalmanDuration(catalogFund.code).catch((error) => {
+            genericDetail.pure_bond_duration_error = error.message;
+            return null;
+          }),
         ]);
         pureBondDuration = currentDuration;
       }

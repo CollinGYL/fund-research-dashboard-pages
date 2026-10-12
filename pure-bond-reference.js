@@ -670,50 +670,71 @@ function getRank(d){
 }
 function getCorr(d){
   if(d.corr&&d.corr.windows)return d.corr;
-  const S=window.CORR_SNAP;return (S&&S[d.code])||null;
+  const value=window.CORR_SNAP?.[d.code];return value&&value.windows&&typeof value.windows==="object"?value:null;
 }
 /* corr 分片按需加载:只在打开"相关性"tab 时拉本基金所在的那一片(约 640 KB),
    首屏不载 —— 这是路径B的另一半收益(首屏 192->165 KB)。 */
-function ensureCorrShard(code,cb){
-  if(window.CORR_SNAP&&window.CORR_SNAP[code])return cb(true);
-  // ★2026-08-08 修正:原来按 code.slice(0,3) 分片,一片装几十只基金(最大5MB),
-  // 而页面一次只看一只 —— 实测浪费 76 倍。改成一只一个文件。
-  let sc=document.querySelector(`script[data-corr="${code}"]`);
-  if(!sc){
-    sc=document.createElement("script");
-    sc.src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_corr/"+code+".js?v="+Date.now();
-    sc.dataset.corr=code;
-    sc.onerror=()=>{sc.dataset.failed="1";};
+// Keep this renderer usable without fund.js. Share only in-flight requests;
+// failed attempts release their script/timer so an explicit retry can recover.
+const PB_SHARD_LOADS=new Map();
+function loadPBShard(kind,code,src,read,cb){
+  const cached=read();
+  if(cached){cb(cached,null);return;}
+  const key=kind+":"+code,active=PB_SHARD_LOADS.get(key);
+  if(active?.status==="pending"){active.callbacks.push(cb);return;}
+  const state={status:"pending",error:null,callbacks:[cb]};
+  PB_SHARD_LOADS.set(key,state);
+  let attempts=0;
+  const finish=(value,error)=>{
+    if(PB_SHARD_LOADS.get(key)!==state||state.status!=="pending")return;
+    state.status=error?"error":"ready";state.error=error;
+    const callbacks=state.callbacks.splice(0);
+    callbacks.forEach(fn=>fn(value,error));
+  };
+  const attempt=()=>{
+    if(PB_SHARD_LOADS.get(key)!==state||state.status!=="pending")return;
+    const available=read();if(available){finish(available,null);return;}
+    attempts++;
+    // A previous renderer may have left a failed node behind.
+    document.querySelector(`script[data-${kind}="${code}"]`)?.remove();
+    const sc=document.createElement("script");
+    sc.dataset[kind]=code;sc.src=src+"?v="+Date.now();
+    let ended=false,timer;
+    const settle=(error,retryable=false)=>{
+      if(ended)return;ended=true;
+      clearTimeout(timer);sc.onload=null;sc.onerror=null;sc.remove();
+      if(PB_SHARD_LOADS.get(key)!==state||state.status!=="pending")return;
+      if(error&&retryable&&attempts<2){setTimeout(attempt,500);return;}
+      finish(error?null:read(),error);
+    };
+    sc.onload=()=>settle(read()?null:new Error("文件已加载，但未取得有效数据："+src));
+    sc.onerror=()=>settle(new Error("网络加载失败："+src),true);
+    timer=setTimeout(()=>settle(new Error("数据加载超时："+src),true),20000);
     document.head.appendChild(sc);
-  }
-  let n=0;
-  (function poll(){
-    if(window.CORR_SNAP&&window.CORR_SNAP[code])return cb(true);
-    if(sc.dataset.failed||++n>200)return cb(false);
-    setTimeout(poll,40);
-  })();
+  };
+  attempt();
+}
+function pbShardFailure(kind,code,label){
+  const error=PB_SHARD_LOADS.get(kind+":"+code)?.error;
+  return `<div class="method-note" role="alert"><b>${esc(label)}未能加载。</b>暂时不能据此判断是否有研究结果，未加载不表示数值为零。<br>${esc(error?.message||"请稍后重试。")} <button type="button" class="text-button" data-pb-retry="${kind}" data-pb-code="${esc(code)}">重新加载${esc(label)}</button></div>`;
+}
+function ensureCorrShard(code,cb){
+  loadPBShard("corr",code,"https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_corr/"+code+".js",()=>{
+    const value=window.CORR_SNAP?.[code];return value&&value.windows&&typeof value.windows==="object"?value:null;
+  },(value,error)=>cb(!!value,error));
 }
 /* ===== 久期日频拟合（卡尔曼）=====
    数据源：纯债基金-久期高频拟合-卡尔曼-仅观测净值/10_全市场全量池_无筛除/
    口径与该文件夹的卡尔曼页一致（Q=3e-4、只用日频净值一条观测通道、120交易日预热），
    唯一差别是样本池不做任何类型筛除（摊余成本/持转债/定开封闭/规模门槛全部不剔），
    因为这个模块要覆盖选择器里的每一只纯债基金。分片按 corr 的路径B约定,一只一文件。 */
+function durKFData(code){
+  const value=window.DURKF_STORE?.[code];
+  return value&&Array.isArray(value.dates)&&Array.isArray(value.dur)&&value.dates.length===value.dur.length&&value.meta?value:null;
+}
 function ensureDurKF(code,cb){
-  if(window.DURKF_STORE&&window.DURKF_STORE[code])return cb(true);
-  let sc=document.querySelector(`script[data-durkf="${code}"]`);
-  if(!sc){
-    sc=document.createElement("script");
-    sc.src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_durkf/"+code+".js?v="+Date.now();
-    sc.dataset.durkf=code;
-    sc.onerror=()=>{sc.dataset.failed="1";};
-    document.head.appendChild(sc);
-  }
-  let n=0;
-  (function poll(){
-    if(window.DURKF_STORE&&window.DURKF_STORE[code])return cb(true);
-    if(sc.dataset.failed||++n>200)return cb(false);
-    setTimeout(poll,40);
-  })();
+  if(!window.DURKF_STORE?.[code]&&window.DURKF_MISS?.[code]){cb(false,null);return;}
+  loadPBShard("durkf",code,"https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_durkf/"+code+".js",()=>durKFData(code),(value,error)=>cb(!!value,error));
 }
 /* 真值点落在报告期末日,模型只在交易日有值 —— 取该日或之前最近的一个交易日(10天内)配对 */
 function durKFPair(K){
@@ -731,10 +752,11 @@ function durKFPair(K){
   return out;
 }
 function durKFBlock(d){
-  const K=(window.DURKF_STORE||{})[d.code];
+  const K=durKFData(d.code);
   if(!K){
     const why=(window.DURKF_MISS||{})[d.code];
     return why?`<div class="method-note"><b>本基金没有日频久期估计。</b>${esc(why)}</div>`
+              :PB_SHARD_LOADS.get("durkf:"+d.code)?.status==="error"?pbShardFailure("durkf",d.code,"久期日频拟合数据")
               :`<div class="method-note">久期日频拟合数据加载中…</div>`;
   }
   const line=K.dates.map((dt,i)=>[dt,K.dur[i]]);
@@ -986,30 +1008,21 @@ const CWL={"1m":"近1月","2m":"近2月","3m":"近3月","6m":"近6月","ytd":"�
 function renderCorr(d){
   let fundHtml=`<div class="method-note">无相关性数据</div>`;
   const CO=getCorr(d);
-  // ★2026-08-08 修复(多agent验证发现,我自己的浏览器实测漏掉了——只测了有数据的基金):
-  //   原来只处理 ok=true,ok=false 时什么都不写,占位文案就【永久停在"加载中"】。
-  //   实测受影响 197 只(2457-2260),合计规模 8953 亿,其中 179 只是定开/持有期/封闭基金。
-  //   这些基金【本来就该没有相关性数据】——净值披露稀疏,重叠观测数过不了 min_obs 门槛
-  //   (build_panel.py:182 `if len(valid) < CORR_TOP_N: continue`,整只不落表),
-  //   是正确的数据判断;错的是前端把"没有数据"显示成了"正在加载"。
-  //   注:只坏左栏,右栏"与其他指数相关性"数据在基金 js 里、一直正常 —— 半边有数据反而
-  //   让人更容易把左边当成"还在转",所以必须给明确文案而不是静默。
-  if(!CO&&d.code&&window.__CORR_MISS!==d.code){
-    setTimeout(()=>ensureCorrShard(d.code,ok=>{
-      const panel=document.querySelector('.fund-tab-panel[data-panel="corr"]');
-      if(!panel||!CURRENT||CURRENT.code!==d.code)return;
-      if(!ok)window.__CORR_MISS=d.code;        // 标记已知缺失,重渲染时不再进异步分支
-      panel.innerHTML=renderCorr(CURRENT);     // ★成功失败都要重渲染
-    }),0);
-    fundHtml=`<div class="loading-state">加载相关性数据 …</div>`;
-  }else if(!CO){
-    fundHtml=`<div class="method-note">
-      <b>本基金无同类相关性数据。</b>该模块要求候选基金与本基金在窗口内有足够的<b>重叠交易日</b>
-      （不低于窗口交易日数的 60%），且有效候选不少于 15 只，否则不出榜单。<br>
-      <b>常见原因</b>：定期开放 / 持有期 / 封闭式基金的净值<b>披露稀疏</b>，与全市场日频基金的重叠观测天然不足。
-      全池 2457 只中有 <b>197 只</b>属于此类（其中 179 只名称含定开/持有/封闭字样）。<br>
-      这是<b>样本不足时不出结果</b>的设计，不是数据缺失或加载失败。右侧「与其他指数相关性」不受影响。
-    </div>`;
+  // A transport failure cannot establish that the fund has no research result.
+  if(!CO&&d.code){
+    if(PB_SHARD_LOADS.get("corr:"+d.code)?.status==="error"){
+      fundHtml=pbShardFailure("corr",d.code,"相关性数据");
+    }else{
+      setTimeout(()=>{
+        const panel=document.querySelector('.fund-tab-panel[data-panel="corr"]');
+        if(!panel||CURRENT!==d)return;
+        ensureCorrShard(d.code,()=>{
+          if(CURRENT!==d||document.querySelector('.fund-tab-panel[data-panel="corr"]')!==panel)return;
+          panel.innerHTML=renderCorr(CURRENT);
+        });
+      },0);
+      fundHtml=`<div class="loading-state">加载相关性数据 …</div>`;
+    }
   }
   if(CO&&CO.windows){
     const wins=Object.keys(CO.windows).filter(k=>CO.windows[k].pos&&CO.windows[k].pos.length);
@@ -1382,6 +1395,7 @@ function renderCampisi(d){
    ★β 与同类池无关——β 是本基金对五因子回归的结果,只有"分位"才需要池子。
      所以对比不涉及池子口径,两只基金即使不同子类也能比 β(但要标注分类)。 */
 let CMP=null;                      // 对比基金的 payload
+let cmpRequest=0;                  // Ignore an older selection after another query/clear.
 function comparePanel(d){
   const opts=(typeof FUNDS_LIST!=="undefined"?FUNDS_LIST:[]).length;
   // ★2026-08-08 用户反馈:原来必须先敲一只基金才有东西看,不友好。
@@ -1422,6 +1436,7 @@ function cmpCandidates(q){
   return L.filter(f=>f.code.toLowerCase().includes(s)||(f.name||"").toLowerCase().includes(s)).slice(0,12);
 }
 function clearCompare(){
+  cmpRequest++;
   CMP=null;
   const box=document.getElementById("cmpBox"), sel=document.getElementById("cmpSel");
   if(box)box.value=""; if(sel)sel.value="";
@@ -1446,16 +1461,23 @@ function wireCmpBox(){
   });
 }
 function doCompare(){
+  const request=++cmpRequest,current=CURRENT;
   const box=document.getElementById("cmpBox");
   if(!box)return;
   const raw=box.value.trim();
   const hit=cmpCandidates(raw)[0];
   const code=(raw.match(/^\d{6}\.[A-Z]{2}$/)?raw:(hit?hit.code:null));
   const w=document.getElementById("cmpWrap");
+  if(!w)return;
   if(!code){w.innerHTML=`<div class="method-note">没找到匹配的基金，请输入 6 位代码（如 110037.OF）或名称关键词。</div>`;return;}
   if(CURRENT&&code===CURRENT.code){w.innerHTML=`<div class="method-note">不能和自己对比。</div>`;return;}
+  CMP=null;
   w.innerHTML=`<div class="loading-state">加载 ${esc(code)} …</div>`;
-  loadCompareFund(code,p=>{CMP=p;renderCompare();});
+  loadCompareFund(code,(p,error)=>{
+    if(request!==cmpRequest||CURRENT!==current||document.getElementById("cmpWrap")!==w)return;
+    if(error){w.innerHTML=`<div class="method-note" role="alert">${esc(code)} 的对比数据未能加载，暂时不能判断是否有可用结果。${esc(error.message)} <button type="button" class="cmp-btn" data-pb-onclick="doCompare()">重新加载对比数据</button></div>`;return;}
+    CMP=p;renderCompare();
+  });
 }
 /* ★2026-08-08 五因子 β 雷达图(用户需求:一张图里两只基金)。
    ⚠ 难点:β 有负值(实测凸度 -0.053/-0.092、违约 -0.259),普通雷达图画不了负数。
@@ -1607,25 +1629,9 @@ function renderCompare(){
     </div>`;
 }
 function loadCompareFund(code,cb){
-  if(fundData(code)){cb(fundData(code));return;}
-  let sc=document.querySelector(`script[data-fund="${code}"]`);
-  if(!sc){
-    sc=document.createElement("script");
-    sc.src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_funds/"+code+".js?v="+Date.now();
-    sc.dataset.fund=code;
-    sc.onerror=()=>{sc.dataset.failed="1";};
-    document.head.appendChild(sc);
-  }
-  let n=0;
-  (function poll(){
-    if(fundData(code)){cb(fundData(code));return;}
-    if(sc.dataset.failed||++n>200){
-      document.getElementById("cmpWrap").innerHTML=
-        `<div class="method-note">${esc(code)} 的数据文件不存在。当前只预生成了纯债基金（中长期+短期），其他类型暂不可比。</div>`;
-      return;
-    }
-    setTimeout(poll,40);
-  })();
+  loadPBShard("fund",code,"https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_funds/"+code+".js",()=>{
+    const value=fundData(code);return value&&value.code===code&&value.head&&value.campisi?value:null;
+  },cb);
 }
 /* 同类百分位定位的自动评价语(★2026-07-30新增,2026-08-07改日频后仍原样复用):
    把光标定位到的那一天、5个因子各自的同类分位翻译成一句话,
@@ -1716,6 +1722,22 @@ function loadFund(code){
 function showMissing(code){
   document.getElementById("app").innerHTML=`<section class="fund-page"><div class="data-boundary"><p class="eyebrow">数据未生成</p><h3>${esc(code)}</h3><p>当前为模板演示版，仅预生成了部分基金数据。批量 ETL 后所有在册纯债基金均可查看。</p></div></section>`;
 }
+
+
+document.addEventListener("click",event=>{
+  const button=event.target.closest?.("[data-pb-retry]");
+  if(!button||!CURRENT||button.dataset.pbCode!==CURRENT.code)return;
+  const kind=button.dataset.pbRetry,code=CURRENT.code,current=CURRENT;
+  if(!["corr","durkf"].includes(kind)||PB_SHARD_LOADS.get(kind+":"+code)?.status==="pending")return;
+  PB_SHARD_LOADS.delete(kind+":"+code);
+  if(kind==="corr"){
+    const panel=document.querySelector('.fund-tab-panel[data-panel="corr"]');
+    if(panel)panel.innerHTML=renderCorr(current);
+  }else{
+    ensureDurKF(code,()=>{if(CURRENT===current)refreshDurKF();});
+    refreshDurKF();
+  }
+});
 
 
 window.__PB={renderHead:renderHead,setCompareWindow:function(v){cmpWin=v;renderCompare();},setCompareFactor:function(v){cmpFac=v;renderCompare();},renderPerf:renderPerf,renderAlloc:renderAlloc,renderBondStruct:renderBondStruct,renderCorr:renderCorr,renderCampisi:renderCampisi,ensureDurKF:ensureDurKF,ensureCorrShard:ensureCorrShard,refreshDurKF:refreshDurKF,setCurrent:function(d){CURRENT=d;idxZoom=null;navZoom=null;}};
