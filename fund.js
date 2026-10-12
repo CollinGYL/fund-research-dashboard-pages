@@ -3328,7 +3328,9 @@ function dailyFilterViewModel(daily,options={}) {
   let start=range==='all'?begin:(()=>{const d=new Date(end);d.setUTCFullYear(d.getUTCFullYear()-Number(range));return [begin,d.toISOString().slice(0,10)].sort().at(-1);})();
   if(options.autoRange&&dates.length&&dates.at(-1)<start){range='all';start=begin;}
   const points=all.filter(p=>p.date>=start&&p.date<=end),visibleDates=[...new Set(points.map(p=>p.date))];
-  const selected=options.date&&options.date>=start&&options.date<=end?options.date:visibleDates.at(-1)||end;
+  const requestedDate=String(options.date||'');
+  const validDate=/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)&&Number.isFinite(Date.parse(requestedDate))&&new Date(requestedDate).toISOString().slice(0,10)===requestedDate;
+  const selected=validDate&&requestedDate>=start&&requestedDate<=end?requestedDate:visibleDates.at(-1)||end;
   const marketDates=new Set((window.FUND_COMMON_BENCHMARKS?.benchmarks?.['000906.SH']?.series||[]).map(row=>row[0]));
   const navDates=(window.FUND_DETAIL_DATA?.[daily.code]?.nav||[]).map(row=>row[0]).filter(d=>d>=start&&d<=end&&marketDates.has(d));
   const gaps=comparisonCoverage(daily.segments,[...new Set([...dates,...navDates])].sort(),start,end,'filter',end,daily.issues||[]);
@@ -6328,13 +6330,37 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
   if (fund.category === "pure-bond") loadTab("research");
   else bindGenericPerformancePanel(fund, detail);
   if (fund.category !== "pure-bond" && !detail?.benchmark?.length) {
-    loadDashboardAsset("common_benchmarks.js").then(() => {
-      const performancePanel = document.querySelector('[data-panel="performance"]');
-      if (!performancePanel) return;
-      performancePanel.innerHTML = genericPerformancePanel(fund, detail, null);
-      bindGenericPerformancePanel(fund, detail);
-    }).catch(() => {});
+    void loadGenericPerformanceBenchmark(fund, detail);
   }
+}
+
+// Keep a failed comparison series visible and retryable without blocking the other tabs.
+function loadGenericPerformanceBenchmark(fund, detail) {
+  const target = document.querySelector('[data-panel="performance"]');
+  if (!target) return Promise.resolve(false);
+  if (target.benchmarkPromise) return target.benchmarkPromise;
+  let status = target.querySelector('[data-benchmark-status]');
+  if (!status) {
+    target.insertAdjacentHTML('afterbegin', '<div data-benchmark-status role="status"></div>');
+    status = target.querySelector('[data-benchmark-status]');
+  }
+  status.innerHTML = '<p class="method-note">正在加载比较基准，已有净值和收益数据可继续查看。</p>';
+  const current = () => target.isConnected !== false && document.querySelector('[data-panel="performance"]') === target;
+  const promise = loadDashboardAsset("common_benchmarks.js").then(() => {
+    if (!current()) return false;
+    const range = target.querySelector('[data-generic-nav-range].active')?.dataset.genericNavRange;
+    target.innerHTML = genericPerformancePanel(fund, detail, null);
+    bindGenericPerformancePanel(fund, detail);
+    if (range && range !== 'all') target.querySelector(`[data-generic-nav-range="${range}"]`)?.click();
+    return true;
+  }).catch((error) => {
+    if (!current()) return false;
+    status.innerHTML = `<p class="simulation-warning" role="alert">比较基准未能加载，暂时不能绘制对比图；基金净值和收益表仍可查看。${escapeHTML(error.message)}</p><button type="button" class="text-button" data-benchmark-retry>重新加载比较基准</button>`;
+    status.querySelector('[data-benchmark-retry]')?.addEventListener('click', () => loadGenericPerformanceBenchmark(fund, detail));
+    return false;
+  }).finally(() => { if (target.benchmarkPromise === promise) delete target.benchmarkPromise; });
+  target.benchmarkPromise = promise;
+  return promise;
 }
 
 function normalizeGenericHoldingHistory(raw) {

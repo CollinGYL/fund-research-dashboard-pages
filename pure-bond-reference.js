@@ -1261,9 +1261,27 @@ function switchPeerFac(k){
 }
 let peerChartIds=[null,null];
 const FAC_WIN_LABEL={ytd:"今年以来","1y":"近1年","3y":"近3年","5y":"近5年",all:"成立以来"};
+// Five-factor dates come from the model itself, never head.asof (refreshed by NAV).
+function campisiDate(value){
+  return typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value)?value:null;
+}
+function campisiDateNote(d,reg,label){
+  const latest=values=>values.map(campisiDate).filter(Boolean).sort().at(-1)||null;
+  const start=campisiDate(reg?.start),end=campisiDate(reg?.end);
+  const rollEnd=latest((d.campisi?.roll||[]).map(row=>row?.[0]));
+  const peerEnd=latest(d.campisi?.peer_beta_ts?.dt||[]);
+  const catalogFund=Array.isArray(window.FUND_DASHBOARD_CATALOG?.funds)?window.FUND_DASHBOARD_CATALOG.funds.find(f=>f.code===d.code):null;
+  const navEnd=latest([...(d.perf?.curve?.nav||[]).map(row=>row?.[0]),catalogFund?.performance?.latest_date]);
+  const oldDates=[end,rollEnd,peerEnd].filter(Boolean).filter(date=>navEnd&&date<navEnd);
+  const windowText=end?`${start?esc(start)+" 至 ":""}<b>${esc(end)}</b>`:"未提供可用回归窗口日期，不能确认模型截至日";
+  return `<div class="method-note pb-campisi-date-note"><b>${esc(label||"五因子数据日期")}</b>：${windowText}。`+
+    `滚动回归截至 ${esc(rollEnd||"未提供")}；同类 β 序列截至 ${esc(peerEnd||"未提供")}。`+
+    (navEnd?`已载入净值截至 ${esc(navEnd)}。`:"未载入可核对的净值日期。")+
+    (oldDates.length?` <strong>五因子模型尚未全部更新到最新净值</strong>；本页为上述历史区间的结果。`:"")+`</div>`;
+}
 function renderCampisi(d){
   const c=d.campisi;
-  if(!c||!c.full)return `<p class="tab-lead">五因子净值归因（Campisi / RBA）</p>`+
+  if(!c||!c.full)return `<p class="tab-lead">五因子净值归因（Campisi / RBA）</p>`+campisiDateNote(d,null)+
     sub("Campisi 归因","净值回归",`<div class="data-boundary"><p class="eyebrow">历史不足</p><h3>净值历史过短</h3><p>该基金净值有效观测 &lt;120，五因子回归不稳定，暂不展示。</p></div>`);
   const regWin=c.reg_win||{};
   const availWins=Object.keys(FAC_WIN_LABEL).filter(k=>regWin[k]);
@@ -1281,7 +1299,13 @@ function renderCampisi(d){
   // ★2026-07-30用户需求:"今年以来"窗口不再年化外推,后端直接给未年化真实拆分(Σ日收益率,
   // 不除以年数),此处"合计"应等于窗口内真实累计收益,可与"业绩表现"tab的cum直接对照
   // (两者天数略有出入——回归窗口需与因子数据交集,起始日略晚于自然年1月1日,故不完全相等)。
-  const capNote=arithAnn==null?"":!isAnnualized
+  const samePerfWindow=Boolean(campisiDate(fr.start)&&campisiDate(fr.end)&&stageMatch?.d0===fr.start&&stageMatch?.d1===fr.end);
+  const capNote=arithAnn==null?"":!samePerfWindow
+    ?`<div class="method-note" style="margin-top:10px"><b>回归窗口与业绩窗口不同，不能直接比较。</b>
+      本页贡献合计 <b>${P(arithAnn,2)}</b>（${isAnnualized?"算术年化":"未年化日收益之和"}），对应 ${esc(fr.start||"未提供")} 至 ${esc(fr.end||"未提供")}。
+      ${stageMatch?`业绩表现「${esc(FAC_WIN_LABEL[curFacWin])}」为 ${esc(stageMatch.d0||"未提供")} 至 ${esc(stageMatch.d1||"未提供")}，${isAnnualized?"复利年化":"累计收益"} ${P(isAnnualized?realAnn:realCum,2)}；`:"未找到可核对的业绩窗口；"}
+      不同日期和收益口径造成的差额不能当作模型误差或仅归因于复利差异。各因子贡献数值保留原模型结果。</div>`
+    :!isAnnualized
     ?`<div class="method-note" style="margin-top:10px">
         <b>本窗口未年化</b>：「${esc(FAC_WIN_LABEL[curFacWin])}」不满整年，这里的"合计"是<b>今年以来实际已经赚到的真实收益</b>
         （未做年化处理），各分项直接相加=合计。
@@ -1373,7 +1397,7 @@ function renderCampisi(d){
         抽到极端值的概率必然上升），跟"同类分歧变大"没关系，正好废掉这幅图的用途；
         且尾部多是<b>低频披露基金</b>（定开/摊余成本法，净值非逐日真实变动）在60天窗口回归下炸出的伪值
         （实测2026-07-14同类信用β最大值13.48，而P99才2.52），会把纵轴撑到看不成图。<br>
-        <b>下方分位条</b>：在任意一幅图上移动鼠标，会定位到那一天并重画这5根条（深色块＝P25~P75，浅色块＝P10~P90，竖线＝P50，圆点＝本基金位置）。默认停在最新净值日。<br>
+        <b>下方分位条</b>：在任意一幅图上移动鼠标，会定位到那一天并重画这5根条（深色块＝P25~P75，浅色块＝P10~P90，竖线＝P50，圆点＝本基金位置）。默认停在该序列最后一个可用日期。<br>
         <b>频率与口径</b>：<b>日频</b>（每个交易日一个锚点），β 由该日往前 <b>60 个交易日</b>的净值日收益对五因子回归得到；
         同类池按 PIT 逐日判定（当日属于中长期纯债、且窗口内 60 天净值齐全），故 n 会逐日小幅变动；并按<b>产品口径</b>去重——同一产品的 A/C/D/E 只算一票，取 Wind 初始份额为代表（<b>为什么必须去重</b>：A/C 是同一个组合，β 几乎相同，重复计票等于给多份额的大厂主力产品更高权重，而这类产品风格系统性更保守，会把整个分布往下拽）。
         本模块<b>完全不使用季报持仓数据</b>，输入只有全池复权净值日收益和债券指数日收益。<br>
@@ -1385,7 +1409,7 @@ function renderCampisi(d){
 
   setTimeout(wireCmpBox,0);
   return `<p class="tab-lead">五因子净值归因 · 画像总结 / 五因子含义 / 收益贡献分解 / 同类百分位定位 / 基金对比</p>`+
-    winSelectorBlock+profileBlock+factorGlossary+alphaGlossary+contribBlock+pctlBlock+comparePanel(d);
+    winSelectorBlock+campisiDateNote(d,fr,`${FAC_WIN_LABEL[curFacWin]||"可得历史"}五因子回归`)+profileBlock+factorGlossary+alphaGlossary+contribBlock+pctlBlock+comparePanel(d);
 }
 
 /* ===== 基金对比 · 五因子 β(★2026-08-08用户需求) =====
@@ -1396,14 +1420,28 @@ function renderCampisi(d){
      所以对比不涉及池子口径,两只基金即使不同子类也能比 β(但要标注分类)。 */
 let CMP=null;                      // 对比基金的 payload
 let cmpRequest=0;                  // Ignore an older selection after another query/clear.
+// The online detail page does not include the legacy FUNDS_LIST asset.
+// Reuse the public catalog on demand, without adding a first-screen dependency.
+function compareFunds(){
+  if(Array.isArray(window.FUNDS_LIST)&&window.FUNDS_LIST.length)return window.FUNDS_LIST;
+  const funds=window.FUND_DASHBOARD_CATALOG?.funds;
+  return Array.isArray(funds)?funds.filter(f=>f.category==="pure-bond").map(f=>({
+    code:f.code,name:f.name,scale:Number.isFinite(f.asset?.net_asset)?f.asset.net_asset/1e8:null
+  })):[];
+}
+function ensureCompareFunds(cb){
+  loadPBShard("comparelist","catalog","https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_catalog.js",()=>{
+    const funds=compareFunds();return funds.length?funds:null;
+  },cb);
+}
 function comparePanel(d){
-  const opts=(typeof FUNDS_LIST!=="undefined"?FUNDS_LIST:[]).length;
+  const opts=compareFunds().length;
   // ★2026-08-08 用户反馈:原来必须先敲一只基金才有东西看,不友好。
   //   改成【进来就画本基金自己的雷达图】,对比基金是可选叠加。
   //   选择器给两条路:①文本框(可打代码或名称,带 datalist 联想) ②下拉滚动选择。
   //   两者都【懒加载】—— 2457 个 option 一次性建会拖慢首屏,首次聚焦/展开时才填充。
   setTimeout(()=>{renderCompare();},0);
-  return sub("基金对比",`本基金五因子 β 雷达图；可叠加任意一只纯债基金对比（可选池 ${opts} 只）`,
+  return sub("基金对比",`本基金五因子 β 雷达图；可叠加纯债基金对比（${opts?`候选 ${opts} 只`:'输入或选择时加载候选'}；能否对比以实际研究数据为准）`,
     `<div class="cmp-bar">
        <input id="cmpBox" class="cmp-input" list="cmpList" placeholder="输入代码或名称对比，如 110037 / 易方达纯债"
               autocomplete="off" data-pb-onfocus="fillCmpOptions()" data-pb-onkeydown="if(event.key==='Enter')doCompare()">
@@ -1414,23 +1452,26 @@ function comparePanel(d){
        <button type="button" class="cmp-btn" data-pb-onclick="doCompare()">对比</button>
        <button type="button" class="cmp-btn cmp-clear" data-pb-onclick="clearCompare()">清除对比</button>
      </div>
+     <div id="cmpPoolStatus" class="method-note" role="status"></div>
      <div id="cmpWrap"></div>`);
 }
-/* 懒填充选择器(2457项)。只填一次。 */
-let cmpOptionsFilled=false;
+/* Each regenerated comparison panel owns its populated selector state. */
 function fillCmpOptions(){
-  if(cmpOptionsFilled)return;
-  cmpOptionsFilled=true;
-  const L=(typeof FUNDS_LIST!=="undefined"?FUNDS_LIST:[]);
-  const dl=document.getElementById("cmpList"), sel=document.getElementById("cmpSel");
-  const self=CURRENT?CURRENT.code:null;
-  const html=L.filter(f=>f.code!==self).map(f=>
-    `<option value="${f.code}">${esc(f.name||"")}${f.scale!=null?"  "+NN(f.scale,1)+"亿":""}</option>`).join("");
-  if(dl)dl.innerHTML=html;
-  if(sel)sel.innerHTML=`<option value="">▼ 滚动选择…</option>`+html;
+  const dl=document.getElementById("cmpList"),sel=document.getElementById("cmpSel"),status=document.getElementById("cmpPoolStatus"),current=CURRENT;
+  if(!dl||!sel||dl.dataset.pbOptionsFilled&&sel.dataset.pbOptionsFilled)return;
+  if(status)status.innerHTML="正在加载纯债候选列表…";
+  ensureCompareFunds((list,error)=>{
+    if(CURRENT!==current||document.getElementById("cmpList")!==dl||document.getElementById("cmpSel")!==sel)return;
+    if(error){if(status)status.innerHTML=`候选列表未能加载。${esc(error.message)} <button type="button" class="text-button" data-pb-retry="comparelist" data-pb-code="${esc(current?.code||'')}">重试候选列表</button>`;return;}
+    const html=list.filter(f=>f.code!==current?.code).map(f=>
+      `<option value="${f.code}">${esc(f.name||"")}${f.scale!=null?"  "+NN(f.scale,1)+"亿":""}</option>`).join("");
+    dl.innerHTML=html;sel.innerHTML=`<option value="">▼ 滚动选择…</option>`+html;
+    dl.dataset.pbOptionsFilled="1";sel.dataset.pbOptionsFilled="1";
+    if(status)status.innerHTML="候选来自纯债目录，能否对比以实际研究数据为准。";
+  });
 }
 function cmpCandidates(q){
-  const L=(typeof FUNDS_LIST!=="undefined"?FUNDS_LIST:[]);
+  const L=compareFunds();
   if(!q)return L.slice(0,12);
   const s=q.trim().toLowerCase();
   return L.filter(f=>f.code.toLowerCase().includes(s)||(f.name||"").toLowerCase().includes(s)).slice(0,12);
@@ -1462,22 +1503,36 @@ function wireCmpBox(){
 }
 function doCompare(){
   const request=++cmpRequest,current=CURRENT;
-  const box=document.getElementById("cmpBox");
-  if(!box)return;
+  const box=document.getElementById("cmpBox"),w=document.getElementById("cmpWrap");
+  if(!box||!w)return;
   const raw=box.value.trim();
-  const hit=cmpCandidates(raw)[0];
-  const code=(raw.match(/^\d{6}\.[A-Z]{2}$/)?raw:(hit?hit.code:null));
-  const w=document.getElementById("cmpWrap");
-  if(!w)return;
-  if(!code){w.innerHTML=`<div class="method-note">没找到匹配的基金，请输入 6 位代码（如 110037.OF）或名称关键词。</div>`;return;}
-  if(CURRENT&&code===CURRENT.code){w.innerHTML=`<div class="method-note">不能和自己对比。</div>`;return;}
-  CMP=null;
-  w.innerHTML=`<div class="loading-state">加载 ${esc(code)} …</div>`;
-  loadCompareFund(code,(p,error)=>{
-    if(request!==cmpRequest||CURRENT!==current||document.getElementById("cmpWrap")!==w)return;
-    if(error){w.innerHTML=`<div class="method-note" role="alert">${esc(code)} 的对比数据未能加载，暂时不能判断是否有可用结果。${esc(error.message)} <button type="button" class="cmp-btn" data-pb-onclick="doCompare()">重新加载对比数据</button></div>`;return;}
-    CMP=p;renderCompare();
-  });
+  const active=()=>request===cmpRequest&&CURRENT===current&&document.getElementById("cmpWrap")===w;
+  const fail=(label,error)=>{w.innerHTML=`<div class="method-note" role="alert">${esc(label)}未能加载，暂时不能判断是否有可用结果。${esc(error.message)} <button type="button" class="cmp-btn" data-pb-onclick="doCompare()">重新加载对比数据</button></div>`;};
+  const compare=()=>{
+    if(!active())return;
+    const hit=cmpCandidates(raw)[0];
+    const code=(raw.match(/^\d{6}\.[A-Z]{2}$/)?raw:(hit?hit.code:null));
+    if(!code){w.innerHTML=`<div class="method-note">没找到匹配的纯债基金，请输入 6 位代码（如 110037）或名称关键词。</div>`;return;}
+    if(current&&code===current.code){w.innerHTML=`<div class="method-note">不能和自己对比。</div>`;return;}
+    CMP=null;
+    w.innerHTML=`<div class="loading-state">加载 ${esc(code)} …</div>`;
+    loadCompareFund(code,(p,error)=>{
+      if(!active())return;
+      if(error){fail(code+" 的对比数据",error);return;}
+      CMP=p;renderCompare();
+    });
+  };
+  if(!raw){w.innerHTML=`<div class="method-note">请输入 6 位代码（如 110037）或名称关键词。</div>`;return;}
+  if(!/^\d{6}\.[A-Z]{2}$/.test(raw)&&!compareFunds().length){
+    w.innerHTML=`<div class="loading-state">加载纯债候选列表…</div>`;
+    ensureCompareFunds((list,error)=>{
+      if(!active())return;
+      if(error){fail("纯债候选列表",error);return;}
+      fillCmpOptions();compare();
+    });
+    return;
+  }
+  compare();
 }
 /* ★2026-08-08 五因子 β 雷达图(用户需求:一张图里两只基金)。
    ⚠ 难点:β 有负值(实测凸度 -0.053/-0.092、违约 -0.259),普通雷达图画不了负数。
@@ -1577,7 +1632,7 @@ function renderCompare(){
   }else if(ra&&rb){
     // ★共同区间:两只基金成立日不同,必须取交集并显著标注,否则等于拿不同期间的β在比
     const s=(ra.start>rb.start?ra.start:rb.start), e=(ra.end<rb.end?ra.end:rb.end);
-    const mismatch=(ra.start!==rb.start);
+    const mismatch=(ra.start!==rb.start||ra.end!==rb.end);
     tbl=`<div class="rt-wrap"><table class="rt"><thead><tr>
         <th>因子</th><th>${esc(A.head.name||A.code)}</th><th>${esc(B.head.name||B.code)}</th><th>差值 Δβ</th><th>谁更高</th></tr></thead><tbody>`;
     FAC_KEYS.forEach(k=>{
@@ -1593,8 +1648,8 @@ function renderCompare(){
         <td>${dv==null?"—":(Math.abs(dv)<0.05?"接近":(dv>0?esc(A.head.name||A.code):esc(B.head.name||B.code)))}</td></tr>`;
     });
     tbl+=`</tbody></table></div>`;
-    warn=`<div class="cmp-range">对比区间 <b>${esc(s)} ~ ${esc(e)}</b>`+
-      (mismatch?` · <span class="cmp-warn">⚠ 两只基金该窗口起点不同（${esc(ra.start)} vs ${esc(rb.start)}），β 来自各自区间，非严格同期</span>`:``)+
+    warn=`<div class="cmp-range">${mismatch?"日期交集（未按交集重新回归）":"相同回归区间"} <b>${esc(s)} ~ ${esc(e)}</b>`+
+      (mismatch?` · <span class="cmp-warn">两只基金起止日期不同，β 来自各自原始窗口，非严格同期。</span>`:``)+
       ` · R² ${NN(ra.r2,2)} / ${NN(rb.r2,2)} · n ${ra.n} / ${rb.n}</div>`;
   }
 
@@ -1616,7 +1671,7 @@ function renderCompare(){
 
   // ★雷达图看"形状差异",表格看"精确数值+t值",两者互补不重复
   const radar=ra?betaRadar(A,B,ra,rb):"";
-  w.innerHTML=head+radar+tbl+warn+
+  w.innerHTML=head+campisiDateNote(A,ra,`${A.head.name||A.code} · ${FAC_WIN_LABEL[cmpWin]||cmpWin}回归`)+(B?campisiDateNote(B,rb,`${B.head.name||B.code} · ${FAC_WIN_LABEL[cmpWin]||cmpWin}回归`):"")+radar+tbl+warn+
     `<div class="subpanel-note" style="margin-top:16px">β 演变${B?"对比":""}
        <select class="period" style="margin-left:8px" data-pb-onchange="cmpFac=this.value;renderCompare()">${facOpts}</select></div>`+
     chart+
@@ -1728,6 +1783,7 @@ document.addEventListener("click",event=>{
   const button=event.target.closest?.("[data-pb-retry]");
   if(!button||!CURRENT||button.dataset.pbCode!==CURRENT.code)return;
   const kind=button.dataset.pbRetry,code=CURRENT.code,current=CURRENT;
+  if(kind==="comparelist"){fillCmpOptions();return;}
   if(!["corr","durkf"].includes(kind)||PB_SHARD_LOADS.get(kind+":"+code)?.status==="pending")return;
   PB_SHARD_LOADS.delete(kind+":"+code);
   if(kind==="corr"){
