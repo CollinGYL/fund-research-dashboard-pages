@@ -2056,6 +2056,14 @@ html:has(.blue-workbench) { scroll-padding-top:88px; scroll-behavior:auto; }
 .blue-workbench .panel-intro h2,.blue-workbench .pb-scope .panel-intro h2 { font-family:inherit; font-size:23px; font-weight:600; }
 .blue-workbench .panel-intro .eyebrow,.blue-workbench .pb-scope .panel-intro .eyebrow { color:#7a94bc; font-size:10px; }
 .blue-workbench .panel-intro > p,.blue-workbench .pb-scope .panel-intro > p { color:#7086a4; font-size:12px; line-height:1.8; }
+
+/* Time-range controls sit on a light panel in the blue theme. */
+.blue-workbench .chart-controls { flex-wrap:wrap; gap:3px; max-width:100%; padding:4px; border:1px solid #c3d1e6; background:#fff; }
+.blue-workbench .chart-controls button { min-height:38px; padding:8px 12px; color:#334e73; background:#f4f7fc; font-weight:600; }
+.blue-workbench .chart-controls button:hover { color:#234879; background:#e0eafb; }
+.blue-workbench .chart-controls button.active { color:#fff; background:#285cc4; font-weight:750; }
+.blue-workbench .chart-controls button:focus-visible { outline:2px solid #2459be; outline-offset:2px; }
+
 .blue-workbench .pb-scope .subpanel { padding:20px; border-color:var(--line); border-radius:10px; background:#fff; }
 .blue-workbench .pb-scope .subpanel h3 { font-family:inherit; color:#3a5477; font-size:15px; font-weight:600; }
 .blue-workbench .pb-scope .rmetric,.blue-workbench .research-metric { background:#fff; border-color:var(--line); border-radius:8px; }
