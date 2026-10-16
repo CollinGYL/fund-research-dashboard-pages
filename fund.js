@@ -3373,12 +3373,14 @@ function dailyFilterPanel(daily,options={},error='') {
   const displayWeight=value=>value>0&&value<.0001?pct(value,4):pct(value,2);
   const ranking=rows.map(name=>{const value=view.point?.groups[name],hasValue=Number.isFinite(value),selected=view.industry===name;return `<li data-daily-row="${escapeHTML(name)}"${name.toLocaleLowerCase().includes(query)?'':' hidden'}><button type="button" class="daily-allocation-row${selected?' active':''}" data-daily-industry="${escapeHTML(name)}" aria-pressed="${selected}" aria-label="${escapeHTML(name)}，${hasValue?pct(value,4):'没有结果'}，查看走势"><span class="daily-allocation-name"><i style="background:${reconstructionColor(name)}" aria-hidden="true"></i>${escapeHTML(name)}</span><span class="daily-allocation-track" aria-hidden="true">${hasValue?`<i class="daily-allocation-bar" style="width:${Math.max(0,Math.min(100,value*100))}%;background:${reconstructionColor(name)}"></i>`:''}</span><strong class="daily-allocation-value" title="${hasValue?pct(value,4):'没有结果'}" data-daily-value="${hasValue?value:''}">${hasValue?displayWeight(value):'—'}</strong></button></li>`;}).join('');
   const value=view.industry&&view.point?view.point.groups[view.industry]:null;
+  const unknownWeight=view.point?.groups['未知残余'];
+  const unknownNote=Number.isFinite(unknownWeight)&&unknownWeight>0?`<p class="method-note" data-kalman-unknown-note>有 ${displayWeight(unknownWeight)} 的股票仓位暂时不能归到具体行业，单列为“未知残余”，没有摊入已知行业。</p>`:'';
   const dateText=view.point?`正在查看 <strong>${escapeHTML(view.selected)}</strong>${view.point.date!==view.selected?`，对应最近一次结果 <strong>${escapeHTML(view.point.date)}</strong>`:''}`:`<strong>${escapeHTML(view.selected)}</strong> 没有可用估计；“—”不表示仓位为 0`;
   return `<section class="daily-explorer">${intro}<p class="simulation-date-note">最近有结果的日期：<strong>${view.latest}</strong>${daily.end!==view.latest?`；此后暂缺估计，数据检查至 ${escapeHTML(daily.end)}`:''}。</p>
     <div class="daily-explorer-controls"><label>时间范围 <select data-daily-range>${[['1','最近1年'],['3','最近3年'],['5','最近5年'],['all','全部历史']].map(([key,label])=>`<option value="${key}"${view.range===key?' selected':''}>${label}</option>`).join('')}</select></label><label>查看日期 <input type="date" data-daily-date min="${view.start}" max="${view.end}" value="${view.selected}"></label><div class="daily-date-buttons"><button type="button" data-daily-date-step="previous" data-daily-target-date="${view.previous}" aria-label="上一个有估计的日期"${view.previous?'':' disabled'}>上一日</button><button type="button" data-daily-date-step="next" data-daily-target-date="${view.next}" aria-label="下一个有估计的日期"${view.next?'':' disabled'}>下一日</button><button type="button" data-daily-date-step="latest" data-daily-target-date="${view.latest}" data-daily-target-range="${view.latest<view.start?'all':''}">最新</button></div></div>
-    <p class="daily-explorer-date" role="status">${dateText}。</p><div class="daily-explorer-layout"><article class="subpanel daily-explorer-chart"><div class="daily-chart-controls"><button type="button" data-daily-industry="" class="text-button${view.industry?'':' active'}" aria-pressed="${!view.industry}">整体配置</button><label>查看行业走势 <select data-daily-industry-select><option value="">整体配置</option>${daily.names.map(name=>`<option value="${escapeHTML(name)}"${name===view.industry?' selected':''}>${escapeHTML(name)}</option>`).join('')}</select></label></div><h3>${view.industry?`${escapeHTML(view.industry)}${Number.isFinite(value)?` · ${displayWeight(value)}`:''}`:'配置随时间的变化'}</h3><p class="simulation-chart-description">${view.industry?'纵轴是该行业或资产占基金净资产的比例。':'色带越厚，占比越大；估计为 20%，相当于每 100 元基金净资产约有 20 元投向这一类。债券在最上层。'}</p><div data-daily-chart>${chart}</div><p class="method-note">点图查看日期，也可用上方日期按钮。灰色或空白处没有结果，前后不会直接连线。</p></article>
+    <p class="daily-explorer-date" role="status">${dateText}。</p>${unknownNote}<div class="daily-explorer-layout"><article class="subpanel daily-explorer-chart"><div class="daily-chart-controls"><button type="button" data-daily-industry="" class="text-button${view.industry?'':' active'}" aria-pressed="${!view.industry}">整体配置</button><label>查看行业走势 <select data-daily-industry-select><option value="">整体配置</option>${daily.names.map(name=>`<option value="${escapeHTML(name)}"${name===view.industry?' selected':''}>${escapeHTML(name)}</option>`).join('')}</select></label></div><h3>${view.industry?`${escapeHTML(view.industry)}${Number.isFinite(value)?` · ${displayWeight(value)}`:''}`:'配置随时间的变化'}</h3><p class="simulation-chart-description">${view.industry?'纵轴是该行业或资产占基金净资产的比例。':'色带越厚，占比越大；估计为 20%，相当于每 100 元基金净资产约有 20 元投向这一类。债券在最上层。'}</p><div data-daily-chart>${chart}</div><p class="method-note">点图查看日期，也可用上方日期按钮。灰色或空白处没有结果，前后不会直接连线。</p></article>
     <article class="subpanel daily-explorer-ranking"><h3>${view.point?`${view.point.date} · 配置明细`:'该日暂无配置明细'}</h3><p class="method-note">按占比从高到低排列，点击一行查看走势，向下滚动可查全部。</p><label class="daily-explorer-search">查找行业或资产 <input type="search" data-daily-search value="${escapeHTML(search)}" placeholder="例如：电子、医药、港股、债券" autocomplete="off"></label><p class="daily-search-count" data-daily-search-count role="status">显示 ${matching} / ${rows.length} 项，可滚动查看全部</p><ul class="daily-allocation-list" aria-label="当日配置，可滚动查看全部行业">${ranking}</ul><p class="empty-copy" data-daily-search-empty${matching?' hidden':''}>没有匹配的行业或资产，可缩短关键词。</p></article></div>
-    <details class="simulation-method"><summary>查看估计方法和没有结果的原因</summary><p>使用 Event-P Filter 逐日估计，比例均占基金净资产，没有重新归一到100%。港股和债券只估计总体比例，不能还原个股、个券。不同披露阶段分别计算，缺数据的时段不沿用旧值。休市日可对应最近一次有结果的日期。历史数据没有逐日留档，这些结果不等于当时保存的实盘预测。</p><p>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'未记录其他异常。')}</p></details></section>`;
+    <details class="simulation-method"><summary>查看估计方法和没有结果的原因</summary><p>使用 Event-P Filter 逐日估计，比例均占基金净资产，没有重新归一到100%。出现“未知残余”时，表示这部分股票仓位暂时无法归到具体行业；它使用市场代理收益，不代表已经识别出新的持仓。港股和债券只估计总体比例，不能还原个股、个券。不同披露阶段分别计算，缺数据的时段不沿用旧值。休市日可对应最近一次有结果的日期。历史数据没有逐日留档，这些结果不等于当时保存的实盘预测。</p><p>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'未记录其他异常。')}</p></details></section>`;
 }
 
 function bindDailyFilterExplorer(target,daily,options,onChange) {
@@ -4273,7 +4275,7 @@ function pureBondDurationPairs(kalmanDuration, disclosureHistory) {
     const estimateDate = dates[found];
     const gapDays = Math.round((target - new Date(`${estimateDate}T00:00:00Z`).getTime()) / 86400000);
     const estimate = Number(values[found]);
-    if (gapDays > 10 || !Number.isFinite(estimate)) return null;
+    if (gapDays > 4 || !Number.isFinite(estimate)) return null;
     return { reportDate: item.date, estimateDate, actual, estimate, error: estimate - actual };
   }).filter(Boolean);
 }
@@ -4308,6 +4310,11 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
     `<strong class="${item.error > 0 ? "value-positive" : item.error < 0 ? "value-negative" : ""}">${item.error >= 0 ? "+" : ""}${num(item.error, 2)}年</strong>`,
   ]);
   const meta = kalmanDuration.meta || {};
+  const bounds = kalmanDuration.duration_bounds?.at(-1);
+  const ambiguous = kalmanDuration.quality?.at(-1)?.duplicate_proxy_active === true
+    && Array.isArray(bounds) && bounds.length === 2 && bounds.every(isFiniteValue);
+  const identificationNote = ambiguous
+    ? `<p class="simulation-warning">部分债券指数走势相同，暂时无法区分各自仓位。在其他估计不变时，久期范围为 <strong>${num(bounds[0], 2)}—${num(bounds[1], 2)} 年</strong>；这不是置信区间，单点估计不能当成真实久期。</p>` : '';
   return `<article class="subpanel chart-subpanel pure-bond-kalman-panel">
     <div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值 · 在线信息集</span></div></div>
     <section class="research-metric-grid metric-six">
@@ -4318,9 +4325,10 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
       ${metric("平均绝对偏差", meanAbsoluteError === null ? "—" : `${num(meanAbsoluteError, 3)}年`)}
       ${metric("过程噪声Q", isFiniteValue(meta.q) ? String(meta.q) : "—")}
     </section>
+    ${identificationNote}
     ${renderMiniLineChart(series, [{ key: "duration", label: `${fund.name}日频估计久期`, color: "#0a7c78", width: 3, format: "years" }], `${fund.name}卡尔曼日频久期估计`)}
     ${recentPairs.length ? `<div class="subpanel-heading pure-bond-kalman-compare-heading"><div><h3>与披露反推久期对照</h3><span>报告期当日或之前最近交易日</span></div></div>${renderTable(["报告期", "披露反推", "模型估计", "偏差"], recentPairs)}` : '<p class="method-note">当前没有落在模型区间内的有效披露久期可供对照。</p>'}
-    <p class="method-note"><strong>口径边界：</strong>模型每天只使用截至当日的基金复权净值与14条债券指数收益，不把半年报/年报久期输入滤波；披露久期仅用于事后对照。输入两侧均做3日移动平均，预热120个有效交易日，Q=${isFiniteValue(meta.q) ? meta.q : "3e-4"}。${meta.factor_variant ? `<strong>因子版本：</strong>${escapeHTML(meta.factor_variant)}。` : ""}这是收益法估计，不等同于逐券组合真实久期，也不用于填补披露值。</p>
+    <p class="method-note"><strong>口径边界：</strong>模型每天只使用截至当日的基金复权净值与14条债券指数收益，不把半年报/年报久期输入滤波；披露久期仅用于事后对照。先按净值与因子的共同起止日计算收益，再对连续3个有效区间取平均；预热120个有效观察，Q=${isFiniteValue(meta.q) ? meta.q : "3e-4"}。${meta.factor_variant ? `<strong>因子版本：</strong>${escapeHTML(meta.factor_variant)}。` : ""}这是收益法估计，不等同于逐券组合真实久期，也不用于填补披露值。</p>
   </article>`;
 }
 
@@ -6157,7 +6165,7 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
     reference.head.scale = assetHistory.at(-1).na;
     reference.head.scale_dt = assetHistory.at(-1).dt;
   }
-  const durationHistory = (detail?.duration_history || []).map((item) => ({
+  const durationHistory = (detail?.duration_history || []).filter((item) => isFiniteValue(item.duration) && Number(item.duration) >= 0 && Number(item.duration) <= 30).map((item) => ({
     dt: item.date,
     dur: Number(item.duration),
     na: assetHistory.find((asset) => asset.dt === item.date)?.na ?? null,
@@ -6171,9 +6179,12 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
       ...previous,
       dates: currentDuration.dates,
       dur: currentDuration.duration,
+      duration_bounds: currentDuration.duration_bounds,
+      quality: currentDuration.quality,
       truth: durationHistory.map((item) => ({ dt: item.dt, dur: item.dur })),
       meta: {
         ...(previous.meta || {}),
+        model: currentDuration.meta?.model,
         q: currentDuration.meta?.q,
         warmup: currentDuration.meta?.warmup,
         n: currentDuration.meta?.observations,
@@ -6181,6 +6192,11 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
         d1: currentDuration.meta?.end,
       },
     };
+    if (window.DURKF_MISS) delete window.DURKF_MISS[fund.code];
+  } else if (currentDuration?.status === "unavailable") {
+    if (window.DURKF_STORE) delete window.DURKF_STORE[fund.code];
+    window.DURKF_MISS = window.DURKF_MISS || {};
+    window.DURKF_MISS[fund.code] = currentDuration.reason || "当前共同样本不足，暂不提供估计。";
   }
 }
 

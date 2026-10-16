@@ -736,18 +736,17 @@ function ensureDurKF(code,cb){
   if(!window.DURKF_STORE?.[code]&&window.DURKF_MISS?.[code]){cb(false,null);return;}
   loadPBShard("durkf",code,"https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_durkf/"+code+".js",()=>durKFData(code),(value,error)=>cb(!!value,error));
 }
-/* 真值点落在报告期末日,模型只在交易日有值 —— 取该日或之前最近的一个交易日(10天内)配对 */
+/* 披露对照只允许同日或最多早四个自然日，与后端评分一致。 */
 function durKFPair(K){
   const idx=new Map();K.dates.forEach((d,i)=>idx.set(d,i));
   const out=[];
   (K.truth||[]).forEach(t=>{
-    let j=-1,probe=new Date(t.dt+"T00:00:00");
-    for(let k=0;k<10;k++){
-      const key=probe.toISOString().slice(0,10);
-      if(idx.has(key)){j=idx.get(key);break;}
-      probe.setDate(probe.getDate()-1);
+    if(t.dur==null||t.dur===""||!Number.isFinite(Number(t.dur))||Number(t.dur)<0||Number(t.dur)>30)return;
+    const time=Date.parse(t.dt+"T00:00:00Z");if(!Number.isFinite(time))return;
+    for(let k=0;k<=4;k++){
+      const day=new Date(time-k*86400000).toISOString().slice(0,10),j=idx.get(day);
+      if(j!==undefined&&Number.isFinite(K.dur[j])){out.push({dt:t.dt,real:Number(t.dur),est:K.dur[j],estimate_date:day,gap_days:k});break;}
     }
-    if(j>=0)out.push({dt:t.dt,real:t.dur,est:K.dur[j]});
   });
   return out;
 }
@@ -764,7 +763,7 @@ function durKFBlock(d){
   // 真值点画出来只会把 x 轴拖长一大段空白,故只画区间内的(区间外的本来也无从对照)。
   const tin=(K.truth||[]).filter(t=>t.dt>=K.meta.d0&&t.dt<=K.meta.d1);
   const series=[{name:"卡尔曼日频估计",color:"var(--teal)",points:line,dp:2,unit:"年",sw:1.5}];
-  if(tin.length)series.push({name:"披露真值（半年频）",color:"var(--gold)",
+  if(tin.length)series.push({name:"披露对照（半年频）",color:"var(--gold)",
     points:tin.map(t=>[t.dt,t.dur]),dp:2,unit:"年",sw:0,dots:true});
   const chart=lineChart(series,{h:220,dp:2});
   const pair=durKFPair(K);
@@ -772,17 +771,20 @@ function durKFBlock(d){
   const bias=pair.length?pair.reduce((a,p)=>a+(p.est-p.real),0)/pair.length:null;
   const cards=[["最新久期",NN(K.dur[K.dur.length-1],2)+" 年"],
                ["估计区间",K.meta.d0+" ~ "+K.meta.d1],
-               ["交易日数",K.meta.n.toLocaleString()],
-               ["可对照真值",pair.length+" 期"],
+               ["输出日期数",K.dates.length.toLocaleString()],
+               ["可配对披露",pair.length+" 期"],
                ["平均绝对误差",mafe==null?"—":NN(mafe,3)+" 年"],
-               ["偏性",bias==null?"—":(bias>=0?"+":"")+NN(bias,3)+" 年"]];
+               ["平均偏差",bias==null?"—":(bias>=0?"+":"")+NN(bias,3)+" 年"]];
   const grid=`<div class="metric-grid-in" style="grid-template-columns:repeat(6,1fr);margin-top:12px">`+
     cards.map(([k,v])=>`<div class="rmetric"><span>${k}</span><strong>${v}</strong></div>`).join("")+`</div>`;
   const fl=Object.entries(K.flags||{}).filter(([,v])=>v).map(([k])=>k);
-  const rows=[`<div class="fg-row"><b>模型估计</b><span>卡尔曼滤波 · <b>日频</b>（每个交易日一个值）· 仅用日频净值一条观测通道</span></div>`,
-    `<div class="fg-row"><b>披露真值</b><span>利率敏感性反推 · <b>半年频</b>（半年报/年报各一个点）</span></div>`];
+  const bound=K.duration_bounds?.at(-1),quality=K.quality?.at(-1);
+  const ambiguous=quality?.duplicate_proxy_active&&Array.isArray(bound)&&bound.length===2&&bound.every(Number.isFinite);
+  const warning=ambiguous?`<p class="method-note" data-duration-identification>两条债券代理近期收益相同，无法仅靠净值区分。保持其他估计不变时，最新久期可能落在 <strong>${NN(bound[0],2)}—${NN(bound[1],2)} 年</strong>；这是条件范围，不是置信区间，单点估计不能当成真实久期。</p>`:"";
+  const rows=[`<div class="fg-row"><b>模型估计</b><span>用净值和债券指数估计久期；先对齐共同起止日，再平滑三个有效收益区间，预热120个观察。</span></div>`,
+    `<div class="fg-row"><b>披露对照</b><span>由半年报或年报利率敏感性反推，仅作事后对照；估计日期最多早四个自然日。</span></div>`];
   if(fl.length)rows.push(`<div class="fg-row"><b>原方法论标签</b><span>该基金命中 ${fl.join("、")}——在卡尔曼页的评价池里会被剔除，本模块不剔除</span></div>`);
-  return chart+grid+`<div class="factor-glossary" style="margin-top:14px">${rows.join("")}</div>`;
+  return warning+chart+grid+`<div class="factor-glossary" style="margin-top:14px">${rows.join("")}</div>`;
 }
 function refreshDurKF(){
   const w=document.getElementById("durkfWrap");
@@ -897,7 +899,7 @@ function renderAlloc(d){
     sub("杠杆 · 久期 · 10年期国债到期收益率","",
       combinedChart+`<div class="factor-glossary" style="margin-top:14px">${combinedDescRows}</div>`+
       (combinedWarn.trim()?`<div class="method-note">${combinedWarn.trim()}</div>`:""))+
-    sub("本基金的久期日频拟合","卡尔曼滤波 · 逐交易日 · 全市场无筛除",
+    sub("本基金的久期日频估计","净值驱动估计 · 历史不足时留空",
       `<div id="durkfWrap">${durKFBlock(d)}</div>`);
 }
 
