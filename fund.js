@@ -4,7 +4,6 @@ const rawFundId = query.get("id");
 const rawFundCode = String(query.get("code") || "").toUpperCase();
 const fundId = /^[A-Za-z0-9_-]{1,64}$/.test(String(rawFundId || "")) ? rawFundId : null;
 const fundCode = /^\d{6}\.(?:OF|SH|SZ)$/.test(rawFundCode) ? rawFundCode : null;
-const DEEP_SAMPLE_CODES = new Set(["005827.OF", "000628.OF", "000001.OF"]);
 let researchNavigationMode = query.get('navigation') === 'grouped' ? 'grouped' : 'all';
 const correlationMetricsPromises = new Map();
 const CORRELATION_SHARD_COUNT = 256;
@@ -15,7 +14,6 @@ const PURE_BOND_RESEARCH_SHARD_COUNT = 64;
 const pureBondReferenceAssetPromises = new Map();
 const pureBondReferenceReadyCodes = new Set();
 const genericDetailPromises = new Map();
-let deepSamplePromise = null;
 const dashboardAssetPromises = new Map();
 const dataScriptPromises = new Map();
 const profileDetailPromises = new Map();
@@ -4833,7 +4831,7 @@ function genericPerformancePanel(fund, detail, brinson) {
     .map((point) => ({ date: point.date, fund: point.fund / point.benchmark }));
   const excessCalendarRows = genericCalendarRiskRows(excessPoints).map((row) => row.slice(0, 5));
   const activeMetrics = fund.category === "active-equity" ? activeEquityPerformance(detail) : null;
-  const managerStart = brinson?.summary?.manager_start || deepSampleManagerStart(fund, detail);
+  const managerStart = brinson?.summary?.manager_start || researchManagerStart(fund, detail);
   const benchmarkLatest = (benchmark.series || []).filter(([, value]) => isFiniteValue(value)).at(-1)?.[0] || "—";
   const contractBenchmark = fund.benchmark || "现有目录未记录";
   return `
@@ -5317,21 +5315,20 @@ function genericMultiIndexAnalysis(fund, detail) {
   return { index_names: indexNames, comparison_points: comparisonPoints };
 }
 
-function deepSampleManagerStart(fund, detail) {
-  // Restore the original team's interval control, but never reuse its stale NAV/returns.
-  const managers = detail?.deep_sample_analysis?.current_managers || [];
+function researchManagerStart(fund, detail) {
+  // Match current manager names before exposing a historical tenure boundary.
+  const managers = detail?.research_metadata?.current_managers || [];
   const expected = [...(fund.manager || [])].sort().join('|');
   const actual = managers.map(item => item.name).sort().join('|');
   return expected && expected === actual ? currentManagerTenureStart(managers) : null;
 }
 
-function renderDeepSampleSizeStyle(fund, detail) {
-  if (!DEEP_SAMPLE_CODES.has(fund.code)) return '';
-  const style = detail?.deep_sample_analysis?.size_index_style;
-  if (!style?.buckets?.length) return `<article class="subpanel"><h3>大小盘风格 · 历史指数成分归属</h3><p class="empty-copy">${escapeHTML(detail?.deep_sample_error || '暂无可得深度样本快照。')}</p></article>`;
+function renderHistoricalSizeStyle(fund, detail) {
+  const style = detail?.research_metadata?.size_index_style;
+  if (!style?.buckets?.length) return `<article class="subpanel"><h3>大小盘风格 · 历史指数成分归属</h3><p class="empty-copy">${escapeHTML('暂无可得的历史指数成分归属数据。')}</p></article>`;
   const entries = style.buckets.filter(item => item.weight > 0).map(item => [item.name, item.weight]);
   const rows = style.buckets.map(item => [escapeHTML(item.name), `${item.count}只`, pct(item.weight, 1)]);
-  return `<article class="subpanel" data-deep-capability="size-style"><div class="subpanel-heading"><h3>大小盘风格</h3><span>${escapeHTML(style.report_date)}完整持仓 · 历史指数成分归属</span></div><div class="two-column two-column-wide"><div>${renderBarList(entries, Math.max(...entries.map(item => item[1]), 0.01))}</div><div>${renderTable(['归属', '持股数', '占基金净值'], rows)}</div></div><p class="method-note">沪深300、中证500和中证1000分别作为大盘、中盘和小盘代理；港股与其他A股单列。此项沿用${escapeHTML(style.report_date)}历史研究快照，不代表${escapeHTML(fund.asset?.report_date || '最新报告期')}配置，也不使用当前指数成分回填历史。</p></article>`;
+  return `<article class="subpanel" data-research-capability="size-style"><div class="subpanel-heading"><h3>大小盘风格</h3><span>${escapeHTML(style.report_date)}完整持仓 · 历史指数成分归属</span></div><div class="two-column two-column-wide"><div>${renderBarList(entries, Math.max(...entries.map(item => item[1]), 0.01))}</div><div>${renderTable(['归属', '持股数', '占基金净值'], rows)}</div></div><p class="method-note">沪深300、中证500和中证1000分别作为大盘、中盘和小盘代理；港股与其他A股单列。此项沿用${escapeHTML(style.report_date)}历史研究快照，不代表${escapeHTML(fund.asset?.report_date || '最新报告期')}配置，也不使用当前指数成分回填历史。</p></article>`;
 }
 
 function holdingTransitionRows(holdingHistory) {
@@ -5386,7 +5383,7 @@ function genericRebalancingPanel(fund, detail, holdingHistory, multiIndexAnalysi
     ${multiIndexAnalysis?.comparison_points?.length ? `<article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>净值与市场/风格指数跟踪</h3><span>近5年日频有效观察 · 可切换对比指数</span></div></div>${renderMultiIndexChart(multiIndexAnalysis, fund.name)}</article>` : ""}
     <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>股票与现金仓位监控</h3><span>报告期披露</span></div></div>${assetHistory.length ? renderMiniLineChart(assetHistory, [{ key: "stock_to_nav", label: "股票仓位", color: "#0b7774", width: 3 }, { key: "cash_to_nav", label: "现金仓位", color: "#c5913d", width: 2.5 }], "股票与现金仓位变化") : '<p class="empty-copy">暂无资产配置历史。</p>'}</article>
     ${fund.category === "active-equity" ? `<div class="research-grid two-column-grid"><article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>季度前十大集中度</h3><span>占基金净值</span></div></div>${concentrationHistory.length ? renderMiniLineChart(concentrationHistory, [{ key: "top10_concentration", label: "前十大集中度", color: "#0b7774", width: 3 }], "季度前十大集中度变化") : '<p class="empty-copy">暂无集中度历史。</p>'}</article><article class="subpanel"><div class="subpanel-heading"><div><h3>核心持仓稳定性</h3><span>前十大名单重合与披露权重变化</span></div></div><section class="research-metric-grid metric-two">${metric("平均名单重合", pct(averageJaccard, 1))}${metric("最新名单重合", pct(latestStability?.jaccard, 1), latestStability ? `${latestStability.common}只共同持有` : "")}${metric("最新披露权重变化", pct(latestStability?.weightChange, 1))}</section><p class="method-note">披露权重变化同时受交易和股价涨跌影响，不等于真实换手率。</p></article></div><article class="subpanel"><div class="subpanel-heading"><div><h3>成长价值风格</h3><span>基金月度收益与成长/价值指数相关性</span></div></div><div id="generic-style-correlation-output">${genericStyleCorrelationContent(fund)}</div></article>` : ""}
-    ${renderDeepSampleSizeStyle(fund, detail)}
+    ${renderHistoricalSizeStyle(fund, detail)}
     <article class="subpanel"><div class="subpanel-heading"><div><h3>季度前十大名单变化</h3><span>近二十个披露期</span></div></div>${transitions.length ? renderTable(["报告期", "披露数", "合计权重", "新进前十", "退出前十"], transitions, "", 8) : '<p class="empty-copy">暂无可比持仓历史。</p>'}</article>
     <article class="subpanel" data-deep-capability="quarter-transitions"><div class="subpanel-heading"><h3>逐期调仓轨迹 · 全部名单与权重变化</h3><span>季度前十大分别比较，不混入同日完整持仓</span></div>${renderTable(['区间', '名单重合', '共同持有', '新出现名称 / 代码', '未列前十名称 / 代码', '披露权重变化'], holdingTransitionRows(holdingHistory), "", 8)}<p class="method-note">保留每个可比区间的完整名单，不只截取前五只；未列前十不等于卖出，权重变化不等于成交或真实换手率。</p></article>
     <p class="method-note">净值及宽基对比可在“业绩表现”查看；未进入历史指数成分的数据不推断大小盘归属。</p>`;
@@ -5867,7 +5864,7 @@ function genericTabLoadingPanel(label) {
 function bindGenericPerformancePanel(fund, detail) {
   const chartPoints = genericNavChartPoints(fund, detail);
   const benchmark = genericBenchmark(fund, detail);
-  bindGenericPerformanceChart(chartPoints, fund.name, benchmark.name, genericFundNavPoints(detail), DEEP_SAMPLE_CODES.has(fund.code));
+  bindGenericPerformanceChart(chartPoints, fund.name, benchmark.name, genericFundNavPoints(detail), ["active-equity", "index-enhanced"].includes(fund.category));
   if (["pure-bond", "hybrid-bond"].includes(fund.category)) bindPureBondIndexComparison(fund, detail);
 }
 
@@ -6437,27 +6434,6 @@ function loadGenericDetail(code) {
   return promise;
 }
 
-function loadDeepSampleData() {
-  const embedded = window.__standaloneEmbeddedData;
-  if (embedded?.["funds.json"] && embedded?.["fund_detail_data.json"] && embedded?.["fund_analysis_data.json"]) {
-    return Promise.resolve({
-      summary: embedded["funds.json"],
-      details: embedded["fund_detail_data.json"],
-      analysis: embedded["fund_analysis_data.json"],
-    });
-  }
-  if (window.FUND_DEEP_SAMPLE_DATA) return Promise.resolve(window.FUND_DEEP_SAMPLE_DATA);
-  if (deepSamplePromise) return deepSamplePromise;
-  deepSamplePromise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/deep_samples.js?v=${DASHBOARD_DATA_VERSION}`, "深度样本数据", () => {
-    if (!window.FUND_DEEP_SAMPLE_DATA) throw new Error("深度样本数据脚本未生成有效内容");
-    return window.FUND_DEEP_SAMPLE_DATA;
-  }).catch((error) => {
-    deepSamplePromise = null;
-    throw error;
-  });
-  return deepSamplePromise;
-}
-
 function loadHoldingCharacteristicDates(dates) {
   return Promise.all([...new Set(dates.filter(Boolean))].map((date) => {
     if (window.FUND_HOLDING_CHARACTERISTICS?.[date]) return Promise.resolve();
@@ -6716,14 +6692,6 @@ if (!fundId && !fundCode) {
       }
       if (!catalogFund) throw new Error("没有找到该基金的研究数据");
       if (!genericDetail) throw new Error("该基金的净值详情尚未生成");
-      if (DEEP_SAMPLE_CODES.has(catalogFund.code)) {
-        try {
-          const deep = await loadDeepSampleData();
-          genericDetail.deep_sample_analysis = deep.analysis?.funds?.[catalogFund.code];
-        } catch (error) {
-          genericDetail.deep_sample_error = `深度样本补充数据加载失败：${error.message}。刷新可重试；当前净值与通用持仓分析不受影响。`;
-        }
-      }
       let pureBondDuration = null;
       if (catalogFund.category === "pure-bond") {
         const [, currentDuration] = await Promise.all([
