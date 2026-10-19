@@ -1582,7 +1582,7 @@ function renderTimelineHeatmap(periods, dimension, options = {}) {
       if (value < 0.0005) return '<td class="timeline-heatmap-empty" title="该期未披露或权重低于0.05%">—</td>';
       const intensity = Math.min(value / scale, 1);
       const alpha = 0.12 + intensity * 0.76;
-      const foreground = intensity > 0.58 ? "#ffffff" : "#102c45";
+      const foreground = "#000000"; // Readable across the full translucent teal scale.
       return `<td style="background:rgba(11,119,116,${alpha.toFixed(3)});color:${foreground}" title="${escapeHTML(periods[index].report_date)} · ${escapeHTML(item.name)} · ${pct(value, 2)}">${pct(value, 1)}</td>`;
     }).join("");
     return `<tr><th scope="row"><button class="timeline-heatmap-row-link" data-industry-name="${escapeHTML(item.name)}">${escapeHTML(item.name)}</button></th>${values}</tr>`;
@@ -2321,7 +2321,7 @@ function renderHoldingTrajectoryHeatmap(periods, scope, rowLimit = 20) {
       const value = Number(holding.weight || 0);
       const intensity = Math.min(value / scale, 1);
       const alpha = 0.12 + intensity * 0.76;
-      const foreground = intensity > 0.58 ? "#ffffff" : "#102c45";
+      const foreground = "#000000"; // Readable across the full translucent teal scale.
       return `<td style="background:rgba(11,119,116,${alpha.toFixed(3)});color:${foreground}" title="${escapeHTML(period.report_date)} · ${escapeHTML(stock.name)} · ${pct(value, 2)}">${pct(value, 1)}</td>`;
     }).join("");
     return `<tr><th scope="row"><button class="timeline-heatmap-row-link" data-holding-stock="${escapeHTML(stock.code)}">${escapeHTML(stock.name)}<small>${escapeHTML(stock.code)}</small></button></th>${cells}</tr>`;
@@ -2656,8 +2656,17 @@ function bindTabs(onActivate = null) {
 }
 
 function researchSummary(fund, detail) {
-  const value = window.FUND_RESEARCH_SUMMARY?.funds?.[fund.code];
+  const shard = (Number(fund.code.split(".")[0]) % 64).toString(16);
+  const value = window.FUND_RESEARCH_SUMMARIES?.[shard]?.[fund.code] || window.FUND_RESEARCH_SUMMARY?.funds?.[fund.code];
   return value && value.nav_date === fund.performance?.latest_date && value.asset_date === (fund.asset?.report_date || null) && value.latest_nav === detail?.nav?.at(-1)?.[1] ? value : null;
+}
+
+function loadResearchSummary(code) {
+  const shard = (Number(code.split(".")[0]) % 64).toString(16);
+  if (window.FUND_RESEARCH_SUMMARIES?.[shard] || window.FUND_RESEARCH_SUMMARY?.funds?.[code]) return Promise.resolve();
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/research_summaries/${shard}.js?v=${DASHBOARD_DATA_VERSION}`, "基金概览", () => {
+    if (!window.FUND_RESEARCH_SUMMARIES?.[shard]?.[code]) throw new Error("该基金概览尚未生成，请稍后重试");
+  });
 }
 
 function researchNavPreview(detail) {
@@ -2772,7 +2781,14 @@ function prepareResearchOverview(fund, detail) {
   }));
   page.querySelectorAll('[data-research-group]').forEach(b => b.addEventListener('click', () => { const ids = RESEARCH_GROUPS.find(g => g[0] === b.dataset.researchGroup)[2]; const selected = ids.map(id => nav.querySelector(`[data-tab="${id}"]`)).find(Boolean); selected?.click(); }));
   syncResearchGroups('overview');
-  loadDashboardAsset('research_summary.js').then(() => { page.querySelector('[data-panel="overview"]').innerHTML = renderResearchOverview(fund, detail); }).catch(error => { page.querySelector('.research-conclusion')?.insertAdjacentHTML('beforeend', `<p class="empty-copy">决策摘要加载失败：${escapeHTML(error.message)}。已保留原始分析页签。</p>`); });
+  const refreshSummary = () => loadResearchSummary(fund.code).then(() => {
+    page.querySelector('[data-panel="overview"]').innerHTML = renderResearchOverview(fund, detail);
+  }).catch(error => {
+    page.querySelector('[data-summary-error]')?.remove();
+    page.querySelector('.research-conclusion')?.insertAdjacentHTML('beforeend', `<div data-summary-error><p class="empty-copy">概览补充信息未能加载：${escapeHTML(error.message)}。净值和其他分析仍可查看。</p><button type="button" class="text-button" data-summary-retry>重新加载概览</button></div>`);
+    page.querySelector('[data-summary-retry]')?.addEventListener('click', refreshSummary);
+  });
+  void refreshSummary();
   foldResearchHistory();
   const observer = new MutationObserver(foldResearchHistory);
   observer.observe(page.querySelector('.fund-tab-content'), {childList: true, subtree: true});
@@ -5870,7 +5886,7 @@ function bindGenericPerformancePanel(fund, detail) {
 
 function createGenericTabLoader(fund, detail) {
   const resourcePromises = new Map();
-  const loadedTabs = new Set(fund.category === "pure-bond" ? [] : ["performance"]);
+  const loadedTabs = new Set();
   const once = (key, loader) => {
     if (!resourcePromises.has(key)) {
       const promise = Promise.resolve().then(loader).catch((error) => {
@@ -5902,6 +5918,12 @@ function createGenericTabLoader(fund, detail) {
   const renderTab = async (id) => {
     const target = document.querySelector(`[data-panel="${id}"]`);
     if (!target) return;
+    if (id === "performance") {
+      target.innerHTML = genericPerformancePanel(fund, detail, null);
+      bindGenericPerformancePanel(fund, detail);
+      if (!detail?.benchmark?.length) void loadGenericPerformanceBenchmark(fund, detail);
+      return;
+    }
     if (id === "simulation") {
       bindCombinedEquitySimulation(target, null, null, '', null, '', fund.code);
       return;
@@ -6198,22 +6220,11 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
 }
 
 function renderPureBondReferenceFund(fund, detail, currentDuration) {
-  const reference = window.FUND_STORE?.[fund.code];
-  if (!pureBondReferenceReadyCodes.has(fund.code) || !reference || !window.__PB) return false;
-  refreshPureBondReferenceData(reference, fund, detail, currentDuration);
+  if (!window.__PB) return false;
   document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
   document.body.classList.remove("pure-bond-reference-page");
-  window.__PB.setCurrent(reference);
   const tabs = GENERIC_TABS["pure-bond"];
-  const wrap = (html) => `<div class="pb-scope">${html}</div>`;
-  const content = {
-    perf: wrap(window.__PB.renderPerf(reference)),
-    alloc: wrap(window.__PB.renderAlloc(reference)),
-    bond: wrap(window.__PB.renderBondStruct(reference)),
-    corr: wrap(window.__PB.renderCorr(reference)),
-    campisi: wrap(window.__PB.renderCampisi(reference)),
-    documents: genericTabLoadingPanel("公告原文"),
-  };
+  const content = Object.fromEntries(tabs.map(([id, label]) => [id, genericTabLoadingPanel(label)]));
   const overviewMetrics = `${metric("近1年收益", pct(fundPerformanceValue(fund, "1y", "returns"), 1, true))}${metric("近3年收益", pct(fundPerformanceValue(fund, "3y", "returns"), 1, true))}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 1))}${metric("最新杠杆", isFiniteValue(fund.asset?.leverage) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—")}`;
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
@@ -6223,31 +6234,62 @@ function renderPureBondReferenceFund(fund, detail, currentDuration) {
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
     <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
     <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>披露持仓是报告期快照，不代表实时持仓；研究结果不构成投资建议。</li></ul></section>`;
-  const loadedTabs = new Set(["perf", "alloc", "bond", "corr", "campisi"]);
   prepareResearchOverview(fund, detail);
-  const loadDocuments = async (id) => {
-    if (id !== "documents" || loadedTabs.has(id)) return;
-    const target = document.querySelector('[data-panel="documents"]');
+  bindPureBondReferenceInteractions();
+  bindTabs(createPureBondTabLoader(fund, detail));
+
+  return true;
+}
+
+function createPureBondTabLoader(fund, detail) {
+  const loadedTabs = new Set();
+  let bundlePromise;
+  const bundle = () => {
+    if (!bundlePromise) bundlePromise = Promise.all([
+      loadPureBondReferenceBundle(fund.code),
+      loadPureBondKalmanDuration(fund.code).catch(error => {
+        detail.pure_bond_duration_error = error.message;
+        return null;
+      }),
+    ]).then(([reference, duration]) => {
+      if (!reference || !pureBondReferenceReadyCodes.has(fund.code)) throw new Error("纯债分析资料尚未准备完成");
+      refreshPureBondReferenceData(reference, fund, detail, duration);
+      window.__PB.setCurrent(reference);
+      return reference;
+    }).catch(error => { bundlePromise = null; throw error; });
+    return bundlePromise;
+  };
+  return async function loadTab(id) {
+    if (loadedTabs.has(id)) return;
+    const target = document.querySelector(`[data-panel="${id}"]`);
     if (!target || target.dataset.loading === "true") return;
     target.dataset.loading = "true";
     target.setAttribute("aria-busy", "true");
+    target.innerHTML = '<p class="method-note" role="status">正在加载本页分析，概览和其他页签可继续查看…</p>';
     try {
-      target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
+      if (id === "documents") target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
+      else {
+        const reference = await bundle();
+        if (!target.isConnected) return;
+        const render = {perf:window.__PB.renderPerf, alloc:window.__PB.renderAlloc, bond:window.__PB.renderBondStruct, corr:window.__PB.renderCorr, campisi:window.__PB.renderCampisi}[id];
+        if (!render) return;
+        target.innerHTML = `<div class="pb-scope">${render(reference)}</div>`;
+        if (id === "alloc") window.__PB.ensureDurKF(reference.code, () => {
+          if (target.isConnected) window.__PB.refreshDurKF();
+        });
+        if (detail.pure_bond_duration_error && id === "alloc") {
+          target.insertAdjacentHTML('afterbegin', `<p class="simulation-warning">最新日频久期未能加载，其他资料仍可查看。${escapeHTML(detail.pure_bond_duration_error)}</p>`);
+        }
+      }
       loadedTabs.add(id);
     } catch (error) {
-      target.innerHTML = genericTabLoadingPanel(error.message) + '<button type="button" class="button" data-tab-data-retry>重新加载公告</button>';
-      target.querySelector("[data-tab-data-retry]")?.addEventListener("click", () => loadDocuments(id));
+      target.innerHTML = `<p class="simulation-warning" role="alert">本页分析未能加载：${escapeHTML(error.message)}。研究概览和公告仍可查看。</p><button type="button" class="button" data-tab-data-retry>重新加载本页分析</button>`;
+      target.querySelector('[data-tab-data-retry]')?.addEventListener('click', () => loadTab(id));
     } finally {
       delete target.dataset.loading;
       target.removeAttribute("aria-busy");
     }
   };
-  bindTabs(loadDocuments);
-  bindPureBondReferenceInteractions();
-  window.__PB.ensureDurKF(reference.code, () => {
-    try { window.__PB.refreshDurKF(); } catch (_error) {}
-  });
-  return true;
 }
 
 function bindPureBondReferenceInteractions() {
@@ -6317,7 +6359,7 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
   const tabLabels = Object.fromEntries(tabs);
   const content = Object.fromEntries(tabs.map(([id, label]) => [
     id,
-    id === "performance" ? genericPerformancePanel(fund, detail, null) : genericTabLoadingPanel(label),
+    genericTabLoadingPanel(label),
   ]));
   const relativeMetrics = window.INDEX_ENHANCED_METRICS?.funds?.[fund.code] || fund.relative_metrics || {};
   const overviewMetrics = (() => {
@@ -6341,10 +6383,7 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
   prepareResearchOverview(fund, detail);
   bindTabs(loadTab);
   if (fund.category === "pure-bond") loadTab("research");
-  else bindGenericPerformancePanel(fund, detail);
-  if (fund.category !== "pure-bond" && !detail?.benchmark?.length) {
-    void loadGenericPerformanceBenchmark(fund, detail);
-  }
+
 }
 
 // Keep a failed comparison series visible and retryable without blocking the other tabs.
@@ -6692,21 +6731,7 @@ if (!fundId && !fundCode) {
       }
       if (!catalogFund) throw new Error("没有找到该基金的研究数据");
       if (!genericDetail) throw new Error("该基金的净值详情尚未生成");
-      let pureBondDuration = null;
-      if (catalogFund.category === "pure-bond") {
-        const [, currentDuration] = await Promise.all([
-          loadPureBondReferenceBundle(catalogFund.code).catch((error) => {
-            genericDetail.pure_bond_reference_error = error.message;
-            return null;
-          }),
-          loadPureBondKalmanDuration(catalogFund.code).catch((error) => {
-            genericDetail.pure_bond_duration_error = error.message;
-            return null;
-          }),
-        ]);
-        pureBondDuration = currentDuration;
-      }
-      renderGenericFund(catalogFund, genericDetail, pureBondDuration);
+      renderGenericFund(catalogFund, genericDetail);
       bindHistoricalControls();
     })
     .catch((error) => showError(error.message));
