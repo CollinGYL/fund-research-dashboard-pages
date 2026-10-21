@@ -38,7 +38,7 @@ const DASHBOARD_GLOBAL_ASSETS = {
 };
 
 // A failed connection gets one fresh attempt; malformed content stays an explicit error.
-function loadDataScript(src, label, read, failureMessage = "") {
+function loadDataScript(src, label, read, failureMessage = "", options = {}) {
   if (dataScriptPromises.has(src)) return dataScriptPromises.get(src);
   const promise = new Promise((resolve, reject) => {
     let attempt = 0;
@@ -53,13 +53,13 @@ function loadDataScript(src, label, read, failureMessage = "") {
         script.onload = script.onerror = null;
         script.remove();
         if (error) {
-          if (retryable && attempt < 2) return start();
+          if (retryable && attempt < (options.maxAttempts || 2)) return start();
           reject(error);
           return;
         }
         try { resolve(read()); } catch (invalid) { reject(invalid); }
       };
-      const timer = setTimeout(() => finish(new Error(`${label} 加载超时，已尝试 ${attempt} 次，请重试`), true), 20000);
+      const timer = setTimeout(() => finish(new Error(`${label} 加载超时，已尝试 ${attempt} 次，请重试`), true), options.timeoutMs || 20000);
       // A removed script may leave its fetch in flight; give the retry a fresh URL.
       script.src = attempt === 1 ? src : `${src}${src.includes('?') ? '&' : '?'}_retry=${attempt}-${Date.now()}`;
       script.onload = () => finish();
@@ -266,9 +266,11 @@ function loadProfileDetails(code) {
   if (window.FUND_PROFILE_DETAILS?.[code]) return Promise.resolve(window.FUND_PROFILE_DETAILS[code]);
   if (profileDetailPromises.has(code)) return profileDetailPromises.get(code);
   const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/profile_details/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, "画像", () => {
-    if (!window.FUND_PROFILE_DETAILS?.[code]) throw new Error("画像数据缺失");
-    return window.FUND_PROFILE_DETAILS[code];
-  }).catch(error => { profileDetailPromises.delete(code); throw error; });
+    if (!window.FUND_PROFILE_DETAILS?.[code]) throw new Error("画像文件未包含该基金的档案，无法展示画像；净值对比仍可查看");
+    const value=window.FUND_PROFILE_DETAILS[code];
+    if (value.code!==code || typeof value.status!=="string") throw new Error("画像文件格式异常，请重试");
+    return value;
+  }, "画像档案未取得：文件可能尚未发布，或网络读取失败。现有画像主要覆盖主观权益产品；未覆盖不代表没有持仓。可重试，暂不判定画像是否相似", {timeoutMs:10000,maxAttempts:1}).catch(error => { profileDetailPromises.delete(code); throw error; });
   profileDetailPromises.set(code, promise);
   return promise;
 }
@@ -299,16 +301,232 @@ function renderDisclosedPercentiles(r) {
   return `<article class="subpanel profile-percentiles"><div class="subpanel-heading"><div><h3>画像分位 · 在可比基金中的位置</h3><span>股票风格与投资行为分开看，不合成为总分</span></div></div><div class="profile-percentile-grid">${group("股票风格", dimensions.slice(0, 3))}${group("投资行为", dimensions.slice(3))}</div><p class="method-note">分位基于${escapeHTML(r.report_date)}同报告期、满足画像可比条件的主观权益产品，A/C份额合并；行为使用截至该期最近有效区间。分位越高只表示该特征越突出，不代表基金越好。PB是估值维度，不能直接当作成长性。</p></article>`;
 }
 
+// One pair drives the profile explanation, NAV chart and return statistics.
+function profilePairCandidates(r) {
+  const w = r.windows?.[selectedProfileWindow(r)] || r;
+  const data = window.FUND_CORRELATION_METRICS?.funds?.[r.code];
+  const all = [...(w.peers || []), ...(data?.peers || []), ...Object.values(data?.windows || {}).flatMap(x => x.peers || [])];
+  return [...new Map(all.filter(x => /^\d{6}\.(?:OF|SH|SZ)$/.test(x.code) && x.code !== r.code).map(x => [x.code, x])).values()];
+}
+
+function profilePeerCards(peers, key = '') {
+  const distance = v => Number.isFinite(v) ? v.toFixed(3) : '未使用';
+  return `<ul class="profile-peer-list profile-pair-candidates">${peers.map((x, i) => `<li class="profile-peer-card"><div class="profile-peer-identity"><span>画像候选 ${i + 1}</span><a href="fund.html?code=${encodeURIComponent(x.code)}&tab=profile${key ? `&profileWindow=${encodeURIComponent(key)}` : ''}">${escapeHTML(x.name)}</a><span>${escapeHTML(x.code)}</span></div><dl class="profile-peer-distances">${[['画像差异',x.distance],['行业',x.industry_distance],['股票风格',x.style_distance],['投资行为',x.behavior_distance]].map(([label,value])=>`<div><dt>${label}</dt><dd>${distance(value)}</dd></div>`).join('')}</dl><button type="button" class="profile-pair-button" data-peer-compare="${escapeHTML(x.code)}" aria-pressed="false">对比画像与净值</button></li>`).join('')}</ul>`;
+}
+
+function profilePairShell(r) {
+  if (!profilePairCandidates(r).length) return '';
+  return `<section class="profile-pair-shell" data-profile-pair="${escapeHTML(r.code)}" aria-label="两只基金联动对比"><div class="subpanel-heading"><div><h3>同一对基金，一起看画像与净值</h3><span>选择上方候选或下方相关性榜单中的“画像与净值对比”</span></div><label class="history-window-label">净值区间 <select data-pair-window aria-label="两只基金净值对比区间">${[['1m','近1月'],['3m','近3月'],['6m','近6月'],['ytd','今年以来'],['1y','近1年'],['3y','近3年'],['5y','近5年'],['all','共同历史']].map(([key,label])=>`<option value="${key}">${label}</option>`).join('')}</select></label></div><div data-pair-output aria-live="polite"><p class="empty-copy">选择基金后加载两只基金的净值。</p></div></section>`;
+}
+
+function pairNavSeries(detail) {
+  const points = new Map();
+  for (const [date, value] of detail?.nav || []) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(value) || value <= 0) continue;
+    if (points.has(date) && points.get(date) !== value) throw new Error(`${date}存在冲突净值，暂不计算对比`);
+    points.set(date, value);
+  }
+  return [...points].sort(([a], [b]) => a.localeCompare(b));
+}
+
+function pairWindowStart(end, key) {
+  if (key === 'all') return '';
+  if (key === 'ytd') return `${end.slice(0,4)}-01-01`;
+  const months = { '1m':1, '3m':3, '6m':6, '1y':12, '3y':36, '5y':60 }[key] || 36;
+  const [year, month, day] = end.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1 - months, 1));
+  const lastDay = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  date.setUTCDate(Math.min(day, lastDay));
+  return date.toISOString().slice(0,10);
+}
+
+function pairNavComparison(leftDetail, rightDetail, key) {
+  const left = pairNavSeries(leftDetail), right = pairNavSeries(rightDetail);
+  const rightMap = new Map(right);
+  const common = left.filter(([date]) => rightMap.has(date));
+  if (common.length < 2) return { points:[], reason:'共同净值日期不足2个，暂无法对比。' };
+  const end = common.at(-1)[0], requestedStart = pairWindowStart(end, key);
+  const rows = common.filter(([date]) => date >= requestedStart);
+  // Use the common NAV on/before the trailing boundary; YTD starts at the prior year end.
+  const previous = requestedStart ? common.filter(([date]) => date < requestedStart).at(-1) : null;
+  if (previous && (key === 'ytd' || rows[0]?.[0] > requestedStart)) rows.unshift(previous);
+  if (rows.length < 2) return { points:[], reason:'所选区间共同净值不足2个，请扩大区间。' };
+  const start = rows[0][0], firstLeft = rows[0][1], firstRight = rightMap.get(start);
+  const points = rows.map(([date,value]) => ({report_date:date, fund:value/firstLeft, peer:rightMap.get(date)/firstRight}));
+  // Match both ends of each return interval. Missing observations are never filled
+  // or compared as a one-day return against a multi-day return.
+  const returns = series => new Map(series.slice(1).flatMap(([date,value],i) => series[i][0] >= start && date <= end ? [[`${series[i][0]}|${date}`,value/series[i][1]-1]] : []));
+  const a = returns(left), b = returns(right);
+  const paired = [...a].filter(([interval]) => b.has(interval)).map(([interval,value])=>[value,b.get(interval)]);
+  let correlation = null;
+  let reason = paired.length < 12 ? `仅${paired.length}个共同收益区间，至少需要12个` : '';
+  if (!reason) {
+    const ax = paired.reduce((s,x)=>s+x[0],0)/paired.length, bx = paired.reduce((s,x)=>s+x[1],0)/paired.length;
+    let xx=0, yy=0, xy=0;
+    for (const [x,y] of paired) {xx+=(x-ax)**2; yy+=(y-bx)**2; xy+=(x-ax)*(y-bx);}
+    if (xx <= 1e-24 || yy <= 1e-24) reason='至少一只基金的区间收益无变化，相关性无定义';
+    else correlation=Math.max(-1,Math.min(1,xy/Math.sqrt(xx*yy)));
+  }
+  return {points,start,end,requestedStart,observations:paired.length,correlation,reason,
+    leftReturn:points.at(-1).fund-1,rightReturn:points.at(-1).peer-1,
+    leftLatest:left.at(-1)?.[0],rightLatest:right.at(-1)?.[0]};
+}
+
+function profilePairAnalysis(left, right, key) {
+  const lw = left?.windows?.[key], rw = right?.windows?.[key];
+  const reasons = [], notes = [];
+  for (const [label,r,w] of [['本基金',left,lw],['对比基金',right,rw]]) {
+    if (!r) reasons.push(`${label}暂无可用画像档案`);
+    else if (r.status !== 'available') reasons.push(`${label}缺少可用完整披露持仓，无法形成完整画像`);
+    else if (!w?.dates?.length) reasons.push(`${label}在所选窗口没有有效披露期`);
+  }
+  let sameBasis = false;
+  if (lw?.dates?.length && rw?.dates?.length) {
+    if (JSON.stringify(lw.dates) !== JSON.stringify(rw.dates)) reasons.push('两只基金实际披露日期覆盖不同；以下保留各自窗口的实际值，不混用分位计算总距离');
+    if (!lw.market_group || lw.market_group !== rw.market_group) reasons.push('A/H市场组不同，股票风格分位的可比样本不同');
+    if (!lw.as_of || lw.as_of !== rw.as_of) reasons.push('画像数据截止日不同，分位基准可能已更新');
+    sameBasis = reasons.length === 0;
+  }
+  const ranked = (w,k) => { const m=w?.metrics?.[k]; return Number.isFinite(m?.percentile) && m.percentile>=0 && m.percentile<=1 && m.comparison_count>=30 ? m.percentile : null; };
+  const groups = [['market_cap','pb','roe'],['activity','concentration','persistence','industry_stability']];
+  const dimensions = groups.map(keys=>keys.filter(k=>ranked(lw,k)!==null && ranked(rw,k)!==null));
+  if (sameBasis && dimensions.flat().some(k=>lw.metrics[k].comparison_count!==rw.metrics[k].comparison_count)) {
+    reasons.push('指标分位的样本数量不同，暂不合并为总距离'); sameBasis=false;
+  }
+  if (lw && rw && dimensions[0].length<2) reasons.push(`共同有效股票风格仅${dimensions[0].length}项，至少需要2项；缺失值不当作零`);
+  const industryValid = w => {
+    const values=Object.values(w?.industry || {});
+    return values.length>0 && values.every(x=>Number.isFinite(x)&&x>=0) && Math.abs(values.reduce((s,x)=>s+x,0)-1)<.001;
+  };
+  if (lw && rw && (!industryValid(lw)||!industryValid(rw))) reasons.push('行业权重缺失或口径不完整，暂不计算行业及总距离');
+  if (left && right) {
+    const managers=(left.current_managers || []).filter(x=>(right.current_managers || []).includes(x));
+    if (managers.length) notes.push(`共同现任经理：${managers.join('、')}。同经理产品不进相似候选榜，但仍可手动对比画像`);
+    if (left.portfolio_id && left.portfolio_id===right.portfolio_id) notes.push('两者属于同一基金产品；份额差异不视作独立的投资画像');
+  }
+  let industry=null, style=null, behavior=null, distance=null;
+  if (!reasons.length) {
+    const labels=[...new Set([...Object.keys(lw.industry),...Object.keys(rw.industry)])];
+    industry=labels.reduce((s,k)=>s+Math.abs((lw.industry[k]||0)-(rw.industry[k]||0)),0)/2;
+    const meanDifference=keys=>keys.reduce((s,k)=>s+Math.abs(ranked(lw,k)-ranked(rw,k)),0)/keys.length;
+    style=meanDifference(dimensions[0]);
+    if (dimensions[1].length>=2) behavior=meanDifference(dimensions[1]);
+    distance=behavior===null?(2*industry+style)/3:.5*industry+.25*style+.25*behavior;
+    if (behavior===null) notes.push(`共同有效行为不足2项（当前${dimensions[1].length}项），不计入总距离；行业/股票风格权重为2/3与1/3`);
+  }
+  return {lw,rw,reasons,notes,sameBasis,industry,style,behavior,distance,styleDimensions:dimensions[0].length,behaviorDimensions:dimensions[1].length};
+}
+
+function profilePairMetricValue(key, value) {
+  if (!Number.isFinite(value)) return '暂无有效值';
+  if (key==='market_cap') return `${value.toFixed(0)}亿元`;
+  if (key==='pb') return `${value.toFixed(1)}倍`;
+  if (key==='roe') return `${value.toFixed(1)}%`;
+  return pct(value,1);
+}
+
+function renderPairProfileComparison(left, right, key, base, peer, errors = {}) {
+  const a=profilePairAnalysis(left,right,key);
+  const names=[base.name,peer.name];
+  const errorReasons=Object.entries(errors).filter(([,e])=>e).map(([side,e])=>`${side==='left'?base.name:peer.name}：${e.message}`);
+  const reasons=errorReasons.length ? [...errorReasons,...a.reasons.filter(x=>!x.includes('暂无可用画像档案'))] : a.reasons;
+  const ready=Number.isFinite(a.distance) && !reasons.length;
+  const existing=a.lw?.peers?.find(x=>x.code===peer.code);
+  const rank=existing ? 1+(a.lw.peers||[]).filter(x=>x.distance<existing.distance).length : null;
+  const rankText=rank ? `已保存画像候选第${rank}名` : '按选中两只基金的已有画像即时对比；未入前5不代表没有画像';
+  const summary=ready ? `<div class="profile-pair-distance"><div><span>画像差异（原综合距离）</span><strong>${a.distance.toFixed(3)}<small>越低越接近</small></strong></div><p>${escapeHTML(rankText)}<br>行业 ${a.industry.toFixed(3)} · 股票风格 ${a.style.toFixed(3)} · 投资行为 ${a.behavior===null?'未使用':a.behavior.toFixed(3)}</p></div>` : `<div class="profile-pair-distance profile-pair-unavailable"><div><span>画像差异</span><strong>暂不可合并</strong></div><ul>${reasons.map(x=>`<li>${escapeHTML(x)}</li>`).join('')}</ul></div>`;
+  const coverage=(r,w)=>!r?'档案未加载':!w?.dates?.length?'窗口无有效披露':`${w.first_date} 至 ${w.last_date} · ${w.dates.length}期 · ${w.market_group}`;
+  const specs=[['market_cap','股票市值'],['pb','估值 PB'],['roe','盈利 ROE'],['activity','调仓活跃度'],['concentration','持仓集中度'],['persistence','持股延续率'],['industry_stability','行业稳定性']];
+  const cell=(w,k)=>{
+    const m=w?.metrics?.[k],p=m?.percentile;
+    const valid=a.sameBasis && Number.isFinite(p) && p>=0 && p<=1 && m.comparison_count>=30;
+    return `<strong>${profilePairMetricValue(k,m?.value)}</strong>${valid?`<small>窗口分位 P${Math.round(p*100)}</small><span class="pair-profile-bar"><i style="width:${(p*100).toFixed(1)}%"></i></span>`:'<small>可比分位不足或基准不同</small>'}`;
+  };
+  const table=`<div class="table-scroll"><table class="profile-pair-table"><thead><tr><th>窗口平均特征</th>${names.map(n=>`<th>${escapeHTML(n)}</th>`).join('')}</tr></thead><tbody>${specs.map(([k,label])=>`<tr><th>${label}</th><td>${cell(a.lw,k)}</td><td>${cell(a.rw,k)}</td></tr>`).join('')}</tbody></table></div>`;
+  const industries=[...new Set([...Object.keys(a.lw?.industry||{}),...Object.keys(a.rw?.industry||{})])].sort((x,y)=>Math.max(a.lw?.industry?.[y]||0,a.rw?.industry?.[y]||0)-Math.max(a.lw?.industry?.[x]||0,a.rw?.industry?.[x]||0)).slice(0,10);
+  const industryCell=(w,k)=>w?.industry && Object.keys(w.industry).length ? pct(w.industry[k] || 0,1) : '暂无';
+  const industryTable=industries.length?`<details class="profile-pair-method"><summary>展开主要行业配置对照（两者最高权重前10项）</summary>${renderTable(['行业',...names.map(escapeHTML)],industries.map(k=>[escapeHTML(k),industryCell(a.lw,k),industryCell(a.rw,k)]))}</details>`:'';
+  const retry=errorReasons.length?`<button type="button" class="profile-pair-button" data-peer-compare="${escapeHTML(peer.code)}">重新读取画像</button>`:'';
+  return `<section class="pair-profile-comparison" aria-label="两只基金画像对照">${summary}${a.notes.map(x=>`<p class="profile-pair-note">${escapeHTML(x)}</p>`).join('')}${retry}<div class="pair-profile-coverage"><p><strong>${escapeHTML(base.name)}</strong>：${escapeHTML(coverage(left,a.lw))}</p><p><strong>${escapeHTML(peer.name)}</strong>：${escapeHTML(coverage(right,a.rw))}</p></div>${a.lw||a.rw?table+industryTable:''}<p class="method-note">画像使用所选披露窗口的平均特征；净值使用下方所选日频窗口。分位越高只表示特征更突出，不是好坏评分。披露覆盖或A/H组不同则保留各自实际值，不计算总距离。</p></section>`;
+}
+
+function renderProfilePairResult(r, peer, result) {
+  const heading = `<div class="profile-pair-names"><strong>${escapeHTML(r.name)} <small>${escapeHTML(r.code)}</small></strong><span>对比</span><strong>${escapeHTML(peer.name)} <small>${escapeHTML(peer.code)}</small></strong></div>`;
+  const distance = "";
+  if (!result.points.length) return heading + distance + `<p class="empty-copy">${escapeHTML(result.reason)}</p>`;
+  const corr = Number.isFinite(result.correlation) ? result.correlation.toFixed(3) : '暂不可算';
+  const corrHint = result.reason || '越接近 +1，历史涨跌越同步；接近0表示线性联动弱，接近 −1表示反向。';
+  return `${heading}${distance}<div class="profile-pair-metrics">${metric('日收益相关系数',corr,corrHint)}${metric(`${r.name} · 区间收益`,pct(result.leftReturn,2,true))}${metric(`${peer.name} · 区间收益`,pct(result.rightReturn,2,true))}${metric('区间收益差（百分点）',`${((result.leftReturn-result.rightReturn)*100).toFixed(2)}`,'本基金减对比基金，不是相关性')}</div><p class="profile-pair-dates">共同区间 ${escapeHTML(result.start)} 至 ${escapeHTML(result.end)} · ${result.points.length}个共同净值日 / ${result.observations}个同起止收益区间 · 起点均归一为1</p>${renderMiniLineChart(result.points,[{key:'fund',label:r.name,color:'#176bcb',format:'number'},{key:'peer',label:peer.name,color:'#b97b28',format:'number'}],'两只基金的复权净值对比，起点为1')}<details class="profile-pair-method"><summary>数据日期与计算口径</summary><p class="method-note">净值最新日：本基金 ${escapeHTML(result.leftLatest)}，对比基金 ${escapeHTML(result.rightLatest)}。图表与收益统计使用共同日期，起点取窗口边界当日或此前最近共同净值；今年以来从上一年末起算。不补齐缺失值，实际覆盖可能因成立时间而缩短。相关系数基于复权净值收益，按两端日期完全相同的区间配对，不使用净值水平计算；至少12个样本。与下方长期榜单的月收益口径不同。</p></details>`;
+}
+
+async function updateProfilePair(fund, requestedCode, requestedWindow) {
+  const panel = page.querySelector('[data-panel="correlation"]');
+  const shell = panel?.querySelector('[data-profile-pair]');
+  if (!shell) return;
+  const r = window.FUND_PROFILE_DETAILS?.[fund.code] || fund;
+  const candidates = profilePairCandidates(r), params = new URLSearchParams(location.search);
+  const code = requestedCode || params.get('compare');
+  const peer = candidates.find(x=>x.code===code) || candidates[0];
+  if (!peer) return;
+  const select = shell.querySelector('[data-pair-window]');
+  const range = requestedWindow || params.get('compareWindow') || selectedProfileWindow(r);
+  select.value = ['1m','3m','6m','ytd','1y','3y','5y','all'].includes(range) ? range : '3y';
+  const url=new URL(location.href);url.searchParams.set('compare',peer.code);url.searchParams.set('compareWindow',select.value);history.replaceState(null,'',url);
+  for (const button of panel.querySelectorAll('[data-peer-compare]')) {
+    const selected=button.dataset.peerCompare===peer.code;
+    button.setAttribute('aria-pressed',String(selected));
+    button.closest('.profile-peer-card')?.classList.toggle('is-pair-selected',selected);
+  }
+  const key=selectedProfileWindow(r), rangeKey=select.value;
+  const host=shell.querySelector('[data-pair-output]');
+  host.innerHTML=`<div data-pair-request><h4>${escapeHTML(fund.name)} 与 ${escapeHTML(peer.name)} · 画像对照</h4><div data-pair-profile-output><p class="loading-state">正在读取所选基金的已有画像…</p></div><div data-pair-nav-output><p class="loading-state">正在读取两只基金的净值…</p></div></div>`;
+  const request=host.firstElementChild;
+  // Portrait and NAV render independently: either can finish or fail on its own.
+  const profileTask=Promise.allSettled([loadProfileDetails(fund.code),loadProfileDetails(peer.code)]).then(results=>{
+    if (!request.isConnected) return;
+    const [left,right]=results.map(x=>x.status==='fulfilled'?x.value:null);
+    const errors=Object.fromEntries(results.map((x,i)=>[i?'right':'left',x.status==='rejected'?x.reason:null]));
+    request.querySelector('[data-pair-profile-output]').innerHTML=renderPairProfileComparison(left,right,key,fund,peer,errors);
+  });
+  const navTask=Promise.all([loadGenericDetail(fund.code),loadGenericDetail(peer.code)]).then(([left,right])=>{
+    if (!request.isConnected) return;
+    request.querySelector('[data-pair-nav-output]').innerHTML=renderProfilePairResult(r,peer,pairNavComparison(left,right,rangeKey));
+    bindMiniLineCharts();
+  }).catch(error=>{
+    if (!request.isConnected) return;
+    request.querySelector('[data-pair-nav-output]').innerHTML=`<p class="empty-copy">净值对比未完成：${escapeHTML(error.message)}。<button type="button" class="profile-pair-button" data-peer-compare="${escapeHTML(peer.code)}">重试净值对比</button></p>`;
+  });
+  await Promise.all([profileTask,navTask]);
+}
+
+function bindProfilePairComparison(fund) {
+  if (fund.category !== 'active-equity') return;
+  if (!page.dataset.pairBound) {
+    page.dataset.pairBound='true';
+    page.addEventListener('click',event=>{
+      const button=event.target.closest('[data-peer-compare]');
+      if (!button) return;
+      updateProfilePair(fund,button.dataset.peerCompare,button.dataset.compareRange);
+      if (!button.closest('.profile-pair-shell')) page.querySelector('[data-profile-pair]')?.scrollIntoView({block:'start',behavior:'smooth'});
+    });
+    page.addEventListener('change',event=>{
+      if (event.target.matches('[data-pair-window]')) updateProfilePair(fund,null,event.target.value);
+      else if(event.target.matches('[data-profile-window]')) updateProfilePair(fund);
+    });
+  }
+  updateProfilePair(fund);
+}
+
 function renderProfilePeers(r, errorMessage = "") {
   if (r?.windows) return renderWindowProfilePeers(r, selectedProfileWindow(r), true);
   const heading = '<div class="subpanel-heading"><div><h3>画像相似基金</h3><span>行业配置、股票风格与投资行为相近，不等同净值走势相关</span></div></div>';
   if (!r || r.status !== "available") return `<article class="subpanel profile-peers">${heading}<p class="empty-copy">${escapeHTML(errorMessage || "暂无可用的完整披露画像，暂不生成相似基金。")}</p></article>`;
   const peers = r.peers || [];
   const distance = value => Number.isFinite(value) ? value.toFixed(3) : "—";
-  const cards = peers.map(x => `<li class="profile-peer-card"><div class="profile-peer-identity"><a href="fund.html?code=${encodeURIComponent(x.code)}&tab=profile">${escapeHTML(x.name)}</a><span>${escapeHTML(x.code)} · ${escapeHTML(x.company || "")}</span></div><dl class="profile-peer-distances">${[["综合距离", x.distance], ["行业", x.industry_distance], ["股票风格", x.style_distance], ["投资行为", x.behavior_distance]].map(([label, value]) => `<div><dt>${label}</dt><dd>${distance(value)}</dd></div>`).join("")}</dl></li>`).join("");
+  const cards = profilePeerCards(peers);
   const dimensions = disclosedProfileDimensions();
   const comparison = peers.length ? `<details class="profile-peer-comparison"><summary>展开分位对照 · 本基金与相似基金</summary><div class="table-scroll"><table class="profile-evidence-table"><thead><tr><th>基金</th>${dimensions.map(([, label]) => `<th>${label}</th>`).join("")}</tr></thead><tbody>${[r, ...peers].map((x, index) => `<tr${index === 0 ? ' class="profile-peer-current"' : ""}><th scope="row">${escapeHTML(x.name)}${index === 0 ? "（本基金）" : ""}</th>${dimensions.map(([key]) => `<td>${disclosedPercentileLabel(x.feature_percentiles?.[key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="method-note">P表示百分位，P80表示第80百分位；各维度高低不是好坏评分。股票风格采用市值、正PB与ROE，目前没有可靠的完整成长性指标。</p></details>` : "";
-  return `<article class="subpanel profile-peers">${heading}<p class="method-note">完整持仓：${escapeHTML(r.report_date)} · ${peers.length ? "以下各项距离越小越相近" : "暂无满足可比条件的基金"}</p>${peers.length ? `<ul class="profile-peer-list">${cards}</ul>` : `<p class="empty-copy">${escapeHTML((r.peer_reasons || []).join("；") || "当前管理结构、特征覆盖或可比样本仍需积累")}。</p>`}${comparison}<p class="method-note">综合距离＝50%行业＋25%股票风格＋25%行为；不使用个股重合度排序。同报告期、同名称主题线索、同A/H市场组内比较，排除同经理产品。名单随披露更新，不是推荐榜、相似概率或永久类别。</p></article>`;
+  return `<article class="subpanel profile-peers">${heading}<p class="method-note">完整持仓：${escapeHTML(r.report_date)} · ${peers.length ? "以下各项距离越小越相近" : "暂无满足可比条件的基金"}</p>${peers.length ? cards : `<p class="empty-copy">${escapeHTML((r.peer_reasons || []).join("；") || "当前管理结构、特征覆盖或可比样本仍需积累")}。</p>`}${profilePairShell(r)}${comparison}<p class="method-note">综合距离＝50%行业＋25%股票风格＋25%行为；不使用个股重合度排序。同报告期、同名称主题线索、同A/H市场组内比较，排除同经理产品。名单随披露更新，不是推荐榜、相似概率或永久类别。</p></article>`;
 }
 
 function renderDisclosedProfile(r, evidenceOnly = false) {
@@ -353,9 +571,11 @@ function renderWindowProfilePeers(r, key, selector = false) {
   const distance = v => Number.isFinite(v) ? v.toFixed(3) : '未使用';
   const peers = w.peers || [];
   return `<article class="subpanel profile-peers" data-window-peers="${escapeHTML(r.code)}"><div class="subpanel-heading"><div><h3>画像相似基金 · ${escapeHTML(w.label)}</h3><span>同实际披露区间、同A/H市场组；不按个股重合排序</span></div>${selector?profileWindowControl(r,key):''}</div>
-    ${peers.length?`<ul class="profile-peer-list">${peers.map(x=>`<li class="profile-peer-card"><div class="profile-peer-identity"><a href="fund.html?code=${encodeURIComponent(x.code)}&tab=profile&profileWindow=${key}">${escapeHTML(x.name)}</a><span>${escapeHTML(x.code)}</span></div><dl class="profile-peer-distances">${[['综合距离',x.distance],['行业',x.industry_distance],['股票风格',x.style_distance],['投资行为',x.behavior_distance]].map(([label,value])=>`<div><dt>${label}</dt><dd>${distance(value)}</dd></div>`).join('')}</dl></li>`).join('')}</ul>
+    <p class="profile-distance-guide"><strong>0.1 该怎么看？</strong>画像差异越低，行业配置、股票风格与投资行为越接近；0表示纳入计算的画像特征无差异。0.1不等于“90%相似”，也没有统一的“很像”分界。结合候选排序，再看下方两只基金是否涨跌同步、收益是否接近。</p>
+    ${peers.length?`${profilePeerCards(peers,key)}
     <details class="profile-peer-comparison"><summary>展开分位对照 · 本基金与相似基金</summary>${renderTable(['基金',...disclosedProfileDimensions().map(x=>x[1])],[{name:r.name,feature_percentiles:Object.fromEntries(Object.entries(w.metrics).map(([k,m])=>[({market_cap:'log_cap',pb:'log_pb'})[k]||k,m.percentile]))},...peers].map(x=>[escapeHTML(x.name),...disclosedProfileDimensions().map(([k])=>disclosedPercentileLabel(x.feature_percentiles[k]))]),'table-scroll')}</details>`:'<p class="empty-copy">该区间暂没有足够的共同股票风格维度或同覆盖期样本；不影响画像页的单项展示。</p>'}
-    <p class="method-note">距离越小越相近，不是推荐分数。默认50%行业＋25%股票风格＋25%行为；共同有效行为不足2项时标为“未使用”，行业/风格重新归一为2/3与1/3。至少2项共同股票风格；剔除同产品和当前同经理产品。名称主题不再作为硬筛选。这里按整个窗口（含本期）的平均特征寻找相似基金，分位对照是同覆盖期、同A/H组内的窗口排序；画像页则展示本期位置与此前平均位置，二者不混用。</p></article>`;
+    ${profilePairShell(r)}
+    <p class="method-note">距离越小越相近，不是推荐分数。默认50%行业＋25%股票风格＋25%行为；共同有效行为不足2项时标为“未使用”，行业/风格重新归一为2/3与1/3。至少2项共同股票风格；相似候选榜剔除同产品和当前同经理产品，手动对照仍可查看。名称主题不再作为硬筛选。这里按整个窗口（含本期）的平均特征寻找相似基金，分位对照是同覆盖期、同A/H组内的窗口排序；画像页则展示本期位置与此前平均位置，二者不混用。</p></article>`;
 }
 
 function profileMetricComparison(r, key, metric) {
@@ -5427,7 +5647,7 @@ function genericCorrelationSide(fund, data, key, type) {
         escapeHTML(item.code),
         `<a href="fund.html?code=${encodeURIComponent(item.code)}"><strong>${escapeHTML(item.name)}</strong></a>`,
         escapeHTML((item.manager || []).join("、") || item.fund_company || "—"),
-        `<strong>${num(item.correlation, 3)}</strong>`,
+        `<strong>${num(item.correlation, 3)}</strong>${fund.category === "active-equity" ? `<button type="button" class="profile-pair-button" data-peer-compare="${escapeHTML(item.code)}" data-compare-range="${escapeHTML(key)}" aria-pressed="false">画像与净值对比</button>` : ""}`,
       ];
     });
     return rows.length ? renderTable(["代码", "名称", "管理人", "相关系数"], rows, "pure-bond-correlation-table") : '<p class="empty-copy">该窗口共同样本不足。</p>';
@@ -5476,7 +5696,7 @@ async function loadCorrelationPanelData(fund) {
 
 function genericCorrelationPanel(fund, errors = {}) {
   const data = window.FUND_CORRELATION_METRICS?.funds?.[fund.code];
-  const profilePeers = fund.category === "active-equity" ? renderProfilePeers(window.FUND_PROFILE_DETAILS?.[fund.code], errors.profile ? `${errors.profile}；可切换到基金画像页重试。` : "") : "";
+  const profilePeers = fund.category === "active-equity" ? renderProfilePeers(window.FUND_PROFILE_DETAILS?.[fund.code], errors.profile ? `${errors.profile}；可切换到基金画像页重试。` : "") + (!window.FUND_PROFILE_DETAILS?.[fund.code] || (!window.FUND_PROFILE_DETAILS[fund.code].windows && window.FUND_PROFILE_DETAILS[fund.code].status !== "available") ? profilePairShell(fund) : "") : "";
   const hasCorrelations = data?.peers?.length || data?.indices?.length || Object.values(data?.windows || {}).some(item => item.peers?.length || item.indices?.length);
   if (!hasCorrelations) return profilePeers + (errors.correlation ? genericCorrelationLoadingPanel(`${errors.correlation}。刷新页面可重试，不影响上方披露画像。`) : genericPendingPanel(fund, "correlation"));
   if (["pure-bond", "active-equity", "hybrid-bond"].includes(fund.category) && data.windows && Object.keys(data.windows).length) {
@@ -5563,6 +5783,7 @@ function bindLazyCorrelation(fund) {
 }
 
 function bindGenericCorrelation(fund) {
+  bindProfilePairComparison(fund);
   if (!["pure-bond", "active-equity", "hybrid-bond"].includes(fund.category)) return;
   const data = window.FUND_CORRELATION_METRICS?.funds?.[fund.code];
   [["peer", "peers"], ["index", "indices"]].forEach(([id, type]) => {
