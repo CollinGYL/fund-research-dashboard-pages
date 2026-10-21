@@ -619,6 +619,8 @@ function needsResearchSummary() {
 
 // Retry transient failures once, then leave an explicit manual retry to the user.
 function loadHomepageScript(src, label, readPayload) {
+  // Same stable URL as detail pages; keep server freshness/ETag validation.
+  if (!src.includes('?')) src += '?v=history-v4';
   const attempt = (number) => new Promise((resolve, reject) => {
     const script = document.createElement('script');
     let settled = false;
@@ -1056,7 +1058,9 @@ function loadCatalog() {
 function initializeCatalog() {
   if (catalogPromise) return catalogPromise;
   resultCount.textContent = '正在加载基金目录…';
-  catalogPromise = loadCatalog().then((catalogData) => {
+  const catalogLoading = loadCatalog();
+  requestClassificationSummary();
+  catalogPromise = catalogLoading.then((catalogData) => {
     catalog = catalogData;
     funds = (catalogData.funds || []).filter(isVisibleWebsiteFund);
     searchTextByCode.clear();
@@ -1076,7 +1080,6 @@ function initializeCatalog() {
     if ([...filter.options].some(o=>o.value===initialListQuery.get('subtype'))) filter.value=initialListQuery.get('subtype');
     syncSubtypeButtons();
     updateListCopy();
-    requestClassificationSummary();
     renderFunds();
     requestAnimationFrame(() => window.scrollTo({top:Math.max(0, Math.min(20000, Number(initialListQuery.get('scroll'))||0)), behavior:'instant'}));
     if (activeCategory === 'active-equity') requestActiveEquityProfiles();

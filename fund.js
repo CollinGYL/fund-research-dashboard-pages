@@ -18,7 +18,9 @@ const dashboardAssetPromises = new Map();
 const dataScriptPromises = new Map();
 const profileDetailPromises = new Map();
 const equityModelAssetPromises = new Map();
-const DASHBOARD_DATA_VERSION = 'history-v4-' + new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }).replaceAll("-", "");
+// Change this only when the data protocol changes, not at midnight.
+// Unchanged files reuse HTTP cache; expired entries revalidate with OSS ETags.
+const DASHBOARD_DATA_VERSION = 'history-v4';
 
 const DASHBOARD_GLOBAL_ASSETS = {
   "equity_eventp_index.js": "FUND_EQUITY_EVENTP_INDEX",
@@ -6192,8 +6194,10 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (id === "industries") {
-      const holdingHistory = equityCategory ? await holdings() : null;
-      if (fund.category === "index-enhanced") await indexRelativeAssets();
+      const [holdingHistory] = await Promise.all([
+        equityCategory ? holdings() : Promise.resolve(null),
+        fund.category === "index-enhanced" ? indexRelativeAssets() : Promise.resolve(),
+      ]);
       if (!holdingHistory?.quarterly?.length && !holdingHistory?.full?.length) await loadDashboardAsset("stock_classification.js");
       target.innerHTML = genericIndustryPanel(fund, holdingHistory);
       if (holdingHistory?.quarterly?.length || holdingHistory?.full?.length) {
@@ -6205,13 +6209,13 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (id === "holdings") {
-      const holdingHistory = equityCategory ? await holdings() : null;
-      if (fund.category === "index-enhanced") await indexRelativeAssets();
-      if (!holdingHistory?.quarterly?.length && !holdingHistory?.full?.length) await loadDashboardAsset("stock_classification.js");
-      const [heavyStockTrends, history] = await Promise.all([
+      const [holdingHistory, heavyStockTrends, history] = await Promise.all([
+        equityCategory ? holdings() : Promise.resolve(null),
         fund.category === "active-equity" ? heavyStock() : Promise.resolve(null),
-        fund.category === "convertible-bond" ? Promise.all([bondAssets(), bondHistory()]).then((values) => values[1]) : Promise.resolve(null),
+        fund.category === "convertible-bond" ? Promise.all([bondAssets(), bondHistory()]).then(values => values[1]) : Promise.resolve(null),
+        fund.category === "index-enhanced" ? indexRelativeAssets() : Promise.resolve(),
       ]);
+      if (!holdingHistory?.quarterly?.length && !holdingHistory?.full?.length) await loadDashboardAsset("stock_classification.js");
       target.innerHTML = genericHoldingsPanel(fund, holdingHistory, heavyStockTrends)
         + (fund.category === "convertible-bond" ? genericBondPanel(fund, history, detail) : "");
       if (holdingHistory?.quarterly?.length || holdingHistory?.full?.length) {
@@ -6922,6 +6926,21 @@ function showError(message) {
   page.querySelector("[data-page-retry]")?.addEventListener("click", () => window.location.reload());
 }
 
+function startInitialFundRequests(code) {
+  // Start only the requested view and selected pair, never a whole peer list.
+  const detail = loadGenericDetail(code);
+  const optional = [loadResearchSummary(code)];
+  const tab = query.get('tab');
+  const peer = query.get('compare');
+  const paired = tab === 'correlation' && /^\d{6}\.(?:OF|SH|SZ)$/.test(peer || '') && peer !== code;
+  if (tab === 'correlation') optional.push(loadCorrelationMetrics(code));
+  if (tab === 'profile' || paired) optional.push(loadProfileDetails(code));
+  if (paired) optional.push(loadGenericDetail(peer), loadProfileDetails(peer));
+  // Optional failures remain retryable in their own UI and cannot reject NAV.
+  for (const request of optional) void request.catch(() => {});
+  return detail;
+}
+
 if (!fundId && !fundCode) {
   window.location.replace("index.html#samples");
 } else {
@@ -6942,7 +6961,7 @@ if (!fundId && !fundCode) {
       }
       if (!normalizedCode) throw new Error("没有找到该基金的研究数据");
       // All products, including former deep samples, use the same current lazy data sources.
-      const genericDetail = await loadGenericDetail(normalizedCode);
+      const genericDetail = await startInitialFundRequests(normalizedCode);
       let catalogFund = genericDetail?.fund || fallbackFund;
       if (!catalogFund) {
         catalogData = catalogData || await loadCatalogData();
