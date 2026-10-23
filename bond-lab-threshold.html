@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>纯债基金久期模型 · 规模门槛敏感性（2 亿 vs 10 亿）</title>
+<style>
+:root{--ink:#122235;--muted:#67788b;--line:#dce5ea;--paper:#f4f7f5;--white:#fff;--navy:#102c45;
+--teal:#0a7c78;--gold:#c69a4b;--shadow:0 18px 50px rgba(18,43,64,.09)}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;overflow-x:hidden;color:var(--ink);background:radial-gradient(circle at 92% 3%,rgba(68,157,146,.14),transparent 24rem),var(--paper);font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+a{color:inherit;text-decoration:none}
+.site-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;min-height:74px;padding:0 5vw;border-bottom:1px solid rgba(220,229,234,.85);background:rgba(244,247,245,.88);backdrop-filter:blur(18px)}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-mark{display:grid;width:40px;height:40px;place-items:center;color:#fff;border-radius:11px;background:var(--navy);font-family:Georgia,serif;font-size:19px}
+.brand strong,.brand small{display:block}.brand small{margin-top:2px;color:var(--muted);font-size:10px;letter-spacing:.11em}
+nav{display:flex;gap:26px;color:#435568;font-size:13.5px}nav a:hover{color:var(--teal)}
+.shell{width:min(1180px,90vw);margin-inline:auto}
+.hero{display:grid;grid-template-columns:1.08fr .92fr;gap:56px;align-items:center;min-height:440px;padding-block:60px 30px}
+.eyebrow{margin:0 0 12px;color:var(--teal);font-size:12px;font-weight:700;letter-spacing:.16em}
+h1{max-width:640px;margin:0;font-family:Georgia,"Songti SC",serif;font-size:clamp(38px,4.8vw,58px);line-height:1.12;letter-spacing:-.04em}
+.hero-text{max-width:620px;margin:24px 0 0;color:#516477;font-size:17px;line-height:1.85}
+.hero-panel{padding:25px;border:1px solid rgba(255,255,255,.7);border-radius:20px;background:rgba(255,255,255,.72);box-shadow:var(--shadow)}
+.panel-topline{display:flex;justify-content:space-between;margin-bottom:18px;color:var(--muted);font-size:12px}
+.live-dot::before{content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:#22a06b;box-shadow:0 0 0 5px rgba(34,160,107,.12)}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mcard{min-height:128px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--white)}
+.mcard span,.mcard small{display:block;color:var(--muted);font-size:12px}
+.mcard strong{display:block;margin:14px 0 8px;color:var(--navy);font-family:Georgia,serif;font-size:29px}
+.mcard.accent{color:#fff;border-color:transparent;background:var(--teal)}
+.mcard.accent span,.mcard.accent small,.mcard.accent strong{color:#fff}
+.block{padding-block:64px}
+.shead{display:flex;align-items:end;justify-content:space-between;gap:36px;margin-bottom:24px}
+.shead h2{margin:0;font-family:Georgia,"Songti SC",serif;font-size:clamp(27px,3.4vw,40px);letter-spacing:-.03em}
+.shead>p{max-width:520px;margin:0;color:var(--muted);font-size:13px;line-height:1.75}
+.step{display:inline-block;margin-right:12px;color:var(--gold);font-family:Georgia,serif}
+.panel{margin-top:16px;padding:26px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.8)}
+.panel h4{margin:20px 0 0;font-size:14px;color:var(--navy)}
+pre.fml{margin:12px 0 0;padding:16px 18px;border:1px solid var(--line);border-radius:10px;background:#f7f9f8;color:#2c3e50;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;line-height:1.75;overflow-x:auto;white-space:pre}
+pre.fml b{color:#b35342;font-weight:700}
+.eqline{margin:12px 0 0;padding:15px 20px;border:1px solid var(--line);border-radius:10px;background:#f7f9f8;overflow-x:auto}
+.eqhead{margin:0 0 8px;font-family:Inter,"PingFang SC",sans-serif;font-size:12px;font-weight:700;color:var(--navy);letter-spacing:.02em}
+.eqrow{display:flex;align-items:baseline;flex-wrap:wrap;gap:.18em;padding:4px 0;font-size:14.5px}
+.eqrow .tag{flex:0 0 100px;font-family:Inter,"PingFang SC",sans-serif;font-size:11.5px;font-weight:700;color:var(--teal);letter-spacing:.02em}
+.eqline .ev{font-family:Georgia,"Songti SC",serif;font-style:italic;color:var(--ink)}
+.eqline .eo{font-style:normal;color:var(--muted);padding:0 .15em}
+.eqline .note2{margin-left:auto;padding-left:1.2em;font-family:Inter,"PingFang SC",sans-serif;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .3em;font-size:.82em;line-height:1.35;font-family:Georgia,serif;font-style:italic}
+.frac .n{padding:0 .2em 2px;border-bottom:1.2px solid var(--ink)}
+.frac .d{padding:2px .2em 0}
+.sumlim{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1;margin:0 .2em;font-family:Georgia,serif;font-style:normal;color:var(--ink)}
+.sumlim .sup,.sumlim .sub{font-size:.52em;font-style:italic}
+.sumlim .sigma{font-size:1.3em;margin:-1px 0}
+.eqline .ev sub,.eqline .ev sup{font-style:italic}
+.fnn{fill:var(--navy);font-size:11px;font-weight:700;font-family:Georgia,serif}
+.fnd{fill:#b35342;font-size:10px;font-family:Inter,sans-serif}
+.panel h3{margin:0 0 12px;font-family:Georgia,"Songti SC",serif;font-size:20px;color:var(--navy)}
+.mb-group{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  margin:34px 0 2px;padding:12px 4px 10px;border-top:2px solid var(--navy);
+  font-family:Georgia,"Songti SC",serif;font-size:19px;font-weight:700;color:var(--navy)}
+.mb-group i{font-style:normal;font-family:-apple-system,"Microsoft YaHei",sans-serif;
+  font-size:12px;font-weight:400;color:var(--muted)}
+
+.dark{padding:19px 24px;color:#d8e3ea;border-radius:14px;background:var(--navy);font-size:14px;line-height:1.85}
+.dark strong{color:#fff}.dark .lab{display:block;margin-bottom:7px;color:#f0c977;font-size:11.5px;font-weight:700;letter-spacing:.08em}
+.callout{display:grid;grid-template-columns:170px 1fr;gap:28px;align-items:center;margin-top:16px;padding:22px 26px;color:#fff;border-radius:14px;background:var(--navy)}
+.callout span{color:#f0c977;font-size:12px;font-weight:700;letter-spacing:.08em}
+.callout p{margin:0;color:#d6e1e8;font-size:14px;line-height:1.8}
+    /* 嵌在 .two 半栏里时容器只有 440px，固定 170px 标签列会把正文压到 190px、堆成十几二十行；此时改为标签在上、正文在下的单列堆叠 */
+    .two .callout{grid-template-columns:1fr;gap:8px}
+    .two .callout span{display:block}
+.tw{width:100%;margin-top:14px;overflow-x:auto;border:1px solid var(--line);border-radius:11px}
+table.rt{width:100%;min-width:560px;border-collapse:collapse;background:var(--white)}
+table.rt th,table.rt td{padding:11px 13px;border-bottom:1px solid var(--line);text-align:left;font-size:12px;line-height:1.6;vertical-align:top}
+table.rt th{color:var(--muted);background:#f7f9f8;font-weight:650;white-space:nowrap}
+table.rt tbody tr:last-child td{border-bottom:0}table.rt td{color:#44596b}table.rt td:first-child{color:var(--navy);font-weight:650}
+.mono{font-family:ui-monospace,Consolas,monospace;font-size:11px}
+.value-positive{color:#08786f!important;font-weight:700}.value-negative{color:#b35342!important;font-weight:700}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.fgrid>*{min-width:0}
+.fund-card{padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--white)}
+.fc-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:12px;flex-wrap:wrap}
+.fc-head b{font-family:Georgia,serif;font-size:15px;color:var(--navy)}
+.fc-mae{color:var(--muted);font-size:11.5px}.fc-mae strong{color:var(--navy);font-size:15px;font-family:Georgia,serif}
+.pill{padding:4px 9px;border-radius:999px;font-size:10.5px;font-weight:700}
+.pill.ok{color:#285f5a;background:#e1f1ed}.pill.mid{color:#815d22;background:#f8edd5}.pill.bad{color:#914f42;background:#f8e5e1}
+.ch{display:block;width:100%;min-width:0;height:auto}
+.gl{stroke:#e6ecef;stroke-width:1}.vgl{stroke:#eef2f4}
+.ax{fill:#8a99a8;font-size:9.5px;font-family:Inter,sans-serif}
+.ln{fill:none;stroke:var(--teal);stroke-width:1.6;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.tp{fill:var(--gold);stroke:#fff;stroke-width:1.5}
+.drop{stroke:rgba(198,154,75,.45);stroke-width:1;stroke-dasharray:2 2}
+.lg{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;color:var(--muted);font-size:10.5px}
+.lg span::before{content:"";display:inline-block;width:14px;height:3px;margin-right:6px;border-radius:2px;vertical-align:middle}
+.lg-ln::before{background:var(--teal)}
+.lg-a::before{background:var(--teal)}
+.lg-b::before{background:var(--gold)}
+
+.lg-tp::before{background:var(--gold);height:8px!important;width:8px!important;border-radius:50%!important}
+.fc-note{margin:12px 0 0;color:#4a5f71;font-size:12.5px;line-height:1.8}
+table.mini{width:100%;margin-top:12px;border-collapse:collapse}
+table.mini th,table.mini td{padding:6px 8px;border-bottom:1px solid #eef2f4;font-size:11px;text-align:right}
+table.mini th:first-child,table.mini td:first-child{text-align:left;color:var(--muted)}
+table.mini th{color:var(--muted);font-weight:600}table.mini tbody tr:last-child td{border-bottom:0}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;border:1px solid #cfe0dd;background:#eef8f5;color:#3d6b64;font-size:10px}
+.fp-wrap{position:relative;max-width:560px;display:flex;flex-direction:column;gap:10px}
+.fp-pool-toggle{display:inline-flex;padding:3px;border-radius:9px;background:rgba(16,44,69,.06);align-self:flex-start}
+.fp-pool-toggle button{min-width:120px;min-height:34px;color:#506578;border:0;border-radius:7px;background:transparent;cursor:pointer;font-size:12.5px}
+.fp-pool-toggle button.active{color:#fff;background:var(--teal);font-weight:700}
+.ic-toggle{display:inline-flex;padding:3px;border-radius:9px;background:rgba(16,44,69,.06)}
+.ic-toggle button{min-width:150px;min-height:32px;color:#506578;border:0;border-radius:7px;background:transparent;cursor:pointer;font-size:12.5px}
+.ic-toggle button.active{color:#fff;background:var(--teal);font-weight:700}
+.ic-kpi{display:flex;flex-wrap:wrap;gap:22px;margin:14px 0 4px;padding:14px 18px;background:#f7f9f8;border-radius:10px;font-size:12.5px}
+.ic-kpi b{color:var(--navy);font-size:17px}
+.ic-kpi .lbl{color:var(--muted);display:block;font-size:11px;margin-bottom:3px}
+.cv-tg{display:inline-flex;padding:3px;border-radius:9px;background:rgba(16,44,69,.06);margin:2px 8px 2px 0}
+.cv-tg button{min-width:132px;min-height:31px;color:#506578;border:0;border-radius:7px;background:transparent;cursor:pointer;font-size:12.5px}
+.cv-tg button.active{color:#fff;background:var(--teal);font-weight:700}
+.cv-kpi{display:flex;flex-wrap:wrap;gap:20px;margin:12px 0 4px;padding:13px 17px;background:#f7f9f8;border-radius:10px;font-size:12.5px}
+.cv-kpi b{color:var(--navy);font-size:17px}
+.cv-kpi .lbl{color:var(--muted);display:block;font-size:11px;margin-bottom:3px}
+.cv-yr tr{cursor:pointer}
+.cv-yr tr:hover{background:rgba(10,124,120,.06)}
+.cv-yr tr.on{background:rgba(10,124,120,.13);font-weight:700}
+.cv-lgd{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px;font-size:11.5px;color:var(--muted);align-items:center}
+.cv-lgd i{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px}
+.cv-lgd .yr{cursor:pointer;user-select:none;padding:1px 6px;border-radius:6px;border:1px solid transparent}
+.cv-lgd .yr:hover{background:rgba(10,124,120,.08)}
+.cv-lgd .yr.off{opacity:.3;text-decoration:line-through}
+.cv-lgd .yrbtn{cursor:pointer;color:var(--teal);text-decoration:underline;font-size:11px}
+.fp-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fp-lab{font-size:12px;color:var(--muted);min-width:76px}
+.fp-pool-toggle.fp-sm button{min-width:0;padding:0 12px;min-height:30px;font-size:12px}
+.fp-filter{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.fp-filter input{width:56px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;font-size:12.5px;font-family:inherit;color:var(--ink);outline:none;transition:border-color .15s}
+.fp-filter input:focus{border-color:var(--teal)}
+.fp-pool-toggle button.fp-allbtn{min-width:78px}
+.fp-filter input.fp-search{flex:1 1 auto;width:auto;min-width:0;font-family:ui-monospace,Consolas,"PingFang SC",sans-serif}
+.fp-search-hint{font-size:11.5px;color:var(--muted);line-height:1.5}
+.fp-search-hint.hit{color:var(--teal);font-weight:700}
+.fp-search-hint.miss{color:#b35342;font-weight:700}
+.fp-filter-count{color:var(--muted)}
+.fp-select{width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:13.5px;font-family:ui-monospace,Consolas,"PingFang SC",sans-serif;color:var(--ink);outline:none;background:var(--white);transition:border-color .15s}
+.fp-select:focus{border-color:var(--teal)}
+.fp-stats{display:flex;flex-wrap:wrap;gap:18px;margin:14px 0 6px;padding:12px 16px;background:#f7f9f8;border-radius:10px;font-size:12.5px}
+.fp-stats b{color:var(--navy);font-size:14px}
+.fp-stats .lbl{color:var(--muted);display:block;font-size:11px;margin-bottom:2px}
+.fp-legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:6px;font-size:11.5px;color:var(--muted)}
+.fp-legend span{display:inline-flex;align-items:center;gap:5px}
+.fp-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chain{display:grid;grid-template-columns:repeat(4,1fr);margin-top:16px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--white)}
+.chain-step{padding:22px 20px;border-right:1px solid var(--line)}
+.chain-step:last-child{border-right:0;background:#f7faf9}
+.cs-n{color:var(--gold);font-family:Georgia,serif;font-size:12px}
+.chain-step h4{margin:6px 0 8px;font-size:14px;color:var(--navy)}
+.chain-step p{margin:0 0 10px;color:var(--muted);font-size:12px;line-height:1.7}
+.cs-freq{display:inline-block;padding:3px 9px;border-radius:999px;border:1px solid #cfe0dd;background:#eef8f5;color:#3d6b64;font-size:10px}
+
+.tree{margin-top:14px;border:1px solid var(--line);border-radius:11px;background:var(--white);padding:14px 16px}
+.tnd{position:relative;padding:5px 0 5px 12px;border-left:2px solid #e6ecef;line-height:1.6}
+.tnd:hover{background:rgba(10,124,120,.035)}
+.tdim{opacity:.5}
+.tcn{color:var(--navy);font-size:12px;font-weight:650}
+.tfd{margin-left:8px;color:#8a99a8;font-size:10.5px}
+.tcov{margin-left:8px;color:var(--muted);font-size:10.5px}
+.tg{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap}
+.tg-o{color:#285f5a;background:#e1f1ed}
+.tg-x{color:#914f42;background:#f8e5e1}
+.tnote{margin-top:3px;color:var(--muted);font-size:11px;line-height:1.65}
+.tsep{margin:14px 0 4px;padding-top:12px;border-top:1px dashed var(--line);color:var(--muted);font-size:11px;font-weight:700}
+@media(max-width:620px){.tnd{margin-left:0!important}.tfd{display:block;margin-left:0}}
+.note{margin:14px 0 0;color:var(--muted);font-size:11.5px;line-height:1.8}.note b{color:#3d5266}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}.two>*{min-width:0}
+footer{display:flex;justify-content:space-between;gap:10px;padding:24px 5vw;color:#7b8a98;border-top:1px solid var(--line);font-size:12px}
+@media(max-width:900px){.site-header nav{display:none}.hero{grid-template-columns:1fr;gap:32px;min-height:auto}
+.fgrid,.chain,.two{grid-template-columns:1fr}.chain-step{border-right:0;border-bottom:1px solid var(--line)}
+.shead{align-items:start;flex-direction:column}.callout{grid-template-columns:1fr;gap:8px}}
+@media(max-width:620px){h1{font-size:34px}.mgrid{grid-template-columns:1fr}}
+
+.subtree{margin-top:14px;border:1px solid var(--line);border-radius:11px;background:var(--white);overflow:hidden}
+.tr-row{display:grid;grid-template-columns:minmax(0,1.5fr) 92px 52px 128px minmax(0,1.3fr);
+  gap:12px;align-items:center;padding:9px 14px 9px 8px;border-bottom:1px solid #eef2f4;font-size:11.5px}
+.tr-row:last-child{border-bottom:0}
+.tr-row.tr-root{background:#f4f8f7;font-weight:650}
+.tr-row.tr-no{color:#8a99a8;background:#fcfcfb}
+.tr-nm{color:var(--navy);min-width:0}
+.tr-row.tr-no .tr-nm{color:#7d8f9e}
+.tr-cd{display:block;color:#9aa8b5;font-family:ui-monospace,Consolas,monospace;font-size:9.5px;margin-top:2px}
+.tr-bar{height:7px;border-radius:4px;background:#eef2f4;overflow:hidden}
+.tr-bar i{display:block;height:100%;background:var(--teal);opacity:.75}
+.tr-row.tr-no .tr-bar i{background:#b0bcc7}
+.tr-pc{color:var(--navy);font-family:Georgia,serif;font-size:11.5px;text-align:right}
+.tg{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;white-space:nowrap}
+.tg-ok{background:#e1f1ed;color:#285f5a}
+.tg-all{background:var(--navy);color:#fff}
+.tg-part{background:#f8edd5;color:#815d22}
+.tg-no{background:#f2f4f5;color:#8a99a8}
+.tr-nt{color:var(--muted);font-size:10.5px;line-height:1.5;min-width:0}
+@media(max-width:900px){.tr-row{grid-template-columns:minmax(0,1fr) 60px 46px;row-gap:4px}
+  .tr-tg,.tr-nt{grid-column:1/-1;padding-left:0}}
+/*CALBOX-STYLE*/
+.cal-box{border:1px solid #d8dfe4;border-left:3px solid var(--navy);border-radius:9px;
+  background:#f7f9fa;padding:13px 16px;margin:16px 0 0;font-size:12px;line-height:1.95;color:#3d5a6e}
+.cal-box b.cal-t{display:block;font-size:12.5px;color:var(--navy);margin-bottom:6px}
+.cal-box code{font-size:11px;background:rgba(18,43,64,.06);padding:1px 5px;border-radius:4px;color:#2c4a5e}
+.cal-box table{width:100%;border-collapse:collapse;margin:8px 0 4px}
+.cal-box td{padding:4px 8px 4px 0;vertical-align:top;border-bottom:1px solid #e8edf0}
+.cal-box td:first-child{width:88px;color:#6b7c88;white-space:nowrap}
+.cal-warn{border-left-color:var(--gold);background:#fdf9f1;color:#6b5220}
+.cal-warn b.cal-t{color:#8a6d3b}
+
+.fc-meta{margin:5px 0 0;font-size:11px;line-height:1.7;color:var(--muted)}
+.fc-meta .fc-meta-v{color:#4a5f71;font-weight:600}
+.fc-meta .fc-meta-rp{margin-left:5px;padding:1px 5px;border:1px solid var(--line);border-radius:3px;font-size:10px;color:var(--muted);white-space:nowrap}
+.fc-meta .fc-meta-sep{margin:0 7px;color:var(--line)}
+</style>
+<style id="outline-css">
+/* ===================== 左侧大纲侧栏 ===================== */
+:root { --ol-w: 274px; }
+#outline { position: fixed; top: 0; left: 0; z-index: 30; display: flex; flex-direction: column;
+  width: var(--ol-w); height: 100vh; border-right: 1px solid var(--line);
+  background: rgba(255,255,255,.96); backdrop-filter: blur(6px); }
+#outline .ol-head { display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+  padding: 16px 14px 12px 18px; border-bottom: 1px solid var(--line); }
+#outline .ol-title { flex: 1; color: var(--navy); font-family: Georgia, "Songti SC", serif;
+  font-size: 15px; font-weight: 700; letter-spacing: .04em; }
+#outline .ol-btn { display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
+  border: 1px solid var(--line); border-radius: 7px; background: #fff; color: #506578;
+  font-size: 13px; line-height: 1; cursor: pointer; }
+#outline .ol-btn:hover { border-color: var(--teal); color: var(--teal); }
+#outline .ol-acts { display: flex; gap: 8px; flex: 0 0 auto; padding: 12px 14px 12px 18px;
+  border-bottom: 1px solid var(--line); }
+#outline .ol-acts button { flex: 1; padding: 6px 8px; border: 1px solid var(--line);
+  border-radius: 8px; background: #fff; color: var(--navy); font-size: 11.5px;
+  font-weight: 650; cursor: pointer; }
+#outline .ol-acts button:hover { border-color: var(--teal); color: var(--teal); }
+/* display:block 必须显式写，见坑 1 */
+#outline .ol-list { display: block; flex: 1 1 auto; overflow-y: auto;
+  overscroll-behavior: contain; padding: 10px 10px 40px 10px; gap: 0; font-size: inherit; }
+#outline a { display: block; border-radius: 7px; text-decoration: none; cursor: pointer; }
+#outline a:hover { background: rgba(10,124,120,.07); }
+/* 点击后 <a> 会保留焦点，浏览器默认焦点环是一圈黑框，很扎眼。
+   换成本风格的 teal 细环，且只在键盘导航时出现（:focus-visible 不响应鼠标点击）。 */
+#outline a:focus { outline: none; }
+#outline a:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+#outline .ol-l1 { margin-top: 14px; padding: 7px 10px; color: var(--navy);
+  font-size: 12px; font-weight: 700; letter-spacing: .05em; }
+#outline .ol-l1:first-child { margin-top: 0; }
+#outline .ol-l2 { position: relative; padding: 6px 10px 6px 20px; color: #44596b;
+  font-size: 12px; line-height: 1.5; }
+#outline .ol-l3 { display: block; padding: 4px 10px 4px 30px; color: #44596b;
+  font-size: 11.5px; line-height: 1.45; font-weight: 700; }
+#outline .ol-l4 { display: block; padding: 3px 10px 3px 46px; color: #7d8f9e;
+  font-size: 11px; line-height: 1.45; }
+#outline .ol-l4.active { color: var(--teal); font-weight: 650; }
+/* 三级标题常驻可见：不做"点开上级才显示"，读者一眼看到全部章节。
+   .show 由 JS 给当前章节加，这里不再用它控制显隐，只留作兼容。 */
+#outline .ol-l3.show { display: block; }
+#outline .ol-l2.active { color: var(--teal); font-weight: 700; background: rgba(10,124,120,.09); }
+#outline .ol-l3.active { color: var(--teal); font-weight: 650; }
+#outline .ol-l2.active::before { content: ""; position: absolute; left: 0; width: 3px; height: 1.2em;
+  border-radius: 0 3px 3px 0; background: var(--teal); }
+
+/* 收起态：缩成一根窄轨 */
+#outline.ol-mini { width: 42px; }
+#outline.ol-mini .ol-title, #outline.ol-mini .ol-acts, #outline.ol-mini .ol-list { display: none; }
+#outline.ol-mini .ol-head { justify-content: center; padding: 16px 0 12px; border-bottom: 0; }
+
+#ol-open { display: none; position: fixed; top: 12px; left: 12px; z-index: 31;
+  width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 10px;
+  background: rgba(255,255,255,.96); color: var(--navy); font-size: 15px; cursor: pointer; }
+
+/* ★★ 布局让位全部交给媒体查询，不依赖任何 JS 事件——见坑 4。
+   body.ol-ready 由 JS 建好侧栏后加一次、永不移除，纯粹是"这页有侧栏"的标记。 */
+@media (min-width: 1280px) {
+  body.ol-ready { padding-left: var(--ol-w); }
+  body.ol-ready.ol-mini-on { padding-left: 42px; }
+  /* 容器宽度补偿——见坑 2。把你页面实际的外层容器类名补进这两条选择器。 */
+  body.ol-ready .shell, body.ol-ready .section-shell, body.ol-ready .wrap {
+    width: min(1180px, calc(100vw - var(--ol-w) - 56px)); }
+  body.ol-ready.ol-mini-on .shell, body.ol-ready.ol-mini-on .section-shell,
+  body.ol-ready.ol-mini-on .wrap {
+    width: min(1180px, calc(100vw - 42px - 56px)); }
+  /* 侧栏展开时页面内那对同名按钮不重复出现（只隐藏，不删除） */
+  body.ol-ready:not(.ol-mini-on) .mod-actions { display: none; }
+}
+
+/* 窄屏：侧栏不占版面，浮在内容之上，由左上角 ☰ 唤出。
+   ★ 默认态写死在 CSS 里（侧栏 none、按钮 block），JS 只负责"打开"这一个动作。
+   反过来写（默认显示、靠 JS 加 class 隐藏）会在事件不触发时让侧栏盖住正文——见坑 4。 */
+@media (max-width: 1279px) {
+  #outline { display: none; box-shadow: var(--shadow); }
+  #outline.ol-shown { display: flex; }
+  #ol-open { display: block; }
+  #outline.ol-shown ~ #ol-open { display: none; }
+}
+@media print {
+  #outline, #ol-open { display: none !important; }
+  body.ol-ready, body.ol-ready.ol-mini-on { padding-left: 0; }
+}
+</style>
+<style>
+/* 14 列的分池细分对照表：默认 13px 内边距会把表撑出容器 17px，收紧到 6px */
+.rt.tight td,.rt.tight th{padding:9px 6px;font-size:11.5px}
+.rt.tight{min-width:0}
+</style>
+<meta name="robots" content="noindex,nofollow"></head><body><aside class="original-source-note" style="padding:14px 20px;background:#fff8e7;border-bottom:1px solid #d9b977;font:14px/1.7 system-ui;color:#473b21"><a href="bond-research.html">← 债基研究目录</a> · <strong>久期研究 · 2亿 / 10亿元门槛敏感性</strong><br>同事交接的完整历史研究结果。保留原有筛选、对照和交互；样本区间及模型设定以页内说明为准，不代表当前生产日更结果。此次仅复用成果，没有重新运行全市场模型。</aside>
+
+<header class="site-header">
+  <a class="brand" href="#top"><span class="brand-mark">久</span>
+  <span><strong>纯债基金久期高频拟合</strong><small>规模门槛敏感性 · 2 亿 vs 10 亿</small></span></a>
+  <nav><a href="#q">问题</a><a href="#fn">漏斗</a><a href="#sc">成绩</a><a href="#dc">分解</a><a href="#tech">附注</a></nav>
+</header>
+
+<main id="top">
+<section class="hero shell" data-ol-skip>
+  <div>
+    <p class="eyebrow">课题3 · 纯债基金 · 仅观测净值分支 · PIT 口径 · 15 个报告期实测</p>
+    <h1>把入池门槛从 10 亿<br/>放宽到 2 亿，会怎样。</h1>
+    <p class="hero-text">现行样本池要求基金<b>截至当期已公告的净资产不低于 10 亿元</b>。
+    这一刀把每日开放的纯债基金从 1,174 只砍到 782 只。
+    本页把门槛改成 <b>2 亿元</b>，其余口径、超参、模型代码<b>全部不变</b>，重跑一遍，
+    看模型成绩怎么变、变化又来自哪里。</p>
+    <p class="hero-text"><b>页面上每一个数字都是现算的</b>，两档各跑一遍同一套代码。
+    10 亿这一档跑出来与现行报告逐格一致，这是本页对比成立的前提。</p>
+  </div>
+  <div class="hero-panel">
+    <div class="panel-topline"><span>全样本 MAFE</span><span class="live-dot">15 期 · 全历史口径</span></div>
+    <div class="mgrid">
+      <div class="mcard"><span>10 亿门槛</span><strong>0.714</strong><small>MAFE · 年</small></div>
+      <div class="mcard"><span>2 亿门槛</span><strong>0.770</strong><small>MAFE · 年</small></div>
+      <div class="mcard"><span>原有样本</span><strong>0.714</strong><small>几乎没动</small></div>
+      <div class="mcard"><span>新增样本</span><strong>0.907</strong><small>劣化全在这里</small></div>
+    </div>
+  </div>
+</section>
+
+<section class="block shell" id="q">
+  <div class="shead"><h2><span class="step">壹</span>这一页在回答什么</h2>
+  <p>一句话：放宽门槛之后成绩变差了，但要分清是<b>模型退步</b>还是<b>样本变难</b>——这两件事的处理方式完全相反。</p></div>
+
+  <div class="panel">
+    <h3>口径：只动一个变量</h3>
+    <div class="tw"><table class="rt">
+      <thead><tr><th style="width:150px">项</th><th>本页设定</th></tr></thead>
+      <tbody>
+        <tr><td><b>唯一改动</b></td><td>样本池规则 8 的规模门槛：<b>截至当期已公告净资产 ≥ 10 亿 → ≥ 2 亿</b>（逐期 PIT 判定，非永久剔除）</td></tr>
+        <tr><td>保持不变</td><td>其余 7 条准入规则、模型代码、全部超参（<span class="mono">Q_SCALE</span>、观测②③关闭状态、平滑窗口）、评价口径、分池口径（Wind 二级分类 302/301）</td></tr>
+        <tr><td>两档都重跑</td><td>10 亿这一档没有沿用现行报告的结果，而是用同一套流程重跑一遍。跑出的分池细分表与现行报告<b>逐格一致</b>，据此确认两档可比</td></tr>
+        <tr><td>评价区间</td><td>2018H2 ~ 2025H2，共 15 个报告期</td></tr>
+      </tbody></table></div>
+  </div>
+</section>
+
+<section class="block shell" id="fn">
+  <div class="shead"><h2><span class="step">贰</span>样本漏斗：门槛放宽之后多了谁</h2>
+  <p>截面为 2025-12-31。金色那一行是唯一被改动的一刀。</p></div>
+
+  <div class="panel">
+    <h3>两档漏斗并排</h3>
+    <div class="tw"><table class="rt">
+      <thead><tr><th>筛选步骤</th><th style="width:96px">10 亿门槛</th><th style="width:96px">2 亿门槛</th><th style="width:88px">差</th></tr></thead>
+      <tbody><tr><td>全市场纯债基金（份额口径）</td><td>4,558</td><td><b>4,558</b></td><td class="mono">+0</td></tr><tr><td>产品口径去重（只留初始份额）</td><td>2,480</td><td><b>2,480</b></td><td class="mono">+0</td></tr><tr><td>剔除摊余成本型</td><td>2,480</td><td><b>2,480</b></td><td class="mono">+0</td></tr><tr><td>未曾归入非纯债子类</td><td>2,466</td><td><b>2,466</b></td><td class="mono">+0</td></tr><tr><td>剔除已披露持有可转债</td><td>2,403</td><td><b>2,403</b></td><td class="mono">+0</td></tr><tr><td>每日开放（剔定期开放/持有期/封闭式）</td><td>1,174</td><td><b>1,174</b></td><td class="mono">+0</td></tr><tr style="background:rgba(198,154,75,.10)"><td>规模≥2亿（截至当期已公告口径，PIT）</td><td>785</td><td><b>1,029</b></td><td class="mono">+244</td></tr><tr><td>当期在样本池内</td><td>783</td><td><b>1,023</b></td><td class="mono">+240</td></tr><tr><td>该期披露了利率敏感性</td><td>783</td><td><b>1,022</b></td><td class="mono">+239</td></tr><tr><td>过坏标签检测（披露方向合理）</td><td>783</td><td><b>1,022</b></td><td class="mono">+239</td></tr><tr><td>成立于评价区间开始前</td><td>783</td><td><b>1,022</b></td><td class="mono">+239</td></tr><tr><td>模型（仅观测净值）跑出估计值</td><td>782</td><td><b>1,020</b></td><td class="mono">+238</td></tr></tbody></table></div>
+    <p class="fc-note">门槛之后的几道（披露利率敏感性、坏标签检测、成立日）在 2 亿口径下各多剔 1 只，
+    10 亿口径下剔 0 只——小基金的披露质量略差，但差得非常有限，不是本页成绩变化的来源。</p>
+  </div>
+</section>
+
+<section class="block shell" id="sc">
+  <div class="shead"><h2><span class="step">叁</span>检验成绩：每一格都变差</h2>
+  <p>与现行报告「B 的检验成绩 · 分池细分」同一张表，两档并排。全历史口径，早期偏高的样本也计入。</p></div>
+
+  <div class="panel">
+    <h3>分池细分对照</h3>
+    <div class="tw"><table class="rt tight">
+      <thead>
+        <tr><th rowspan="2" style="width:104px">分组</th><th colspan="2">样本</th>
+            <th colspan="3">MAFE<span class="note2" style="display:block;margin:0;padding:0;font-weight:400">平均绝对预测误差</span></th>
+            <th colspan="2">RMSPE</th><th colspan="2">偏性</th>
+            <th colspan="2">误差≤0.5年</th><th colspan="2">误差≤1年</th></tr>
+        <tr><th>10亿</th><th>2亿</th><th>10亿</th><th>2亿</th><th>变化</th>
+            <th>10亿</th><th>2亿</th><th>10亿</th><th>2亿</th>
+            <th>10亿</th><th>2亿</th><th>10亿</th><th>2亿</th></tr>
+      </thead>
+      <tbody><tr><td>短期纯债池<span class="note2">Wind 302</span></td><td>1,107</td><td><b>1,645</b></td><td>0.4752</td><td><b>0.5568</b></td><td><span class="">+0.0816</span></td><td>0.7132</td><td><b>0.8186</b></td><td>+0.3142</td><td><b>+0.4098</b></td><td>67.7%</td><td><b>60.1%</b></td><td>90.0%</td><td><b>85.5%</b></td></tr><tr><td>中长期纯债池<span class="note2">Wind 301</span></td><td>6,514</td><td><b>9,075</b></td><td>0.7546</td><td><b>0.8085</b></td><td><span class="">+0.0539</span></td><td>1.0269</td><td><b>1.1208</b></td><td>+0.4062</td><td><b>+0.4638</b></td><td>44.6%</td><td><b>41.9%</b></td><td>74.2%</td><td><b>71.6%</b></td></tr><tr><td>全样本</td><td>7,621</td><td><b>10,720</b></td><td>0.7140</td><td><b>0.7699</b></td><td><span class="">+0.0559</span></td><td>0.9875</td><td><b>1.0800</b></td><td>+0.3928</td><td><b>+0.4555</b></td><td>48.0%</td><td><b>44.6%</b></td><td>76.5%</td><td><b>73.7%</b></td></tr></tbody></table></div>
+    <p class="fc-note">全样本 MAFE 从 0.7140 升到 0.7699，
+    相对劣化 <b>+7.8%</b>；偏性由 +0.3928 升到 +0.4555。
+    <b>下一节回答这个劣化从哪来。</b></p>
+  </div>
+</section>
+
+<section class="block shell" id="dc">
+  <div class="shead"><h2><span class="step">肆</span>新增样本单独看</h2>
+  <p>把 2 亿池拆成两半：<b>原有样本</b>（两档都在的那 7,620 条）与
+  <b>新增样本</b>（规模 2~10 亿、只在 2 亿池里的 3,100 条）。
+  如果劣化来自新样本本身，原有样本的成绩应当纹丝不动；如果是整体漂移，原有样本也会跟着变差。</p></div>
+
+  <div class="panel">
+    <h3>四行对照：劣化到底在哪一半</h3>
+    <div class="tw"><table class="rt">
+      <thead><tr><th style="width:230px">口径</th><th>样本</th><th>基金数</th><th>MAFE</th><th>RMSPE</th><th>偏性</th><th>误差≤0.5年</th><th>真值中位</th></tr></thead>
+      <tbody><tr><td>10 亿池（基线）</td><td>7,621</td><td>1,049</td><td>0.7140</td><td>0.9875</td><td>+0.3928</td><td>48.0%</td><td>2.25</td></tr><tr><td>2 亿池 · 全部</td><td>10,720</td><td>1,201</td><td>0.7699</td><td>1.0800</td><td>+0.4555</td><td>44.6%</td><td>2.18</td></tr><tr style="background:rgba(10,124,120,.06)"><td>2 亿池 · <b>原有样本</b><span class="note2">两档都在</span></td><td>7,620</td><td>1,049</td><td>0.7143</td><td>0.9881</td><td>+0.3925</td><td>48.1%</td><td>2.25</td></tr><tr style="background:rgba(198,154,75,.10)"><td>2 亿池 · <b>新增样本</b><span class="note2">规模 2~10 亿</span></td><td>3,100</td><td>767</td><td>0.9066</td><td>1.2779</td><td>+0.6105</td><td>36.2%</td><td>1.99</td></tr></tbody></table></div>
+    <div class="eqline" style="border-left:3px solid var(--gold)">
+      <p class="eqhead" style="margin:0">结论</p>
+      <p style="margin:8px 0 0;font-size:15px;color:var(--navy);font-weight:700">
+      是新样本本身更难估，不是整体漂移。</p>
+      <p style="margin:8px 0 0;font-size:12.5px;color:#4a5f71;line-height:1.85">
+      原有那 7,620 条样本的 MAFE 从 0.7140 变成 0.7143，
+      变化 +0.0002 年——在四位小数上才看得见。<br>
+      新进来的 3,100 条（767 只基金）MAFE 0.9066，
+      比原有样本高 <b>+26.9%</b>，偏性 +0.6105 也明显更高。</p>
+    </div>
+    <p class="fc-note">补充：模型是逐基金独立估计的，扩池<b>不会</b>改变已有基金的估计路径——
+    这一点在数据上也验证过，见文末技术附注。</p>
+  </div>
+
+  <div class="panel">
+    <h3>再按池拆开：短期池受伤更重</h3>
+    <div class="tw"><table class="rt">
+      <thead><tr><th style="width:100px">口径</th><th style="width:170px">池</th><th>样本</th><th>基金数</th><th>MAFE</th><th>偏性</th><th>真值中位</th></tr></thead>
+      <tbody><tr><td>原有样本</td><td>短期纯债池<span class="note2">Wind 302</span></td><td>1,106</td><td>170</td><td>0.4744</td><td>+0.3130</td><td>1.07</td></tr><tr><td>原有样本</td><td>中长期纯债池<span class="note2">Wind 301</span></td><td>6,514</td><td>883</td><td>0.7550</td><td>+0.4060</td><td>2.42</td></tr><tr style="background:rgba(198,154,75,.10)"><td>新增样本</td><td>短期纯债池<span class="note2">Wind 302</span></td><td>539</td><td>158</td><td>0.7258</td><td>+0.6085</td><td>0.99</td></tr><tr style="background:rgba(198,154,75,.10)"><td>新增样本</td><td>中长期纯债池<span class="note2">Wind 301</span></td><td>2,561</td><td>612</td><td>0.9446</td><td>+0.6110</td><td>2.21</td></tr></tbody></table></div>
+    <p class="fc-note">短期池新增样本 MAFE 比原有高 <b>+53.0%</b>，中长期池高 <b>+25.1%</b>。
+    短期池久期基数小（真值中位约 1 年），同样的绝对误差在占比上更重，所以相对劣化更明显。</p>
+  </div>
+
+  <div class="panel">
+    <h3>逐报告期：15/15 期新增样本都更差</h3>
+    <p class="note" style="margin-top:0">如果只是个别时期的偶然，两条线应当交错；实际是新增样本的线<b>始终在上方</b>。</p>
+    <div class="nav-chart-wrap"><svg class="ch" viewBox="0 0 620 250"><line class="gl" x1="46" y1="206.6" x2="608" y2="206.6"/><text class="ax" x="40" y="210.1" text-anchor="end">0.5</text><line class="gl" x1="46" y1="163.5" x2="608" y2="163.5"/><text class="ax" x="40" y="167.0" text-anchor="end">0.8</text><line class="gl" x1="46" y1="120.3" x2="608" y2="120.3"/><text class="ax" x="40" y="123.8" text-anchor="end">1.0</text><line class="gl" x1="46" y1="77.2" x2="608" y2="77.2"/><text class="ax" x="40" y="80.7" text-anchor="end">1.2</text><line class="gl" x1="46" y1="34.1" x2="608" y2="34.1"/><text class="ax" x="40" y="37.6" text-anchor="end">1.5</text><polyline points="46.0,188.5 86.1,144.9 126.3,172.2 166.4,148.0 206.6,152.4 246.7,167.5 286.9,196.0 327.0,96.9 367.1,75.7 407.3,165.5 447.4,187.0 487.6,204.8 527.7,207.5 567.9,175.7 608.0,196.1" fill="none" stroke="#0a7c78" stroke-width="1.9" stroke-linejoin="round"/><circle cx="46.0" cy="188.5" r="2.6" fill="#0a7c78"/><circle cx="86.1" cy="144.9" r="2.6" fill="#0a7c78"/><circle cx="126.3" cy="172.2" r="2.6" fill="#0a7c78"/><circle cx="166.4" cy="148.0" r="2.6" fill="#0a7c78"/><circle cx="206.6" cy="152.4" r="2.6" fill="#0a7c78"/><circle cx="246.7" cy="167.5" r="2.6" fill="#0a7c78"/><circle cx="286.9" cy="196.0" r="2.6" fill="#0a7c78"/><circle cx="327.0" cy="96.9" r="2.6" fill="#0a7c78"/><circle cx="367.1" cy="75.7" r="2.6" fill="#0a7c78"/><circle cx="407.3" cy="165.5" r="2.6" fill="#0a7c78"/><circle cx="447.4" cy="187.0" r="2.6" fill="#0a7c78"/><circle cx="487.6" cy="204.8" r="2.6" fill="#0a7c78"/><circle cx="527.7" cy="207.5" r="2.6" fill="#0a7c78"/><circle cx="567.9" cy="175.7" r="2.6" fill="#0a7c78"/><circle cx="608.0" cy="196.1" r="2.6" fill="#0a7c78"/><polyline points="46.0,170.2 86.1,110.2 126.3,156.7 166.4,139.9 206.6,129.5 246.7,132.5 286.9,173.1 327.0,68.9 367.1,31.7 407.3,135.4 447.4,142.6 487.6,194.1 527.7,174.2 567.9,146.8 608.0,152.0" fill="none" stroke="#b35342" stroke-width="1.9" stroke-linejoin="round"/><circle cx="46.0" cy="170.2" r="2.6" fill="#b35342"/><circle cx="86.1" cy="110.2" r="2.6" fill="#b35342"/><circle cx="126.3" cy="156.7" r="2.6" fill="#b35342"/><circle cx="166.4" cy="139.9" r="2.6" fill="#b35342"/><circle cx="206.6" cy="129.5" r="2.6" fill="#b35342"/><circle cx="246.7" cy="132.5" r="2.6" fill="#b35342"/><circle cx="286.9" cy="173.1" r="2.6" fill="#b35342"/><circle cx="327.0" cy="68.9" r="2.6" fill="#b35342"/><circle cx="367.1" cy="31.7" r="2.6" fill="#b35342"/><circle cx="407.3" cy="135.4" r="2.6" fill="#b35342"/><circle cx="447.4" cy="142.6" r="2.6" fill="#b35342"/><circle cx="487.6" cy="194.1" r="2.6" fill="#b35342"/><circle cx="527.7" cy="174.2" r="2.6" fill="#b35342"/><circle cx="567.9" cy="146.8" r="2.6" fill="#b35342"/><circle cx="608.0" cy="152.0" r="2.6" fill="#b35342"/><text class="ax" x="46.0" y="232" text-anchor="middle">2018</text><text class="ax" x="126.3" y="232" text-anchor="middle">2019</text><text class="ax" x="206.6" y="232" text-anchor="middle">2020</text><text class="ax" x="286.9" y="232" text-anchor="middle">2021</text><text class="ax" x="367.1" y="232" text-anchor="middle">2022</text><text class="ax" x="447.4" y="232" text-anchor="middle">2023</text><text class="ax" x="527.7" y="232" text-anchor="middle">2024</text><text class="ax" x="608.0" y="232" text-anchor="middle">2025</text><text class="ax" x="40" y="12" text-anchor="end">MAFE(年)</text></svg></div>
+    <div class="cv-lgd"><span><i style="background:#0a7c78"></i>原有样本</span>
+      <span><i style="background:#b35342"></i>新增样本（规模 2~10 亿）</span></div>
+    <p class="fc-note">数据频率：半年度。15 个报告期里有 <b>15 期</b>新增样本 MAFE 更高，
+    差距最大的一期是 <b>2023年末</b>（相差 0.2574 年）。</p>
+  </div>
+
+  <div class="panel">
+    <h3>评价资历分桶：不是"新入池所以估不准"</h3>
+    <p class="note" style="margin-top:0">一个替代解释是：新基金刚进池、模型还没预热好。
+    但资历分桶显示两档的<b>形状一致</b>——第 1、2 期都偏高，第 3 期起显著回落。
+    2 亿档每一桶都比 10 亿档差，说明差距不是资历造成的。</p>
+    <div class="tw"><table class="rt">
+      <thead><tr><th rowspan="2" style="width:130px">评价资历</th><th colspan="2">样本</th><th colspan="2">MAFE</th><th colspan="2">偏性</th></tr>
+      <tr><th>10亿</th><th>2亿</th><th>10亿</th><th>2亿</th><th>10亿</th><th>2亿</th></tr></thead>
+      <tbody><tr><td>第1期</td><td>1,049</td><td>1,201</td><td>0.8309</td><td><b>0.8767</b></td><td>+0.5757</td><td><b>+0.6935</b></td></tr><tr><td>第2期</td><td>973</td><td>1,154</td><td>0.8391</td><td><b>0.8943</b></td><td>+0.5638</td><td><b>+0.6669</b></td></tr><tr><td>第3期及以后</td><td>5,599</td><td>8,365</td><td>0.6704</td><td><b>0.7374</b></td><td>+0.3289</td><td><b>+0.3922</b></td></tr></tbody></table></div>
+  </div>
+</section>
+
+<section class="block shell" id="tech">
+  <div class="shead"><h2><span class="step">伍</span>技术附注</h2>
+  <p>做这次对照时查出来的两件事，与结论无关但值得记录。</p></div>
+
+  <div class="panel">
+    <h3>扩池不改变已有基金的估计路径</h3>
+    <p class="note" style="margin-top:0">模型逐基金独立递推，理论上同一条（基金 × 报告期）在两个门槛下应当得到完全相同的估计值。
+    实测在共同样本上 MAFE 为 0.7140 与 0.7143，
+    差 +0.0002 年，与理论一致。</p>
+    <p class="fc-note">存在极小的残差，来源是净值宽表的<b>日期网格是所有在池基金的并集</b>：
+    新进来的基金带进了 3 个非交易日的净值记录，这几行插入后会让所有基金在这些日期上出现空值，
+    进而使紧随其后的收益率与 3 日平滑窗口发生位移，少数基金的可用观测因此少了几个点。
+    共同日期上的收益率数值<b>逐位完全相同</b>，对本页所有结论没有影响。</p>
+  </div>
+
+  <div class="panel">
+    <h3>本页与现行报告的关系</h3>
+    <div class="tw"><table class="rt">
+      <thead><tr><th style="width:150px">项</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>覆盖范围</td><td>只覆盖<b>与规模门槛有关</b>的模块。建模粒度、共线性处理、卡尔曼设定、交叉验证方法等与门槛无关的内容，两档完全相同，见现行报告</td></tr>
+        <tr><td>数据来源</td><td>两档各自完整重跑数据管线，产出分别在 <span class="mono">06_网页数据_PIT</span> 与 <span class="mono">06_网页数据_PIT2亿</span></td></tr>
+        <tr><td>可复现</td><td>本页每个数字均由生成脚本现算，不从现行报告搬运，不存在写死的旧值</td></tr>
+      </tbody></table></div>
+  </div>
+</section>
+</main>
+
+<footer><span>© 2026 中信投研 · 课题3 纯债基金久期高频拟合 · 规模门槛敏感性</span>
+<span>数据来源：Wind / Choice，仅供内部研究参考</span></footer>
+
+<script>
+/* ===================== 左侧大纲 · OUTLINE-JS =====================
+   必须最后执行：若页面有折叠脚本，它会把标题搬进 .sec-bar，早执行就取不到。
+   可选配置：在本块之前写 window.OUTLINE_CFG = { sectionSelector: '...' }。 */
+(function () {
+  var CFG = window.OUTLINE_CFG || {};
+  var SEC_SEL = CFG.sectionSelector || 'section';
+  var NARROW = matchMedia('(max-width: 1279px)');
+
+  var txt = function (el, drop) {
+    if (!el) return '';
+    var c = el.cloneNode(true);
+    (drop || ['.sec-arrow', '.freq-badge', '.badge', '.step']).forEach(function (s) {
+      c.querySelectorAll(s).forEach(function (n) { n.remove(); });
+    });
+    return c.textContent.replace(/\s+/g, ' ').trim();
+  };
+
+  /* ---------- 1. 扫描页面 ---------- */
+  var entries = [], auto = 0;
+  document.querySelectorAll(SEC_SEL).forEach(function (sec) {
+    if (sec.hasAttribute('data-ol-skip')) return;
+    /* 含 h1 的是 hero/封面区，不进目录：它通常没有 h2，会一路回退到 <b>
+       抓到正文碎片当标题（实测抓出过"每个交易日"这种词）。 */
+    if (sec.querySelector('h1')) return;
+    var title = sec.getAttribute('data-ol-title') || '';
+    if (!title) {
+      title = txt(sec.querySelector(':scope > .sec-bar h2'))
+           || txt(sec.querySelector(':scope > .shead h2'))
+           || txt(sec.querySelector('h2'))
+           || txt(sec.querySelector(':scope > .panel-intro .eyebrow'))
+           || txt(sec.querySelector(':scope > .data-boundary .eyebrow'))
+           || txt(sec.querySelector('b'));
+    }
+    if (!title) return;
+    var level = +(sec.getAttribute('data-ol-level') || 0);
+    if (!level) {
+      var divider = !!sec.querySelector(':scope > .panel-intro, :scope > .data-boundary')
+                 && !sec.querySelector('table, svg, .research-table');
+      level = divider ? 1 : 2;
+    }
+    if (!sec.id) sec.id = 'ol-sec-' + (++auto);
+    entries.push({ level: level, title: title, id: sec.id, sec: sec });
+
+    if (level === 2) {
+      /* 若本 section 里有 .mb-group 分组栏，则分组栏记 l3、面板 h3 降为 l4；
+         没有分组栏的 section 维持原行为（h3 = l3），不影响该组件在其它页面的复用。 */
+      var grouped = sec.querySelector('.mb-group');
+      var nodes = sec.querySelectorAll(grouped ? '.mb-group, h3' : 'h3');
+      var gi = 0, hi = 0;
+      nodes.forEach(function (n) {
+        var isG = n.classList && n.classList.contains('mb-group');
+        /* 必须把默认剔除列表一并带上，否则频率徽章会混进标题 */
+        var t = txt(n, ['.sec-arrow', '.freq-badge', '.badge', '.step', 'i']);
+        if (!t) return;
+        if (!n.id) n.id = sec.id + (isG ? '-g' + (++gi) : '-h' + (++hi));
+        entries.push({ level: isG ? 3 : (grouped ? 4 : 3), title: t,
+                       id: n.id, sec: sec, head: n });
+      });
+    }
+  });
+  if (entries.length < 2) return;               // 少于2条不值得做目录
+
+  /* ---------- 2. 能力探测：页面有没有"全部展开/折叠"可接管 ---------- */
+  var btnE = document.getElementById('btn-expand');
+  var btnC = document.getElementById('btn-collapse');
+  var dets = document.querySelectorAll('details');
+  var hasCollapse = (btnE && btnC) || dets.length > 0;
+
+  /* ---------- 3. 建 DOM ---------- */
+  var aside = document.createElement('aside');
+  aside.id = 'outline';
+  aside.innerHTML =
+    '<div class="ol-head"><span class="ol-title">目录</span>'
+    + '<button class="ol-btn" id="ol-fold" title="收起目录">&laquo;</button></div>'
+    + (hasCollapse ? '<div class="ol-acts"><button data-act="expand">全部展开</button>'
+                     + '<button data-act="collapse">全部折叠</button></div>' : '')
+    /* ★ 用 div 不用 nav：页面常有全局 nav{display:flex}，见坑 1 */
+    + '<div class="ol-list"></div>';
+  var list = aside.querySelector('.ol-list');
+
+  entries.forEach(function (e) {
+    var a = document.createElement('a');
+    a.className = 'ol-l' + e.level;
+    a.textContent = e.title;
+    a.href = '#' + e.id;
+    a.dataset.sec = e.sec.id;
+    a.title = e.title;                          // 长标题悬停看全
+    list.appendChild(a);
+    e.a = a;
+  });
+  document.body.appendChild(aside);
+  document.body.classList.add('ol-ready');   /* 加一次、永不移除，见坑 4 */
+
+  var opener = document.createElement('button');
+  opener.id = 'ol-open';
+  opener.title = '展开目录';
+  opener.textContent = '☰';
+  document.body.appendChild(opener);
+
+  /* ---------- 4. 全部展开/折叠：复用页面已有的，不另写状态机 ---------- */
+  aside.querySelectorAll('.ol-acts button').forEach(function (b) {
+    b.onclick = function () {
+      var wantOpen = b.dataset.act === 'expand';
+      var src = wantOpen ? btnE : btnC;
+      if (src) src.click();
+      else dets.forEach(function (d) { d.open = wantOpen; });
+      requestAnimationFrame(spy);
+    };
+  });
+
+  /* ---------- 5. 收起/展开侧栏 ---------- */
+  /* 唯一职责：同步 mini 态到 body。窄屏浮层的默认显隐、宽屏的让位，全部由 CSS 决定。
+     ol-shown 是"打开"这一个正向动作的标记，过期也无害（宽屏媒体查询里根本不看它）。 */
+  var applyLayout = function () {
+    document.body.classList.toggle('ol-mini-on',
+      !NARROW.matches && aside.classList.contains('ol-mini'));
+  };
+  document.getElementById('ol-fold').onclick = function () {
+    if (NARROW.matches) { aside.classList.remove('ol-shown'); }   // 窄屏：关掉浮层
+    else {
+      var mini = aside.classList.toggle('ol-mini');
+      var f = aside.querySelector('#ol-fold');
+      f.innerHTML = mini ? '&raquo;' : '&laquo;';
+      f.title = mini ? '展开目录' : '收起目录';
+      try { localStorage.setItem('ol-mini', mini ? '1' : '0'); } catch (err) {}
+    }
+    applyLayout();
+  };
+  opener.onclick = function () { aside.classList.add('ol-shown'); };
+  NARROW.addEventListener('change', function () {
+    aside.classList.remove('ol-shown'); applyLayout();
+  });
+  try {
+    if (localStorage.getItem('ol-mini') === '1') {
+      aside.classList.add('ol-mini');
+      var f0 = aside.querySelector('#ol-fold');
+      f0.innerHTML = '&raquo;'; f0.title = '展开目录';
+    }
+  } catch (err) {}
+  applyLayout();
+
+  /* ---------- 6. 点击跳转：目标若是折叠的，先展开再滚 ---------- */
+  var headH = function () {
+    var h = document.querySelector('.site-header');
+    return h ? h.offsetHeight : 0;
+  };
+  var expand = function (sec) {
+    var changed = false;
+    if (sec && sec.classList.contains('sec-collapsed')) {
+      sec.classList.remove('sec-collapsed');
+      var b = sec.querySelector(':scope > .sec-body');
+      if (b) b.hidden = false;
+      changed = true;
+    }
+    if (sec) sec.querySelectorAll('details:not([open])').forEach(function (d) {
+      d.open = true; changed = true;
+    });
+    return changed;
+  };
+  list.addEventListener('click', function (ev) {
+    var a = ev.target.closest('a'); if (!a) return;
+    ev.preventDefault();
+    var sec = document.getElementById(a.dataset.sec);
+    var changed = expand(sec);
+    var go = function () {
+      var t = document.getElementById(a.getAttribute('href').slice(1)) || sec;
+      if (!t) return;
+      var y = t.getBoundingClientRect().top + scrollY - headH() - 14;
+      scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    };
+    /* 展开改变了布局高度，等两帧再量，否则滚偏 */
+    changed ? requestAnimationFrame(function () { requestAnimationFrame(go); }) : go();
+    if (NARROW.matches) aside.classList.remove('ol-shown');   // 跳转后收起浮层
+  });
+
+  /* ---------- 7. 滚动高亮 ---------- */
+  var cur = null, ticking = false;
+  function spy() {
+    ticking = false;
+    var line = headH() + 24, act = null;
+    entries.forEach(function (e) {
+      var el = e.level === 3 ? e.head : e.sec;
+      if (!el || !el.offsetParent) return;       // 折叠隐藏的跳过
+      if (el.getBoundingClientRect().top <= line) act = e;
+    });
+    if (act === cur) return;
+    cur = act;
+    entries.forEach(function (e) { e.a.classList.remove('active'); });
+    var secId = act ? act.sec.id : null;
+    entries.forEach(function (e) {
+      if (e.level === 3) e.a.classList.toggle('show', e.sec.id === secId);
+    });
+    if (act) {
+      act.a.classList.add('active');
+      if (act.level === 3) {
+        var p = entries.find(function (e) { return e.level === 2 && e.sec.id === act.sec.id; });
+        if (p) p.a.classList.add('active');
+      }
+      var r = act.a.getBoundingClientRect(), lr = list.getBoundingClientRect();
+      if (r.top < lr.top || r.bottom > lr.bottom) list.scrollTop += r.top - lr.top - lr.height / 3;
+    }
+  }
+  addEventListener('scroll', function () {
+    if (!ticking) { ticking = true; requestAnimationFrame(spy); }
+  }, { passive: true });
+  addEventListener('resize', function () { applyLayout(); spy(); });
+  /* ★ 不能只靠 resize 事件：某些渲染环境（内嵌预览、快照视图）改视口时压根不派发它，
+     结果就是 body 拿不到 ol-on、侧栏直接盖住正文。ResizeObserver 看的是真实尺寸变化，
+     不依赖事件派发，作为兜底。 */
+  if (window.ResizeObserver) {
+    new ResizeObserver(function () { applyLayout(); }).observe(document.documentElement);
+  }
+  document.querySelectorAll('.sec-bar').forEach(function (b) {
+    b.addEventListener('click', function () { requestAnimationFrame(spy); });
+  });
+  document.querySelectorAll('details').forEach(function (d) {
+    d.addEventListener('toggle', function () { requestAnimationFrame(spy); });
+  });
+  spy();
+})();
+</script>
+</body></html>
