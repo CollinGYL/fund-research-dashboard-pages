@@ -738,6 +738,7 @@ function ensureDurKF(code,cb){
 }
 /* 披露对照只允许同日或最多早四个自然日，与后端评分一致。 */
 function durKFPair(K){
+  if(Array.isArray(K.core_evaluation?.points))return K.core_evaluation.points.filter(r=>!r.excluded_reason&&Number.isFinite(r.actual)&&Number.isFinite(r.estimate)).map(r=>({dt:r.report_date,real:r.actual,est:r.estimate,estimate_date:r.estimate_date,gap_days:Math.round((Date.parse(r.report_date)-Date.parse(r.estimate_date))/86400000)}));
   const idx=new Map();K.dates.forEach((d,i)=>idx.set(d,i));
   const out=[];
   (K.truth||[]).forEach(t=>{
@@ -761,7 +762,8 @@ function durKFBlock(d){
   const line=K.dates.map((dt,i)=>[dt,K.dur[i]]);
   // 真值序列从 2016H2 起,模型要 120 交易日预热、最早 2018-08 才有值 —— 落在模型区间之外的
   // 真值点画出来只会把 x 轴拖长一大段空白,故只画区间内的(区间外的本来也无从对照)。
-  const tin=(K.truth||[]).filter(t=>t.dt>=K.meta.d0&&t.dt<=K.meta.d1);
+  const truth=Array.isArray(K.core_evaluation?.points)?durKFPair(K).map(r=>({dt:r.dt,dur:r.real})):(K.truth||[]);
+  const tin=truth.filter(t=>t.dt>=K.meta.d0&&t.dt<=K.meta.d1);
   const series=[{name:"卡尔曼日频估计",color:"var(--teal)",points:line,dp:2,unit:"年",sw:1.5}];
   if(tin.length)series.push({name:"披露对照（半年频）",color:"var(--gold)",
     points:tin.map(t=>[t.dt,t.dur]),dp:2,unit:"年",sw:0,dots:true});
@@ -783,6 +785,10 @@ function durKFBlock(d){
   const warning=ambiguous?`<p class="method-note" data-duration-identification>两条债券代理近期收益相同，无法仅靠净值区分。保持其他估计不变时，最新久期可能落在 <strong>${NN(bound[0],2)}—${NN(bound[1],2)} 年</strong>；这是条件范围，不是置信区间，单点估计不能当成真实久期。</p>`:"";
   const rows=[`<div class="fg-row"><b>模型估计</b><span>用净值和债券指数估计久期；先对齐共同起止日，再平滑三个有效收益区间，预热120个观察。</span></div>`,
     `<div class="fg-row"><b>披露对照</b><span>由半年报或年报利率敏感性反推，仅作事后对照；估计日期最多早四个自然日。</span></div>`];
+  if(K.meta.factor_variant)rows.push(`<div class="fg-row"><b>因子版本</b><span>${esc(K.meta.factor_variant)}</span></div>`);
+  const pool=K.core_evaluation?.current_pool;
+  const reasons={pure_bond_at_report:'当时不属于纯债',initial_share:'非初始份额',not_amortized:'摊余成本产品',never_nonpure_bond:'曾属于其他债基类型',no_announced_convertibles:'已公告持有转债',daily_open:'非每日开放',net_assets_at_least_1bn:'当时已公告规模不足10亿元或缺失',age_at_least_180_days:'成立不足180天',missing_description:'缺少产品信息'};
+  if(pool)rows.push(`<div class="fg-row" data-bond-core-screen><b>原版核心筛选</b><span>${esc(pool.report_date)}：${pool.eligible?'符合核心评价池要求':'未入核心评价池：'+(pool.reasons||[]).map(r=>esc(reasons[r]||r)).join('、')+'；曲线保留作展示'}。误差只统计各报告期通过筛选且标签核验合格的记录。</span></div>`);
   if(fl.length)rows.push(`<div class="fg-row"><b>原方法论标签</b><span>该基金命中 ${fl.join("、")}——在卡尔曼页的评价池里会被剔除，本模块不剔除</span></div>`);
   return warning+chart+grid+`<div class="factor-glossary" style="margin-top:14px">${rows.join("")}</div>`;
 }

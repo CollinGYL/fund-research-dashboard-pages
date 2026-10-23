@@ -4489,6 +4489,9 @@ function pureBondChangeSummary(label, series, key, valueFormat, description) {
 
 function pureBondDurationPairs(kalmanDuration, disclosureHistory) {
   if (kalmanDuration?.status !== "ok" || !kalmanDuration.dates?.length) return [];
+  if (Array.isArray(kalmanDuration.core_evaluation?.points)) {
+    return kalmanDuration.core_evaluation.points.filter(r=>!r.excluded_reason&&Number.isFinite(r.actual)&&Number.isFinite(r.estimate)).map(r=>({reportDate:r.report_date,estimateDate:r.estimate_date,actual:r.actual,estimate:r.estimate,error:r.estimate-r.actual}));
+  }
   const dates = kalmanDuration.dates;
   const values = kalmanDuration.duration || [];
   return (disclosureHistory || []).map((item) => {
@@ -4549,6 +4552,9 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
   const bounds = kalmanDuration.duration_bounds?.at(-1);
   const ambiguous = kalmanDuration.quality?.at(-1)?.duplicate_proxy_active === true
     && Array.isArray(bounds) && bounds.length === 2 && bounds.every(isFiniteValue);
+  const pool=kalmanDuration.core_evaluation?.current_pool;
+  const poolReasons={pure_bond_at_report:'当时不属于纯债',initial_share:'非初始份额',not_amortized:'摊余成本产品',never_nonpure_bond:'曾属于其他债基类型',no_announced_convertibles:'已公告持有转债',daily_open:'非每日开放',net_assets_at_least_1bn:'当时已公告规模不足10亿元或缺失',age_at_least_180_days:'成立不足180天',missing_description:'缺少产品信息'};
+  const poolNote=pool?`<p class="method-note" data-bond-core-screen><strong>同事原版核心筛选（${escapeHTML(pool.report_date)}）：</strong>${pool.eligible?'符合核心评价池要求。':'未入核心评价池：'+(pool.reasons||[]).map(r=>escapeHTML(poolReasons[r]||r)).join('、')+'。曲线保留作展示。'} 披露误差只统计各报告期通过筛选且标签核验合格的记录。</p>`:'';
   const identificationNote = ambiguous
     ? `<p class="simulation-warning">部分债券指数走势相同，暂时无法区分各自仓位。在其他估计不变时，久期范围为 <strong>${num(bounds[0], 2)}—${num(bounds[1], 2)} 年</strong>；这不是置信区间，单点估计不能当成真实久期。</p>` : '';
   return `<article class="subpanel chart-subpanel pure-bond-kalman-panel">
@@ -4561,7 +4567,7 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
       ${metric("平均绝对偏差", meanAbsoluteError === null ? "—" : `${num(meanAbsoluteError, 3)}年`)}
       ${metric("过程噪声Q", isFiniteValue(meta.q) ? String(meta.q) : "—")}
     </section>
-    ${identificationNote}
+    ${identificationNote}${poolNote}
     ${renderMiniLineChart(series, [{ key: "duration", label: `${fund.name}日频估计久期`, color: "#0a7c78", width: 3, format: "years" }], `${fund.name}卡尔曼日频久期估计`)}
     ${recentPairs.length ? `<div class="subpanel-heading pure-bond-kalman-compare-heading"><div><h3>与披露反推久期对照</h3><span>报告期当日或之前最近交易日</span></div></div>${renderTable(["报告期", "披露反推", "模型估计", "偏差"], recentPairs)}` : '<p class="method-note">当前没有落在模型区间内的有效披露久期可供对照。</p>'}
     <p class="method-note"><strong>口径边界：</strong>模型每天只使用截至当日的基金复权净值与14条债券指数收益，不把半年报/年报久期输入滤波；披露久期仅用于事后对照。先按净值与因子的共同起止日计算收益，再对连续3个有效区间取平均；预热120个有效观察，Q=${isFiniteValue(meta.q) ? meta.q : "3e-4"}。${meta.factor_variant ? `<strong>因子版本：</strong>${escapeHTML(meta.factor_variant)}。` : ""}这是收益法估计，不等同于逐券组合真实久期，也不用于填补披露值。</p>
@@ -6444,10 +6450,13 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
       dur: currentDuration.duration,
       duration_bounds: currentDuration.duration_bounds,
       quality: currentDuration.quality,
+      core_evaluation: currentDuration.core_evaluation,
+      factor_transition: currentDuration.factor_transition,
       truth: durationHistory.map((item) => ({ dt: item.dt, dur: item.dur })),
       meta: {
         ...(previous.meta || {}),
         model: currentDuration.meta?.model,
+        factor_variant: currentDuration.meta?.factor_variant,
         q: currentDuration.meta?.q,
         warmup: currentDuration.meta?.warmup,
         n: currentDuration.meta?.observations,
