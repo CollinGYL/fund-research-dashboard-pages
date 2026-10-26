@@ -4495,7 +4495,7 @@ function pureBondDurationPairs(kalmanDuration, disclosureHistory) {
   const dates = kalmanDuration.dates;
   const values = kalmanDuration.duration || [];
   return (disclosureHistory || []).map((item) => {
-    const actual = Number(item.duration);
+    const actual = isFiniteValue(item.duration) ? Number(item.duration) : NaN;
     if (!Number.isFinite(actual) || actual < 0 || actual > 30) return null;
     const target = new Date(`${item.date}T00:00:00Z`).getTime();
     let low = 0;
@@ -4532,7 +4532,7 @@ function downsamplePureBondDuration(kalmanDuration, maximum = 900) {
 
 function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
   if (!kalmanDuration) {
-    return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">该基金的日频久期分片尚未生成。</p></article>`;
+    return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${detail?.pure_bond_duration_error ? `日频久期数据加载失败：${escapeHTML(detail.pure_bond_duration_error)}` : "该基金的日频久期分片尚未生成。"}</p></article>`;
   }
   if (kalmanDuration.status !== "ok") {
     return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${escapeHTML(kalmanDuration.reason || "共同日频样本不足，暂不输出不稳定估计。")}</p><p class="method-note">低频净值、成立时间过短或与债券因子共同样本不足时不强行拟合。</p></article>`;
@@ -4552,9 +4552,7 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
   const bounds = kalmanDuration.duration_bounds?.at(-1);
   const ambiguous = kalmanDuration.quality?.at(-1)?.duplicate_proxy_active === true
     && Array.isArray(bounds) && bounds.length === 2 && bounds.every(isFiniteValue);
-  const pool=kalmanDuration.core_evaluation?.current_pool;
-  const poolReasons={pure_bond_at_report:'当时不属于纯债',initial_share:'非初始份额',not_amortized:'摊余成本产品',never_nonpure_bond:'曾属于其他债基类型',no_announced_convertibles:'已公告持有转债',daily_open:'非每日开放',net_assets_at_least_1bn:'当时已公告规模不足10亿元或缺失',age_at_least_180_days:'成立不足180天',missing_description:'缺少产品信息'};
-  const poolNote=pool?`<p class="method-note" data-bond-core-screen><strong>同事原版核心筛选（${escapeHTML(pool.report_date)}）：</strong>${pool.eligible?'符合核心评价池要求。':'未入核心评价池：'+(pool.reasons||[]).map(r=>escapeHTML(poolReasons[r]||r)).join('、')+'。曲线保留作展示。'} 披露误差只统计各报告期通过筛选且标签核验合格的记录。</p>`:'';
+  const poolNote=`<p class="method-note" data-bond-all-scope><strong>覆盖范围：</strong>全部纯债组合，A/C等份额共用结果，不按规模、开放方式等筛选。披露对照仍要求数值有效、日期匹配及来源核验通过。</p>`;
   const identificationNote = ambiguous
     ? `<p class="simulation-warning">部分债券指数走势相同，暂时无法区分各自仓位。在其他估计不变时，久期范围为 <strong>${num(bounds[0], 2)}—${num(bounds[1], 2)} 年</strong>；这不是置信区间，单点估计不能当成真实久期。</p>` : '';
   return `<article class="subpanel chart-subpanel pure-bond-kalman-panel">
@@ -6511,21 +6509,57 @@ function bondOriginalResearchPanel(fund) {
 function createPureBondTabLoader(fund, detail) {
   let deepLoader;
   const loadedTabs = new Set();
-  let bundlePromise;
+  let bundlePromise, durationPromise;
+  const duration = () => {
+    if (!durationPromise) durationPromise = loadPureBondKalmanDuration(fund.code).then(value => {
+      delete detail.pure_bond_duration_error;
+      return value;
+    }).catch(error => {
+      durationPromise = null;
+      detail.pure_bond_duration_error = error.message;
+      throw error;
+    });
+    return durationPromise;
+  };
   const bundle = () => {
     if (!bundlePromise) bundlePromise = Promise.all([
-      loadPureBondReferenceBundle(fund.code),
-      loadPureBondKalmanDuration(fund.code).catch(error => {
-        detail.pure_bond_duration_error = error.message;
-        return null;
-      }),
-    ]).then(([reference, duration]) => {
+      loadPureBondReferenceBundle(fund.code), duration().catch(() => null),
+    ]).then(([reference, value]) => {
       if (!reference || !pureBondReferenceReadyCodes.has(fund.code)) throw new Error("纯债分析资料尚未准备完成");
-      refreshPureBondReferenceData(reference, fund, detail, duration);
+      refreshPureBondReferenceData(reference, fund, detail, value);
       window.__PB.setCurrent(reference);
       return reference;
     }).catch(error => { bundlePromise = null; throw error; });
     return bundlePromise;
+  };
+  const allocation = async target => {
+    // Each part owns its loading/error state: shared research cannot hide duration.
+    target.innerHTML = '<div data-bond-allocation-body></div><div data-bond-duration-body></div>';
+    const assets = target.querySelector('[data-bond-allocation-body]');
+    const estimate = target.querySelector('[data-bond-duration-body]');
+    const loadEstimate = async () => {
+      estimate.innerHTML = '<p class="method-note" role="status">正在加载日频久期估计…</p>';
+      try {
+        const value = await duration();
+        if (estimate.isConnected) estimate.innerHTML = genericPureBondKalmanDurationPanel(fund, detail, value);
+      } catch (error) {
+        if (!estimate.isConnected) return;
+        estimate.innerHTML = `<p class="simulation-warning" role="alert">日频久期估计加载失败：${escapeHTML(error.message)}</p><button type="button" class="button" data-duration-retry>重新加载久期</button>`;
+        estimate.querySelector('[data-duration-retry]')?.addEventListener('click', loadEstimate);
+      }
+    };
+    const loadAssets = async () => {
+      assets.innerHTML = '<p class="method-note" role="status">正在加载其他资产配置资料…</p>';
+      try {
+        const reference = await bundle();
+        if (assets.isConnected) assets.innerHTML = `<div class="pb-scope">${window.__PB.renderAlloc(reference, {includeDuration:false})}</div>`;
+      } catch (error) {
+        if (!assets.isConnected) return;
+        assets.innerHTML = `<p class="simulation-warning" role="alert">其他资产配置资料未能加载：${escapeHTML(error.message)}。日频久期独立展示。</p><button type="button" class="button" data-assets-retry>重新加载其他资料</button>`;
+        assets.querySelector('[data-assets-retry]')?.addEventListener('click', loadAssets);
+      }
+    };
+    await Promise.all([loadEstimate(), loadAssets()]);
   };
   return async function loadTab(id) {
     if (id === "research" || id === "original") { deepLoader ||= createGenericTabLoader(fund, detail); return deepLoader(id); }
@@ -6536,7 +6570,8 @@ function createPureBondTabLoader(fund, detail) {
     target.setAttribute("aria-busy", "true");
     target.innerHTML = '<p class="method-note" role="status">正在加载本页分析，概览和其他页签可继续查看…</p>';
     try {
-      if (id === "documents") target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
+      if (id === "alloc") await allocation(target);
+      else if (id === "documents") target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
       else {
         const reference = await bundle();
         if (!target.isConnected) return;

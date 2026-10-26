@@ -786,10 +786,7 @@ function durKFBlock(d){
   const rows=[`<div class="fg-row"><b>模型估计</b><span>用净值和债券指数估计久期；先对齐共同起止日，再平滑三个有效收益区间，预热120个观察。</span></div>`,
     `<div class="fg-row"><b>披露对照</b><span>由半年报或年报利率敏感性反推，仅作事后对照；估计日期最多早四个自然日。</span></div>`];
   if(K.meta.factor_variant)rows.push(`<div class="fg-row"><b>因子版本</b><span>${esc(K.meta.factor_variant)}</span></div>`);
-  const pool=K.core_evaluation?.current_pool;
-  const reasons={pure_bond_at_report:'当时不属于纯债',initial_share:'非初始份额',not_amortized:'摊余成本产品',never_nonpure_bond:'曾属于其他债基类型',no_announced_convertibles:'已公告持有转债',daily_open:'非每日开放',net_assets_at_least_1bn:'当时已公告规模不足10亿元或缺失',age_at_least_180_days:'成立不足180天',missing_description:'缺少产品信息'};
-  if(pool)rows.push(`<div class="fg-row" data-bond-core-screen><b>原版核心筛选</b><span>${esc(pool.report_date)}：${pool.eligible?'符合核心评价池要求':'未入核心评价池：'+(pool.reasons||[]).map(r=>esc(reasons[r]||r)).join('、')+'；曲线保留作展示'}。误差只统计各报告期通过筛选且标签核验合格的记录。</span></div>`);
-  if(fl.length)rows.push(`<div class="fg-row"><b>原方法论标签</b><span>该基金命中 ${fl.join("、")}——在卡尔曼页的评价池里会被剔除，本模块不剔除</span></div>`);
+  rows.push(`<div class="fg-row" data-bond-all-scope><b>覆盖范围</b><span>全部纯债组合，A/C等份额共用结果；不按规模、开放方式等筛选。保留有效净值样本及披露对照的日期、数值检查。</span></div>`);
   return warning+chart+grid+`<div class="factor-glossary" style="margin-top:14px">${rows.join("")}</div>`;
 }
 function refreshDurKF(){
@@ -871,7 +868,7 @@ function renderPerf(d){
     ${sub("指数对比","vs 中债新综合财富指数（按久期匹配期限档）",idxHtml)}`;
 }
 
-function renderAlloc(d){
+function renderAlloc(d,options={}){
   const style=d.alloc.style||[],dur=d.alloc.duration||[];
   // ★2026-07-29用户要求:资产配置4张图统一时间轴——以基金自身季度数据(style,资产分布/杠杆的口径)
   // 为准,久期/国债收益率两张图强制对齐到同一区间(forceX),不再各自按自己的数据范围单独定轴。
@@ -905,8 +902,8 @@ function renderAlloc(d){
     sub("杠杆 · 久期 · 10年期国债到期收益率","",
       combinedChart+`<div class="factor-glossary" style="margin-top:14px">${combinedDescRows}</div>`+
       (combinedWarn.trim()?`<div class="method-note">${combinedWarn.trim()}</div>`:""))+
-    sub("本基金的久期日频估计","净值驱动估计 · 历史不足时留空",
-      `<div id="durkfWrap">${durKFBlock(d)}</div>`);
+    (options.includeDuration===false?"":sub("本基金的久期日频估计","净值驱动估计 · 历史不足时留空",
+      `<div id="durkfWrap">${durKFBlock(d)}</div>`));
 }
 
 function renderBondStruct(d){
