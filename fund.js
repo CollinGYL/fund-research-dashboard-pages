@@ -4,7 +4,6 @@ const rawFundId = query.get("id");
 const rawFundCode = String(query.get("code") || "").toUpperCase();
 const fundId = /^[A-Za-z0-9_-]{1,64}$/.test(String(rawFundId || "")) ? rawFundId : null;
 const fundCode = /^\d{6}\.(?:OF|SH|SZ)$/.test(rawFundCode) ? rawFundCode : null;
-let researchNavigationMode = query.get('navigation') === 'grouped' ? 'grouped' : 'all';
 const correlationMetricsPromises = new Map();
 const CORRELATION_SHARD_COUNT = 256;
 const stockPriceUpdatePromises = new Map();
@@ -2860,9 +2859,9 @@ function bindTabs(onActivate = null) {
       item.hidden = !active;
     });
     if (onActivate && target !== 'overview') void onActivate(target);
-    syncResearchGroups(target);
     const url = new URL(window.location.href);
     url.searchParams.set("tab", target);
+    url.searchParams.delete("navigation");
     try { history.replaceState(null, "", url); } catch (_) { /* standalone file viewer */ }
     document.querySelector(".fund-tab-nav")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
@@ -2953,28 +2952,6 @@ function renderResearchOverview(fund, detail) {
   return `<div class="research-conclusion"><span>研究概览 · 数据摘要，非投资评级</span><p>${escapeHTML(conclusion)}</p></div><div class="research-freshness" aria-label="各项数据对应日期">${dates.map(([label, date]) => `<span>${label} <b>${escapeHTML(date || '暂无披露')}</b></span>`).join('')}</div><section class="research-decision-metrics">${tiles.join('')}</section><div class="research-overview-grid"><article class="subpanel research-chart"><div class="subpanel-heading"><h3>净值与回撤</h3><span>最近一年可得区间 · 基金自身</span></div>${researchNavPreview(detail)}<p class="method-note">曲线按区间起点归一；完整基准对比见“业绩与风险”。当前回撤按全部可得净值计算（起于${escapeHTML(s?.nav_start || detail?.nav?.[0]?.[0] || '—')}）。</p></article><article class="subpanel research-changes"><h3>最近发生了什么</h3>${signals.map(([title, text, note]) => `<div class="research-signal"><span>${title}</span><strong>${escapeHTML(text)}</strong><small>${escapeHTML(note)}</small></div>`).join('')}${s?.entry_names?.length ? `<p class="method-note">本次新出现的较大持仓：${escapeHTML(s.entry_names.join('、'))}。名单仅比较两个完整披露截面，不推断具体交易日期。</p>` : ''}</article></div><article class="research-risk"><h3>阅读前需要知道</h3><ul>${risks.map(t => `<li>${escapeHTML(t)}</li>`).join('')}</ul><p>同类位置：按内部基金类别、相同净值截止日、满一年净值历史的至少30个当前产品计算；并列取中秩。仅当前存续截面，不是历史回测。历史画像应在新披露后更新，模型识别须先冻结留档、再用新披露验真。</p></article>`;
 }
 
-const RESEARCH_GROUPS = [
-  ['overview', '概览', ['overview']], ['performance', '业绩与风险', ['performance', 'perf', 'evaluation']],
-  ['portfolio', '组合透视', ['assets', 'alloc', 'industries', 'holdings', 'bonds', 'bond', 'profile', 'research']],
-  ['changes', '变动监测', ['rebalancing', 'simulation']], ['comparison', '对标与归因', ['correlation', 'corr', 'attribution', 'campisi']],
-  ['data', '公告与数据', ['documents']],
-];
-
-function syncResearchGroups(target) {
-  const group = RESEARCH_GROUPS.find(([, , ids]) => ids.includes(target));
-  const grouped = researchNavigationMode === 'grouped';
-  document.querySelectorAll('[data-research-group]').forEach(b => { const active = b.dataset.researchGroup === group?.[0]; b.classList.toggle('active', active); b.setAttribute('aria-pressed', String(active)); });
-  document.querySelectorAll('.fund-tab-nav [data-tab]').forEach(b => { b.hidden = grouped && !group?.[2].includes(b.dataset.tab); });
-  document.querySelectorAll('[data-navigation-mode]').forEach(b => { const active = b.dataset.navigationMode === researchNavigationMode; b.classList.toggle('active', active); b.setAttribute('aria-pressed', String(active)); });
-  const groupNav = document.querySelector('.research-group-nav');
-  if (groupNav) groupNav.hidden = !grouped;
-  const nav = document.querySelector('.fund-tab-nav');
-  if (nav) {
-    nav.classList.toggle('all-functions', !grouped);
-    nav.classList.toggle('single-subtab', grouped && group?.[2].filter(id => document.querySelector(`[data-tab="${id}"]`)).length <= 1);
-  }
-}
-
 function foldResearchHistory() {
   page.querySelectorAll('table:not([data-history-checked])').forEach(table => {
     table.dataset.historyChecked = 'true';
@@ -3001,19 +2978,9 @@ function prepareResearchOverview(fund, detail) {
   nav.insertAdjacentHTML('afterbegin', '<button class="active" data-tab="overview" role="tab" aria-selected="true">研究概览</button>');
   page.querySelectorAll('[data-panel]').forEach(p => { p.hidden = true; p.classList.remove('active'); });
   page.querySelector('.fund-tab-content').insertAdjacentHTML('afterbegin', panel('overview', renderResearchOverview(fund, detail), true));
-  const groups = RESEARCH_GROUPS.filter(([, , ids]) => ids.some(id => nav.querySelector(`[data-tab="${id}"]`)));
-  nav.insertAdjacentHTML('beforebegin', `<nav class="research-group-nav" aria-label="研究分组">${groups.map(([id, label]) => `<button data-research-group="${id}" aria-pressed="${id === 'overview'}">${label}</button>`).join('')}</nav>`);
-  nav.previousElementSibling.insertAdjacentHTML('beforebegin', '<div class="research-navigation-mode" aria-label="功能导航方式"><button type="button" data-navigation-mode="all">全部功能</button><button type="button" data-navigation-mode="grouped">按研究分组</button><span>概览之外，原有分析可直接打开</span></div>');
-  page.querySelectorAll('[data-navigation-mode]').forEach(b => b.addEventListener('click', () => {
-    researchNavigationMode = b.dataset.navigationMode;
-    syncResearchGroups(nav.querySelector('[aria-selected="true"]')?.dataset.tab || 'overview');
-    const url = new URL(window.location.href);
-    if (researchNavigationMode === 'grouped') url.searchParams.set('navigation', 'grouped');
-    else url.searchParams.delete('navigation');
-    try { history.replaceState(null, '', url); } catch (_) { /* standalone file viewer */ }
-  }));
-  page.querySelectorAll('[data-research-group]').forEach(b => b.addEventListener('click', () => { const ids = RESEARCH_GROUPS.find(g => g[0] === b.dataset.researchGroup)[2]; const selected = ids.map(id => nav.querySelector(`[data-tab="${id}"]`)).find(Boolean); selected?.click(); }));
-  syncResearchGroups('overview');
+  // One navigation keeps every available analysis directly accessible.
+  nav.classList.add('all-functions');
+  nav.setAttribute('aria-label', '基金分析功能');
   const refreshSummary = () => loadResearchSummary(fund.code).then(() => {
     page.querySelector('[data-panel="overview"]').innerHTML = renderResearchOverview(fund, detail);
   }).catch(error => {
