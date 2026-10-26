@@ -1228,29 +1228,39 @@ function miniLineValue(value, format = "percent") {
   return pct(value, 2);
 }
 
-function renderMiniLineChart(series, lines, ariaLabel) {
+function renderMiniLineChart(series, lines, ariaLabel, timeAxis = false) {
   if (!series || series.length < 2) return '<p class="empty-copy">趋势数据不足。</p>';
   const width = 900;
   const height = 250;
   const margin = { top: 24, right: 24, bottom: 42, left: 54 };
-  const values = series.flatMap((item) => lines.map((line) => Number(item[line.key])).filter(Number.isFinite));
+  const values = series.flatMap((item) => lines.map((line) => isFiniteValue(item[line.key]) ? Number(item[line.key]) : NaN).filter(Number.isFinite));
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
   const padding = Math.max((rawMax - rawMin) * 0.12, 0.01);
   const min = Math.max(0, rawMin - padding);
   const max = rawMax + padding;
-  const x = (index) => margin.left + (index / (series.length - 1)) * (width - margin.left - margin.right);
+  const times = series.map(item => Date.parse(item.report_date));
+  const x = (index) => margin.left + (timeAxis && times.at(-1) > times[0]
+    ? (times[index] - times[0]) / (times.at(-1) - times[0]) : index / (series.length - 1)) * (width - margin.left - margin.right);
   const y = (value) => margin.top + ((max - value) / Math.max(max - min, 0.01)) * (height - margin.top - margin.bottom);
   const ticks = Array.from({ length: 4 }, (_, index) => min + ((max - min) * index) / 3).reverse();
-  const dateIndexes = chartTickIndexes(series.length, 7);
+  const dateIndexes = timeAxis ? [...new Set(Array.from({length:7},(_,i)=>{
+    const target=times[0]+(times.at(-1)-times[0])*i/6;
+    return times.reduce((best,value,index)=>Math.abs(value-target)<Math.abs(times[best]-target)?index:best,0);
+  }))] : chartTickIndexes(series.length, 7);
   const formats = lines.map((line) => line.format || "percent");
   return `
     <div class="mini-chart-legend">${lines.map((line) => `<span style="--line-color:${line.color}">${escapeHTML(line.label)}</span>`).join("")}</div>
     <div class="nav-chart-wrap mini-line-chart-wrap"><svg class="nav-chart mini-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(ariaLabel)}" data-min="${min}" data-max="${max}" data-labels="${escapeHTML(lines.map((line) => line.label).join("|"))}">
       ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 9}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${miniLineValue(tick, formats[0])}</text>`).join("")}
-      ${lines.map((line) => `<polyline points="${series.map((item, index) => [index, Number(item[line.key])]).filter(([, value]) => Number.isFinite(value)).map(([index, value]) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(" ")}" class="chart-line" style="stroke:${line.color};stroke-width:${line.width || 2.5}"/>`).join("")}
+      ${lines.map((line) => {
+        const points=series.map((item,index)=>[index,isFiniteValue(item[line.key])?Number(item[line.key]):NaN]).filter(([,value])=>Number.isFinite(value));
+        if (line.points) return points.map(([index,value])=>`<circle cx="${x(index).toFixed(1)}" cy="${y(value).toFixed(1)}" r="4" fill="${line.hollow?'white':line.color}" stroke="${line.color}" stroke-width="2"><title>${escapeHTML(series[index].report_date)} · ${escapeHTML(line.label)}：${miniLineValue(value,line.format)}</title></circle>`).join('');
+        return `<polyline points="${points.map(([index,value])=>`${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(' ')}" class="chart-line" style="stroke:${line.color};stroke-width:${line.width||2.5}"/>`;
+      }).join('')}
+
       ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label chart-axis-date" text-anchor="${index === 0 ? "start" : index === series.length - 1 ? "end" : "middle"}">${escapeHTML(series[index].report_date.slice(0, 7))}</text>`).join("")}
-      ${series.map((item, index) => `<g class="mini-line-data" data-date="${escapeHTML(item.report_date)}" data-values="${lines.map((line) => Number(item[line.key])).join("|")}" data-x="${x(index).toFixed(2)}"></g>`).join("")}
+      ${series.map((item, index) => `<g class="mini-line-data" data-date="${escapeHTML(item.report_date)}" data-values="${lines.map((line) => isFiniteValue(item[line.key]) ? Number(item[line.key]) : "NaN").join("|")}" data-x="${x(index).toFixed(2)}"></g>`).join("")}
       <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="mini-line-crosshair" hidden/>
       ${lines.map((line) => `<circle r="4" class="mini-line-hover-dot" style="stroke:${line.color}" hidden/>`).join("")}
       <rect x="${margin.left}" y="${margin.top}" width="${width - margin.left - margin.right}" height="${height - margin.top - margin.bottom}" class="mini-line-hover-target"/>
@@ -1288,7 +1298,7 @@ function bindMiniLineCharts() {
     const update = (event) => {
       const bounds = svg.getBoundingClientRect();
       const rawX = Math.min(width - margin.right, Math.max(margin.left, (event.clientX - bounds.left) / bounds.width * width));
-      const index = Math.max(0, Math.min(data.length - 1, Math.round((rawX - margin.left) / (width - margin.left - margin.right) * (data.length - 1))));
+      const index = data.reduce((best, point, i) => Math.abs(point.x-rawX) < Math.abs(data[best].x-rawX) ? i : best, 0);
       const point = data[index];
       crosshair.setAttribute("x1", point.x);
       crosshair.setAttribute("x2", point.x);
@@ -1299,6 +1309,7 @@ function bindMiniLineCharts() {
       card.innerHTML = `<strong>${escapeHTML(point.date)}</strong>${point.values.map((value, lineIndex) => `<span>${escapeHTML(labels[lineIndex] || `序列${lineIndex + 1}`)}：${miniLineValue(value, formats[lineIndex])}</span>`).join("")}`;
       card.style.left = `${Math.min(Math.max(point.x / width * 100, 16), 84)}%`;
       setVisible(true);
+      dots.forEach((dot,i)=>{if(!Number.isFinite(point.values[i]))dot.setAttribute('hidden','');});
     };
     target.addEventListener("pointermove", update);
     target.addEventListener("pointerdown", update);
@@ -4530,12 +4541,41 @@ function downsamplePureBondDuration(kalmanDuration, maximum = 900) {
   return [...indexes].sort((left, right) => left - right).map((index) => ({ report_date: dates[index], duration: Number(values[index]) }));
 }
 
+function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
+  const history=(detail?.duration_history||[]).filter(r=>isFiniteValue(r.duration)&&Number(r.duration)>=0&&Number(r.duration)<=30);
+  const comparisons=kalmanDuration?.core_evaluation?.points||[];
+  const byDate=new Map(comparisons.map(r=>[r.report_date,r]));
+  const comparable=new Set(comparisons.filter(r=>!r.excluded_reason&&isFiniteValue(r.actual)).map(r=>r.report_date));
+  const model=kalmanDuration?.status==='ok'?downsamplePureBondDuration(kalmanDuration):[];
+  const series=new Map(model.map(r=>[r.report_date,{...r}]));
+  const reasons={missing_same_period_signed_sensitivity:'缺少同报告期双向利率敏感性核验',missing_same_period_net_assets:'缺少同报告期净资产核验',invalid_sensitivity_direction:'敏感性方向未通过核验',unverified_disclosure:'披露来源尚未完成核验',no_estimate_before_report:'报告期早于模型估计起点',estimate_too_far:'最近估计日距报告期过远'};
+  const rows=history.map(r=>{
+    const check=byDate.get(r.date), matched=comparable.has(r.date);
+    const item=series.get(r.date)||{report_date:r.date};
+    // Verified comparison uses the audited net-assets formula; other points keep their source value.
+    item[matched?'disclosed':'historical']=matched?Number(check.actual):Number(r.duration);series.set(r.date,item);
+    const source=r.source==='verified_report_net_assets'?'原报告核验':r.source==='choice_fpdurationbyir'?'Choice利率敏感性字段':'已有报告敏感性历史';
+    const reason=matched?'可用于披露对照':kalmanDuration?.status!=='ok'?'暂无有效日频估计':r.date<(kalmanDuration.dates?.[0]||'')?'报告期早于模型估计起点':(reasons[check?.excluded_reason]||'仅展示历史披露，尚不满足严格对照条件');
+    return [escapeHTML(r.date),`${num(r.duration,4)}年`,escapeHTML(source),escapeHTML(reason)];
+  });
+  const state=detail?.fund?.duration_disclosure||fund.duration_disclosure||{};
+  const missing=state.status==='report_without_numeric_sensitivity'?'已核对报告，本期未给出可计算的数值敏感性，不记为0。':state.status==='invalid_numeric_value'?'本期来源数值异常（超出0—30年检查范围），未用于图表，等待核查。':state.status==='source_value_missing'?'本期利率敏感性久期尚未取得；保留历史值，后续自动补查。':'';
+  const points=[...series.values()].sort((a,b)=>a.report_date.localeCompare(b.report_date));
+  return `<section class="bond-disclosed-history"><div class="subpanel-heading"><div><h3>日频估计与半年报／年报久期</h3><span>日期按报告期末标注 · 单位：年</span></div></div>
+    ${missing?`<p class="method-note">${escapeHTML(state.target_report_date||'')}：${missing}</p>`:''}
+    ${points.length>=2?renderMiniLineChart(points,[{key:'duration',label:'日频估计',color:'#0a7c78',format:'years'},{key:'disclosed',label:'已核验披露对照',color:'#c17729',format:'years',points:true},{key:'historical',label:'其他历史披露',color:'#78848c',format:'years',points:true,hollow:true}],`${fund.name}日频估计与历史披露久期`,true):'<p class="empty-copy">可用久期点不足以绘图；已有披露见下表。</p>'}
+    <p class="method-note">实心点为通过来源与日期核验的披露对照；空心点保留其他历史披露，包括模型起点之前的数据，不计入拟合误差。缺值不填0，披露不作为日频模型输入。鼠标悬停可查看具体日期和数值。</p>
+    ${rows.length?`<details><summary>全部历史披露（${rows.length}期）</summary>${renderTable(['报告期','披露久期','来源','对照说明'],rows.reverse())}</details>`:'<p class="method-note">暂未取得可用的历史数值披露。</p>'}
+  </section>`;
+}
+
 function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
+  const historical = pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration);
   if (!kalmanDuration) {
-    return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${detail?.pure_bond_duration_error ? `日频久期数据加载失败：${escapeHTML(detail.pure_bond_duration_error)}` : "该基金的日频久期分片尚未生成。"}</p></article>`;
+    return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${detail?.pure_bond_duration_error ? `日频久期数据加载失败：${escapeHTML(detail.pure_bond_duration_error)}` : "该基金的日频久期分片尚未生成。"}</p>${historical}</article>`;
   }
   if (kalmanDuration.status !== "ok") {
-    return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${escapeHTML(kalmanDuration.reason || "共同日频样本不足，暂不输出不稳定估计。")}</p><p class="method-note">低频净值、成立时间过短或与债券因子共同样本不足时不强行拟合。</p></article>`;
+    return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${escapeHTML(kalmanDuration.reason || "共同日频样本不足，暂不输出不稳定估计。")}</p><p class="method-note">低频净值、成立时间过短或与债券因子共同样本不足时不强行拟合。</p>${historical}</article>`;
   }
   const series = downsamplePureBondDuration(kalmanDuration);
   const pairs = pureBondDurationPairs(kalmanDuration, detail?.duration_history);
@@ -4566,7 +4606,7 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
       ${metric("过程噪声Q", isFiniteValue(meta.q) ? String(meta.q) : "—")}
     </section>
     ${identificationNote}${poolNote}
-    ${renderMiniLineChart(series, [{ key: "duration", label: `${fund.name}日频估计久期`, color: "#0a7c78", width: 3, format: "years" }], `${fund.name}卡尔曼日频久期估计`)}
+    ${historical}
     ${recentPairs.length ? `<div class="subpanel-heading pure-bond-kalman-compare-heading"><div><h3>与披露反推久期对照</h3><span>报告期当日或之前最近交易日</span></div></div>${renderTable(["报告期", "披露反推", "模型估计", "偏差"], recentPairs)}` : '<p class="method-note">当前没有落在模型区间内的有效披露久期可供对照。</p>'}
     <p class="method-note"><strong>口径边界：</strong>模型每天只使用截至当日的基金复权净值与14条债券指数收益，不把半年报/年报久期输入滤波；披露久期仅用于事后对照。先按净值与因子的共同起止日计算收益，再对连续3个有效区间取平均；预热120个有效观察，Q=${isFiniteValue(meta.q) ? meta.q : "3e-4"}。${meta.factor_variant ? `<strong>因子版本：</strong>${escapeHTML(meta.factor_variant)}。` : ""}这是收益法估计，不等同于逐券组合真实久期，也不用于填补披露值。</p>
   </article>`;
@@ -6541,7 +6581,7 @@ function createPureBondTabLoader(fund, detail) {
       estimate.innerHTML = '<p class="method-note" role="status">正在加载日频久期估计…</p>';
       try {
         const value = await duration();
-        if (estimate.isConnected) estimate.innerHTML = genericPureBondKalmanDurationPanel(fund, detail, value);
+        if (estimate.isConnected) { estimate.innerHTML = genericPureBondKalmanDurationPanel(fund, detail, value); bindMiniLineCharts(); }
       } catch (error) {
         if (!estimate.isConnected) return;
         estimate.innerHTML = `<p class="simulation-warning" role="alert">日频久期估计加载失败：${escapeHTML(error.message)}</p><button type="button" class="button" data-duration-retry>重新加载久期</button>`;
