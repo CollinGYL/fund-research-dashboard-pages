@@ -1,40 +1,40 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-26T18:36:40+08:00",
+  "generatedAt": "2026-10-27T08:42:55+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "index.html": {
-      "size": 9208,
-      "sha256": "6d26d511a4133171559e5c8f7f0ce8e0ca828127eb2a08d7f6ab6bfd5acef819"
+      "size": 9215,
+      "sha256": "f6daf6cad50ae3975868f86d7583449cf6485e376132d9d2fcb83bf8ecb2e57e"
     },
     "fund.html": {
-      "size": 3364,
-      "sha256": "af3e39fa25eee678bc2420748fd5dacd998f2cda226558f1c64363ad15001add"
+      "size": 3362,
+      "sha256": "31406a09b0e6e6b4a4987390909301f30eb96f0c94d346000977603f6003600f"
     },
     "styles.css": {
-      "size": 212912,
-      "sha256": "8bc76759f96483f4b9573d8681dbf6b45ad0553c33ec049c89a7f6d1e7f2ef8e"
+      "size": 226054,
+      "sha256": "02b3ccf71fc73ad4b00be8f785a13f956b7bfca30d1103a39fba45a5ee43c53e"
     },
     "pure-bond-reference.css": {
       "size": 22114,
       "sha256": "c88ab8454792d1365e868e4aafbc101d7114ac495360a8bb24816809e96813a3"
     },
     "app.js": {
-      "size": 79142,
-      "sha256": "12a4edd14cb4e98fb87d1ee9bc979f35297fa5d5c48939d1b99609c49ec7f1f6"
+      "size": 84397,
+      "sha256": "df818e7e65121002352372f2ed10d0ccf83595bea63122868859baa034ea88ba"
     },
     "pure-bond-reference.js": {
-      "size": 124834,
-      "sha256": "9ef0356d430ed7d083b06e7af45a42fc6d12ed6e991d8f79b97e515c8222aa28"
+      "size": 114155,
+      "sha256": "2fb8e9942d5cf65617c5a3cb2c2a9cad242e2c56ab31ba36a5e65d5bb7481af8"
     },
     "fund.js": {
-      "size": 595235,
-      "sha256": "bd8fec15f1c421bee117dd03eef55065785575a8e8b63ba4df4280c5c1783b63"
+      "size": 594431,
+      "sha256": "74be1abc183837da22e1b916ddd08919bc0d0523a2d0ec49eecd3dd162ee50a8"
     },
     "research-core.js": {
-      "size": 2368,
-      "sha256": "d53181142b2d1330be5a80e756fdf18587930e70e4c3ee0c29804dcb3747307d"
+      "size": 12143,
+      "sha256": "7c8c4039b06f384a3bc949304b687dba3311370bf8d2ae64d2498f7de5bd6f41"
     },
     "robots.txt": {
       "size": 26,
@@ -72,10 +72,10 @@
   "pathReplacements": {
     "index.html": 0,
     "fund.html": 0,
-    "app.js": 5,
+    "app.js": 6,
     "pure-bond-reference.js": 5,
     "fund.js": 20,
-    "research-core.js": 0,
+    "research-core.js": 1,
     "bond-research.html": 0,
     "bond-original-single.html": 0,
     "bond-original-hybrid.html": 0,

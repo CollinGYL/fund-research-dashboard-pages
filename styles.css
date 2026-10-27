@@ -2468,3 +2468,151 @@ html:has(.blue-workbench) { scroll-padding-top:88px; scroll-behavior:auto; }
 .profile-pair-unavailable strong { font-size: 19px; }
 .profile-pair-unavailable ul { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.8; color: #65748a; }
 @media(max-width:600px) { .profile-pair-table th,.profile-pair-table td { padding: 9px 6px; font-size: 12px; } .profile-pair-unavailable ul { margin-top:10px; } }
+
+/* Shared category overview and compact research presentation. */
+#bond-market-overview[hidden]{display:none}
+.market-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
+.market-facts>div{background:#f3f7fb;border:1px solid #dbe5ef;border-radius:10px;padding:15px 18px}
+.market-facts small{display:block;color:#62778c;font-size:12px}
+.market-facts strong{display:block;margin-top:6px;color:#244b72;font-size:28px;line-height:1.2;font-variant-numeric:tabular-nums}
+.market-facts em{font-size:12px;font-style:normal;margin-left:5px;font-weight:500}
+.market-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:18px}.market-grid>.subpanel{min-width:0;margin:0}
+.market-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.market-panel-head h3{margin:0}
+.market-panel-head select{border:1px solid #d5dfe9;background:#fff;border-radius:5px;padding:5px 8px;font:inherit;font-size:12px}
+.market-class-bars>div{display:grid;grid-template-columns:85px minmax(40px,1fr) 85px;gap:10px;align-items:center;margin:24px 0}
+.market-class-bars>div>div{height:18px;background:#eff3f8;border-radius:3px}.market-class-bars i{display:block;height:100%;background:#477eaf;border-radius:3px}
+.market-class-bars small{grid-column:1/4;color:#78899a}.market-class-bars b{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.market-group-bars{display:flex;gap:14px;padding:8px 0 0}.market-group-bars>div{flex:1;min-width:0;text-align:center;font-size:12px}.market-group-bars small{display:block;color:#687e92;margin-top:3px}
+.market-bar-space{height:125px;display:flex;align-items:end;justify-content:center;border-bottom:1px solid #cbd9e4;margin-bottom:8px}.market-bar-space i{display:block;width:60%;background:#698fae;border-radius:4px 4px 0 0;position:relative;min-width:25px}.market-group-bars>div:last-child i{background:#c29958}
+.market-bar-space b{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-style:normal;font-size:11px;white-space:nowrap}
+.market-chart{margin-top:12px}.market-chart svg{width:100%;display:block;touch-action:pan-y;outline-offset:3px}.market-chart svg text{font-size:11px;fill:#688097;font-family:inherit}
+.market-tooltip{min-height:30px;font-size:12px;color:#294c6b;display:flex;gap:14px;flex-wrap:wrap;padding:5px 8px;background:#f4f7fa;border-radius:4px;font-variant-numeric:tabular-nums}
+.market-chart-legend{display:flex;justify-content:center;gap:24px;font-size:12px;padding:7px;color:#576e83}.market-chart-legend i{display:inline-block;width:18px;height:3px;margin-right:7px;vertical-align:middle}
+.campisi-profile-summary{display:block;padding:13px 16px;margin:12px 0 20px;background:#edf3f8;border-left:3px solid #48769d;border-radius:4px;color:#294b67}
+.campisi-profile-summary>strong{font-size:12px}.campisi-profile-summary p{margin:5px 0;font-size:14px;line-height:1.55;max-width:none}.campisi-profile-summary small{font-size:11px;color:#6b7f91}
+.manager-tenure-dates{line-height:1.5;font-variant-numeric:tabular-nums}
+body[data-list-view="portfolio"] .industry-filter-heading{min-width:210px}body[data-list-view="changes"] .fund-list-table td{white-space:normal}
+@media(max-width:800px){.market-facts{grid-template-columns:repeat(2,1fr)}.market-grid{grid-template-columns:1fr}.market-group-bars{gap:6px}.market-facts strong{font-size:23px}.market-chart-legend{gap:10px;flex-wrap:wrap}.market-tooltip{gap:6px}.market-panel-head{flex-wrap:wrap}}
+
+/* Research dashboard density: preserve readable labels and chart hit areas. */
+.blue-workbench { --section-gap:14px; --card-pad:16px; }
+.blue-workbench .section-heading { align-items:center; gap:12px 24px; margin-bottom:14px; }
+.blue-workbench .section-heading h2 { font-family:inherit; font-size:24px; line-height:1.35; letter-spacing:0; font-weight:650; }
+.blue-workbench .section-heading .eyebrow { margin:0 0 5px; font-size:10px; letter-spacing:.08em; }
+.blue-workbench .section-heading > p { font-size:12px; line-height:1.5; }
+.blue-workbench.compact-home #bond-market-overview { padding:14px 0 24px; scroll-margin-top:74px; }
+.blue-workbench .market-overview { min-width:0; }
+.blue-workbench .market-overview > .section-heading { margin-bottom:12px; }
+.blue-workbench .market-overview .eyebrow { display:none; }
+.blue-workbench .market-facts { gap:10px; margin:12px 0; }
+.blue-workbench .market-facts > div { padding:12px 14px; border-radius:8px; background:#fff; }
+.blue-workbench .market-facts strong { margin-top:4px; font-size:25px; font-weight:650; }
+.blue-workbench .market-facts small { font-size:11px; line-height:1.4; }
+.blue-workbench .market-grid { gap:12px; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr); }
+.blue-workbench .market-grid > .subpanel { margin:0; }
+.blue-workbench .market-panel-head { gap:10px; }
+.blue-workbench .market-panel-head h3 { line-height:1.5; }
+.blue-workbench .market-panel-head select { width:136px; min-height:32px; height:32px; padding:4px 8px; flex-shrink:0; }
+.blue-workbench .market-class-bars > div { margin:16px 0; gap:5px 10px; font-size:13px; }
+.blue-workbench .market-class-bars > div > div { height:12px; }
+.blue-workbench .market-class-bars small { font-size:11px; }
+.blue-workbench .market-group-bars { gap:10px; padding-top:4px; }
+.blue-workbench .market-bar-space { height:108px; margin-bottom:6px; }
+.blue-workbench .market-group-bars small { font-size:11px; margin-top:2px; }
+.blue-workbench .market-overview .method-note { margin:7px 0; font-size:11px; line-height:1.55; }
+.blue-workbench .market-chart { margin-top:6px; }
+.blue-workbench .market-tooltip { min-height:28px; padding:5px 8px; gap:5px 12px; }
+.blue-workbench .market-chart-legend { padding:6px 0 0; gap:18px; font-size:11px; }
+.blue-workbench .market-overview > .subpanel { margin-top:12px; }
+.blue-workbench :is(.subpanel,.research-overview-grid .subpanel,.history-metric,.simulation-metrics .research-metric,.simulation-method),
+.blue-workbench .pb-scope .subpanel { padding:var(--card-pad); border-radius:8px; }
+.blue-workbench .subpanel { margin-top:14px; }
+.blue-workbench .subpanel-heading,.blue-workbench .pb-scope .subpanel-heading { margin-bottom:10px; gap:8px 18px; flex-wrap:wrap; }
+.blue-workbench .subpanel h3,.blue-workbench .pb-scope .subpanel h3 { margin:0; font-size:14px; line-height:1.5; }
+.blue-workbench .method-note { line-height:1.65; }
+.blue-workbench .panel-intro,.blue-workbench .pb-scope .panel-intro { padding:14px 16px; gap:12px 20px; border-radius:8px; }
+.blue-workbench .panel-intro h2,.blue-workbench .pb-scope .panel-intro h2 { font-size:21px; line-height:1.4; }
+.blue-workbench .panel-intro .eyebrow,.blue-workbench .pb-scope .panel-intro .eyebrow { margin-bottom:5px; }
+.blue-workbench .panel-intro > p,.blue-workbench .pb-scope .panel-intro > p { line-height:1.6; }
+.blue-workbench.decision-detail .fund-page { padding-top:16px; }
+.blue-workbench.decision-detail .fund-page-hero { padding:9px 0 14px; margin-bottom:12px; gap:16px; }
+.blue-workbench.decision-detail .fund-page-hero h1 { font-size:25px; line-height:1.35; }
+.blue-workbench.decision-detail .fund-page-hero .eyebrow { margin-bottom:6px; }
+.blue-workbench.decision-detail .fund-page-summary { margin:7px 0 0; }
+.blue-workbench.decision-detail .fund-tab-nav:not(.single-subtab) { padding:5px; gap:3px; margin-bottom:14px; border-radius:8px; }
+.blue-workbench.decision-detail .fund-tab-nav button,.blue-workbench.decision-detail .fund-tab-nav.all-functions button { min-height:34px; padding:7px 11px; }
+.blue-workbench .research-conclusion { padding:10px 14px; }
+.blue-workbench .research-conclusion p { margin:4px 0 0; line-height:1.6; font-size:13px; }
+.blue-workbench .research-freshness { padding:9px 0; gap:4px 16px; }
+.blue-workbench .research-decision-metrics { margin-bottom:14px; border-radius:8px; }
+.blue-workbench .research-decision-metrics > div { padding:13px 14px; }
+.blue-workbench .research-decision-metrics strong { font-size:24px; line-height:1.25; margin:5px 0; }
+.blue-workbench .research-overview-grid { gap:12px; align-items:start; }
+.blue-workbench .research-overview-grid > .subpanel { margin-top:0; }
+.blue-workbench .research-signal { padding:10px 0; }
+.blue-workbench .research-metric,.blue-workbench .pb-scope .rmetric { padding:12px 14px; border-radius:7px; }
+.blue-workbench .pb-scope .rmetric strong { margin-top:4px; }
+.blue-workbench .pb-scope .metric-grid-in { gap:8px; }
+.blue-workbench .pb-scope .rt :is(th,td),.blue-workbench .research-table :is(th,td) { padding:8px 10px; line-height:1.5; }
+.blue-workbench .pb-scope .pctl-rows { gap:14px; }
+.blue-workbench .pb-scope .pctl-row .pctl-head { margin-bottom:4px; }
+.blue-workbench .campisi-profile-summary { padding:10px 13px; margin:8px 0 12px; }
+.blue-workbench .campisi-profile-summary p { font-size:13px; line-height:1.6; margin:4px 0; }
+.blue-workbench .data-boundary { margin-top:18px; padding:16px 18px; border-radius:8px; }
+.blue-workbench .profile-pair-shell { margin-top:16px; padding-top:16px; }
+.blue-workbench .profile-pair-metrics { gap:10px; margin-top:14px; }
+.blue-workbench .profile-pair-distance { padding:12px 14px; gap:16px; }
+.blue-workbench .profile-pair-table :is(th,td) { padding:8px 10px; line-height:1.5; }
+.blue-workbench.compact-home .category-hub { padding-top:16px; padding-bottom:12px; }
+.blue-workbench.compact-home #samples > .section-heading { margin-bottom:12px; }
+.blue-workbench.compact-home #samples #fund-list-title { font-size:23px; }
+.blue-workbench.compact-home .list-toolbar { gap:8px 10px; padding-bottom:10px; margin-bottom:10px; }
+.blue-workbench.compact-home .list-status-row { gap:6px 14px; margin-bottom:6px; }
+.blue-workbench.compact-home .selected-filters { margin:6px 0; gap:6px; }
+.blue-workbench.compact-home .home-classification-note { margin:7px 0; font-size:11px; line-height:1.55; }
+.blue-workbench.compact-home .fund-list-table thead th { padding:10px 10px; font-size:11px; }
+.blue-workbench.compact-home .fund-list-table tbody td,
+.blue-workbench.compact-home .fund-list-table.active-equity-mode tbody td { padding:10px 10px; line-height:1.45; }
+.blue-workbench.compact-home .fund-list-table td small { margin-top:2px; line-height:1.45; font-size:11px; }
+.blue-workbench.compact-home .fund-list-table .manager-tenure-dates { margin-top:4px; color:#52677b; }
+.blue-workbench.compact-home .fund-list-table tbody tr:nth-child(even) td { background:#fafbfd; }
+.blue-workbench.compact-home .fund-list-table tbody tr:hover td { background:#eff4fc; }
+@media(max-width:900px) {
+  .blue-workbench .market-grid { grid-template-columns:1fr; }
+  .blue-workbench .market-panel-head h3 { font-size:14px; }
+  .blue-workbench .market-overview > .section-heading { align-items:flex-start; flex-direction:column; gap:5px; }
+}
+@media(max-width:760px) {
+  .blue-workbench { --card-pad:13px; }
+  .blue-workbench .section-heading h2 { font-size:21px; }
+  .blue-workbench.compact-home #bond-market-overview { padding:12px 0 20px; }
+  .blue-workbench .market-facts { gap:8px; }
+  .blue-workbench .market-facts > div { padding:10px 12px; }
+  .blue-workbench .market-facts strong { font-size:23px; }
+  .blue-workbench .market-panel-head { flex-wrap:wrap; }
+  .blue-workbench .market-panel-head select { min-height:36px; height:36px; }
+  .blue-workbench .market-chart-legend { flex-wrap:wrap; gap:5px 12px; }
+  .blue-workbench.decision-detail .fund-page-hero h1 { font-size:23px; }
+  .blue-workbench.decision-detail .fund-tab-nav:not(.single-subtab) { position:static; margin-bottom:12px; }
+  .blue-workbench.decision-detail .fund-tab-nav button,.blue-workbench.decision-detail .fund-tab-nav.all-functions button { min-height:38px; }
+  .blue-workbench .panel-intro,.blue-workbench .pb-scope .panel-intro { padding:13px; }
+  .blue-workbench.compact-home .fund-list-table tbody td { padding:10px; }
+}
+@media(min-width:1100px) {
+  .blue-workbench.compact-home .category-hub { padding:0; }
+  .blue-workbench.compact-home #bond-market-overview .market-overview > .section-heading { display:block; padding-right:390px; }
+  .blue-workbench.compact-home #bond-market-overview .section-heading > p { margin-top:5px; font-size:11px; }
+}
+@media(min-width:761px) {
+  .blue-workbench.compact-home .active-equity-mode .metric-sort-controls { flex-direction:row; gap:4px; margin-top:4px; }
+  .blue-workbench.compact-home .active-equity-mode .metric-sort-controls button { font-size:10px; padding:2px 0; }
+  .blue-workbench.compact-home .fund-list-table tbody td { padding-block:8px; }
+  .blue-workbench.compact-home .active-equity-mode .fund-row-details > summary { min-height:0; padding:1px 0; }
+  .blue-workbench.compact-home .selected-filters { margin:3px 0; }
+  .blue-workbench.compact-home .selected-filters button { min-height:27px; padding:3px 9px; }
+  .blue-workbench.compact-home .list-status-row { margin-bottom:2px; }
+}
+@media(min-width:761px) {
+  .blue-workbench.compact-home:is([data-list-view="portfolio"],[data-list-view="changes"]) .decision-filters { order:3; flex-basis:100%; padding-top:2px; }
+  .blue-workbench.compact-home:is([data-list-view="portfolio"],[data-list-view="changes"]) .page-density { margin-left:auto; }
+}

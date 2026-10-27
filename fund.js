@@ -2975,12 +2975,16 @@ function prepareResearchOverview(fund, detail) {
   page.querySelector('.fund-page-metrics')?.remove();
   const nav = page.querySelector('.fund-tab-nav');
   nav.querySelectorAll('button').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
-  nav.insertAdjacentHTML('afterbegin', '<button class="active" data-tab="overview" role="tab" aria-selected="true">研究概览</button>');
+  nav.insertAdjacentHTML('afterbegin', `<button class="active" data-tab="overview" role="tab" aria-selected="true">${fund.category === 'pure-bond' ? '市场概览' : '研究概览'}</button>`);
   page.querySelectorAll('[data-panel]').forEach(p => { p.hidden = true; p.classList.remove('active'); });
   page.querySelector('.fund-tab-content').insertAdjacentHTML('afterbegin', panel('overview', renderResearchOverview(fund, detail), true));
   // One navigation keeps every available analysis directly accessible.
   nav.classList.add('all-functions');
   nav.setAttribute('aria-label', '基金分析功能');
+  if (fund.category === 'pure-bond') {
+    void FundMarket.mount(page.querySelector('[data-panel="overview"]'));
+    return;
+  }
   const refreshSummary = () => loadResearchSummary(fund.code).then(() => {
     page.querySelector('[data-panel="overview"]').innerHTML = renderResearchOverview(fund, detail);
   }).catch(error => {
@@ -3784,7 +3788,7 @@ function bindEquitySimulation(target, data, index) {
 const GENERIC_TABS = {
   "active-equity": [["performance", "业绩表现"], ["profile", "基金画像"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股分析"], ["simulation", "持仓模拟（研究版）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "index-enhanced": [["performance", "业绩表现"], ["industries", "行业分析（相比基准）"], ["holdings", "持股分析（相比基准）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["documents", "公告原文"]],
-  "pure-bond": [["perf", "业绩表现"], ["alloc", "资产配置"], ["bond", "券种结构"], ["corr", "相关性分析"], ["campisi", "Campisi归因"], ["research", "当前基金深度分析"], ["original", "同事原版与久期研究"], ["documents", "公告原文"]],
+  "pure-bond": [["perf", "业绩表现"], ["alloc", "资产配置"], ["bond", "券种结构"], ["corr", "相关性分析"], ["campisi", "Campisi归因"], ["documents", "公告原文"]],
   "hybrid-bond": [["performance", "业绩表现"], ["evaluation", "五维评价"], ["assets", "资产配置"], ["bonds", "券种结构"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["original", "同事原版与久期研究"], ["documents", "公告原文"]],
   "convertible-bond": [["performance", "业绩表现"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股与转债分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["original", "同事原版与久期研究"], ["documents", "公告原文"]],
 };
@@ -4531,7 +4535,7 @@ function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
   return `<section class="bond-disclosed-history"><div class="subpanel-heading"><div><h3>日频估计与半年报／年报久期</h3><span>日期按报告期末标注 · 单位：年</span></div></div>
     ${missing?`<p class="method-note">${escapeHTML(state.target_report_date||'')}：${missing}</p>`:''}
     ${points.length>=2?renderMiniLineChart(points,[{key:'duration',label:'日频估计',color:'#0a7c78',format:'years'},{key:'disclosed',label:'已核验披露对照',color:'#c17729',format:'years',points:true},{key:'historical',label:'其他历史披露',color:'#78848c',format:'years',points:true,hollow:true}],`${fund.name}日频估计与历史披露久期`,true):'<p class="empty-copy">可用久期点不足以绘图；已有披露见下表。</p>'}
-    <p class="method-note">实心点为通过来源与日期核验的披露对照；空心点保留其他历史披露，包括模型起点之前的数据，不计入拟合误差。缺值不填0，披露不作为日频模型输入。鼠标悬停可查看具体日期和数值。</p>
+    <p class="method-note">实心点：已核验披露对照；空心点：其他历史披露。鼠标悬停查看日期、数值和来源。</p>
     ${rows.length?`<details><summary>全部历史披露（${rows.length}期）</summary>${renderTable(['报告期','披露久期','来源','对照说明'],rows.reverse())}</details>`:'<p class="method-note">暂未取得可用的历史数值披露。</p>'}
   </section>`;
 }
@@ -4542,7 +4546,7 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
     return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${detail?.pure_bond_duration_error ? `日频久期数据加载失败：${escapeHTML(detail.pure_bond_duration_error)}` : "该基金的日频久期分片尚未生成。"}</p>${historical}</article>`;
   }
   if (kalmanDuration.status !== "ok") {
-    return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${escapeHTML(kalmanDuration.reason || "共同日频样本不足，暂不输出不稳定估计。")}</p><p class="method-note">低频净值、成立时间过短或与债券因子共同样本不足时不强行拟合。</p>${historical}</article>`;
+    return `<article class="subpanel"><div class="subpanel-heading"><div><h3>日频久期估计</h3><span>卡尔曼滤波 · 仅观测净值</span></div></div><p class="empty-copy">${escapeHTML(kalmanDuration.reason || "共同日频样本不足。")}</p>${historical}</article>`;
   }
   const series = downsamplePureBondDuration(kalmanDuration);
   const pairs = pureBondDurationPairs(kalmanDuration, detail?.duration_history);
@@ -4559,7 +4563,7 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
   const bounds = kalmanDuration.duration_bounds?.at(-1);
   const ambiguous = kalmanDuration.quality?.at(-1)?.duplicate_proxy_active === true
     && Array.isArray(bounds) && bounds.length === 2 && bounds.every(isFiniteValue);
-  const poolNote=`<p class="method-note" data-bond-all-scope><strong>覆盖范围：</strong>全部纯债组合，A/C等份额共用结果，不按规模、开放方式等筛选。披露对照仍要求数值有效、日期匹配及来源核验通过。</p>`;
+  const poolNote=`<p class="method-note" data-bond-all-scope><strong>覆盖范围：</strong>全部纯债组合 · A/C等份额合并 · 无规模门槛。</p>`;
   const identificationNote = ambiguous
     ? `<p class="simulation-warning">部分债券指数走势相同，暂时无法区分各自仓位。在其他估计不变时，久期范围为 <strong>${num(bounds[0], 2)}—${num(bounds[1], 2)} 年</strong>；这不是置信区间，单点估计不能当成真实久期。</p>` : '';
   return `<article class="subpanel chart-subpanel pure-bond-kalman-panel">
@@ -4575,7 +4579,7 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
     ${identificationNote}${poolNote}
     ${historical}
     ${recentPairs.length ? `<div class="subpanel-heading pure-bond-kalman-compare-heading"><div><h3>与披露反推久期对照</h3><span>报告期当日或之前最近交易日</span></div></div>${renderTable(["报告期", "披露反推", "模型估计", "偏差"], recentPairs)}` : '<p class="method-note">当前没有落在模型区间内的有效披露久期可供对照。</p>'}
-    <p class="method-note"><strong>口径边界：</strong>模型每天只使用截至当日的基金复权净值与14条债券指数收益，不把半年报/年报久期输入滤波；披露久期仅用于事后对照。先按净值与因子的共同起止日计算收益，再对连续3个有效区间取平均；预热120个有效观察，Q=${isFiniteValue(meta.q) ? meta.q : "3e-4"}。${meta.factor_variant ? `<strong>因子版本：</strong>${escapeHTML(meta.factor_variant)}。` : ""}这是收益法估计，不等同于逐券组合真实久期，也不用于填补披露值。</p>
+    <p class="method-note">输入：复权净值与债券指数日收益。半年报、年报披露用于同日对照；单位：年。</p>
   </article>`;
 }
 
@@ -6491,7 +6495,7 @@ function renderPureBondReferenceFund(fund, detail, currentDuration) {
     <section class="fund-page-metrics">${overviewMetrics}</section>
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
     <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
-    <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>披露持仓是报告期快照，不代表实时持仓；研究结果不构成投资建议。</li></ul></section>`;
+    <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>持仓按季度、半年报和年报的报告期展示。</li></ul></section>`;
   prepareResearchOverview(fund, detail);
   bindPureBondReferenceInteractions();
   bindTabs(createPureBondTabLoader(fund, detail));
@@ -6688,7 +6692,7 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
     <section class="fund-page-metrics">${overviewMetrics}</section>
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
     <div class="fund-tab-content">${tabs.map(([id], index) => panel(id, content[id], index === 0)).join("")}</div>
-    <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>${navSource}；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>披露持仓是报告期快照，不代表实时持仓；研究结果不构成投资建议。</li></ul></section>`;
+    <section class="data-boundary"><div><p class="eyebrow">DATA BOUNDARY</p><h2>数据口径</h2></div><ul><li>${navSource}；该基金实际净值日期为 ${escapeHTML(fund.performance?.latest_date || "—")}。</li><li>资产配置报告期为 ${escapeHTML(fund.asset?.report_date || "—")}；久期报告期为 ${escapeHTML(fund.duration?.report_date || "—")}。</li><li>同一基金的A/C/D/E等份额已合并；规模和持仓按基金主体去重，不重复加总。</li><li>持仓按季度、半年报和年报的报告期展示。</li></ul></section>`;
   page.querySelector("[data-pure-bond-retry]")?.addEventListener("click", () => window.location.reload());
   const loadTab = createGenericTabLoader(fund, detail);
   prepareResearchOverview(fund, detail);

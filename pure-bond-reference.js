@@ -76,6 +76,7 @@ function lineChart(series,opt={}){
   const pad=(ymax-ymin)*0.1||0.01;ymin-=pad;ymax+=pad;
   if(opt.floor!=null)ymin=Math.max(ymin,opt.floor);
   if(opt.ceil!=null)ymax=Math.min(ymax,opt.ceil);   // ★2026-08-07:分位图要把量程夹在0~100%
+  if(opt.integerTicks){ymin=0;ymax=Math.max(4,Math.ceil(ymax/4)*4);}
   const allx=clipped.flatMap(s=>s.points.map(p=>+new Date(p[0]))).concat(clippedRight.flatMap(s=>s.points.map(p=>+new Date(p[0]))));
   const x0f=x0!=null?x0:Math.min(...allx),x1f=x1!=null?x1:Math.max(...allx);
   const X=t=>pl+(x1f===x0f?pw/2:(t-x0f)/(x1f-x0f)*pw),Y=v=>pt+ph-(v-ymin)/(ymax-ymin)*ph;
@@ -83,7 +84,7 @@ function lineChart(series,opt={}){
   const rMin=rAll.length?Math.min(0,...rAll,-0.0001):-0.0001;   // 右轴永远以0为天花板,不留padding
   const YR=v=>pt+(Math.abs(v)/Math.abs(rMin))*ph;
   let svg=`<svg viewBox="0 0 ${w} ${h}" id="svg_${id}">`;
-  for(let i=0;i<=4;i++){const v=ymin+(ymax-ymin)*i/4,y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${opt.pctY?P(v,1):NN(v,opt.dp||2)}</text>`;}
+  for(let i=0;i<=4;i++){const v=ymin+(ymax-ymin)*i/4,y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${opt.pctY?P(v,1):NN(v,opt.dp??2)}</text>`;}
   if(ymin<0&&ymax>0){const y=Y(0);svg+=`<line x1="${pl}" y1="${y}" x2="${w-pr}" y2="${y}" stroke="#aeb9c2"/>`;}
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="${opt.refLineColor||"#c0392b"}" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
   xTicks(x0f,x1f).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
@@ -785,7 +786,7 @@ function durKFBlock(d){
   const warning=ambiguous?`<p class="method-note" data-duration-identification>两条债券代理近期收益相同，无法仅靠净值区分。保持其他估计不变时，最新久期可能落在 <strong>${NN(bound[0],2)}—${NN(bound[1],2)} 年</strong>；这是条件范围，不是置信区间，单点估计不能当成真实久期。</p>`:"";
   const rows=[`<div class="fg-row"><b>模型估计</b><span>用净值和债券指数估计久期；先对齐共同起止日，再平滑三个有效收益区间，预热120个观察。</span></div>`,
     `<div class="fg-row"><b>披露对照</b><span>由半年报或年报利率敏感性反推，仅作事后对照；估计日期最多早四个自然日。</span></div>`];
-  if(K.meta.factor_variant)rows.push(`<div class="fg-row"><b>因子版本</b><span>${esc(K.meta.factor_variant)}</span></div>`);
+
   rows.push(`<div class="fg-row" data-bond-all-scope><b>覆盖范围</b><span>全部纯债组合，A/C等份额共用结果；不按规模、开放方式等筛选。保留有效净值样本及披露对照的日期、数值检查。</span></div>`);
   return warning+chart+grid+`<div class="factor-glossary" style="margin-top:14px">${rows.join("")}</div>`;
 }
@@ -869,41 +870,10 @@ function renderPerf(d){
 }
 
 function renderAlloc(d,options={}){
-  const style=d.alloc.style||[],dur=d.alloc.duration||[];
-  // ★2026-07-29用户要求:资产配置4张图统一时间轴——以基金自身季度数据(style,资产分布/杠杆的口径)
-  // 为准,久期/国债收益率两张图强制对齐到同一区间(forceX),不再各自按自己的数据范围单独定轴。
-  const styleX=style.length?{x0:+new Date(style[0].dt),x1:+new Date(style[style.length-1].dt)}:null;
-  // ★2026-07-30用户要求:资产配置4张图原为h:200/180/180/180高度不统一,堆叠起来参差不齐,
-  // 统一成h:200(仅改传入lineChart/stackArea的opt.h数值,不动函数内部逻辑；forceX的3图联动
-  // 靠水平方向的pl/pw几何决定,与h高度无关,故此改动不影响linkChartsMulti的hover同步)。
-  const assetChart=stackArea(style,AKEYS,{h:200,colors:AC,names:ACN,refLine:100});
-  const levBadge=changeBadge("杠杆",style,"lev","x",2);
-  const durBadge=dur.length?changeBadge("久期",dur,"dur","年",2):"";
-  // ★2026-07-30用户需求:杠杆演变/久期时间序列/10年期国债收益率 三张单独的图合并成一幅三轴联合折线图
-  const combinedSeries=[{name:"杠杆率",color:"var(--navy)",points:style.map(r=>[r.dt,r.lev]),dp:2,unit:"x",refLine:1}];
-  if(dur.length)combinedSeries.push({name:"修正久期",color:"var(--gold)",points:dur.map(r=>[r.dt,r.dur]),dp:2,unit:"年"});
-  if(typeof YIELD_CURVE_LIB!=="undefined"&&YIELD_CURVE_LIB.points&&YIELD_CURVE_LIB.points.length){
-    combinedSeries.push({name:"10年期国债到期收益率",color:"var(--teal)",points:YIELD_CURVE_LIB.points,dp:2,unit:"%"});
-  }
-  const combinedChart=tripleAxisChart(combinedSeries,{forceX:styleX});
-  // ★2026-07-30用户要求:标签横幅("杠杆·久期·10年期国债到期收益率")要完整横着展示,不能被
-  // 右侧说明文字挤占空间导致换行——把原来塞进sub()的rightNote的那段长说明挪出来,改成
-  // 图表下方分段展示(每个指标独立一行,复用五因子含义说明同款.fg-row样式,风格统一)。
-  const combinedDescRows=[
-    `<div class="fg-row"><b>杠杆</b><span>总资产/净资产${levBadge?" · "+levBadge:""}</span></div>`,
-    dur.length?`<div class="fg-row"><b>久期</b><span>利率冲击反推${durBadge?" · "+durBadge:""}</span></div>`:"",
-    `<div class="fg-row"><b>国债收益率</b><span>宏观利率环境背景代理变量</span></div>`
-  ].join("");
-  const combinedWarn=(dur.length?"":"该基金无利率敏感性数据，久期序列缺失，仅展示杠杆率与国债收益率。")+
-    (typeof YIELD_CURVE_LIB!=="undefined"&&YIELD_CURVE_LIB.points&&YIELD_CURVE_LIB.points.length?"":" 国债收益率曲线库未加载。");
-  return `<p class="tab-lead">资产分布 · 杠杆/久期/利率环境（合并联动，时间轴统一对齐）</p>`+
-    sub("资产分布","六大类资产占净值（季度）· 固定收益投资/现金/股票/其他资产/基金/货币市场工具",
-      assetChart)+
-    sub("杠杆 · 久期 · 10年期国债到期收益率","",
-      combinedChart+`<div class="factor-glossary" style="margin-top:14px">${combinedDescRows}</div>`+
-      (combinedWarn.trim()?`<div class="method-note">${combinedWarn.trim()}</div>`:""))+
-    (options.includeDuration===false?"":sub("本基金的久期日频估计","净值驱动估计 · 历史不足时留空",
-      `<div id="durkfWrap">${durKFBlock(d)}</div>`));
+  const style=d.alloc.style||[];
+  const assetChart=stackArea(style,AKEYS,{h:220,colors:AC,names:ACN,refLine:100});
+  return sub("资产分布","季度披露 · 占基金净资产",assetChart)+
+    (options.includeDuration===false?"":sub("日频久期估计","年",`<div id="durkfWrap">${durKFBlock(d)}</div>`));
 }
 
 function renderBondStruct(d){
@@ -969,7 +939,7 @@ function turnoverChart(bonds){
     {name:"加仓",color:"var(--f-level)",points:rows.map(r=>[r.dt,r.add])},
     {name:"减仓",color:"var(--f-slope)",points:rows.map(r=>[r.dt,r.cut])},
     {name:"清仓",color:"var(--f-default)",points:rows.map(r=>[r.dt,r.clr])}
-  ],{h:190,dp:0,floor:0});
+  ],{h:190,dp:0,floor:0,integerTicks:true});
 }
 function bondTable(period){
   // 评级带来源角标:发行人评级与债项评级口径不同(主体信用 vs 债项信用),不标来源会误导
@@ -1278,16 +1248,16 @@ function campisiDateNote(d,reg,label){
   const catalogFund=Array.isArray(window.FUND_DASHBOARD_CATALOG?.funds)?window.FUND_DASHBOARD_CATALOG.funds.find(f=>f.code===d.code):null;
   const navEnd=latest([...(d.perf?.curve?.nav||[]).map(row=>row?.[0]),catalogFund?.performance?.latest_date]);
   const oldDates=[end,rollEnd,peerEnd].filter(Boolean).filter(date=>navEnd&&date<navEnd);
-  const windowText=end?`${start?esc(start)+" 至 ":""}<b>${esc(end)}</b>`:"未提供可用回归窗口日期，不能确认模型截至日";
+  const windowText=end?`${start?esc(start)+" 至 ":""}<b>${esc(end)}</b>`:"回归日期待补";
   return `<div class="method-note pb-campisi-date-note"><b>${esc(label||"五因子数据日期")}</b>：${windowText}。`+
     `滚动回归截至 ${esc(rollEnd||"未提供")}；同类 β 序列截至 ${esc(peerEnd||"未提供")}。`+
-    (navEnd?`已载入净值截至 ${esc(navEnd)}。`:"未载入可核对的净值日期。")+
-    (oldDates.length?` <strong>五因子模型尚未全部更新到最新净值</strong>；本页为上述历史区间的结果。`:"")+`</div>`;
+    (navEnd?`已载入净值截至 ${esc(navEnd)}。`:"净值日期待补。")+
+    (oldDates.length?` <span>五因子结果日期：${esc(end||"待补")}。</span>`:"")+`</div>`;
 }
 function renderCampisi(d){
   const c=d.campisi;
   if(!c||!c.full)return `<p class="tab-lead">五因子净值归因（Campisi / RBA）</p>`+campisiDateNote(d,null)+
-    sub("Campisi 归因","净值回归",`<div class="data-boundary"><p class="eyebrow">历史不足</p><h3>净值历史过短</h3><p>该基金净值有效观测 &lt;120，五因子回归不稳定，暂不展示。</p></div>`);
+    sub("Campisi 归因","净值回归",`<div class="data-boundary"><p class="eyebrow">历史不足</p><h3>净值历史过短</h3><p>该基金净值有效观测 &lt;120，暂无五因子回归结果。</p></div>`);
   const regWin=c.reg_win||{};
   const availWins=Object.keys(FAC_WIN_LABEL).filter(k=>regWin[k]);
   if(!curFacWin||!regWin[curFacWin])curFacWin=availWins.includes("ytd")?"ytd":availWins[0];
@@ -1305,29 +1275,7 @@ function renderCampisi(d){
   // 不除以年数),此处"合计"应等于窗口内真实累计收益,可与"业绩表现"tab的cum直接对照
   // (两者天数略有出入——回归窗口需与因子数据交集,起始日略晚于自然年1月1日,故不完全相等)。
   const samePerfWindow=Boolean(campisiDate(fr.start)&&campisiDate(fr.end)&&stageMatch?.d0===fr.start&&stageMatch?.d1===fr.end);
-  const capNote=arithAnn==null?"":!samePerfWindow
-    ?`<div class="method-note" style="margin-top:10px"><b>回归窗口与业绩窗口不同，不能直接比较。</b>
-      本页贡献合计 <b>${P(arithAnn,2)}</b>（${isAnnualized?"算术年化":"未年化日收益之和"}），对应 ${esc(fr.start||"未提供")} 至 ${esc(fr.end||"未提供")}。
-      ${stageMatch?`业绩表现「${esc(FAC_WIN_LABEL[curFacWin])}」为 ${esc(stageMatch.d0||"未提供")} 至 ${esc(stageMatch.d1||"未提供")}，${isAnnualized?"复利年化":"累计收益"} ${P(isAnnualized?realAnn:realCum,2)}；`:"未找到可核对的业绩窗口；"}
-      不同日期和收益口径造成的差额不能当作模型误差或仅归因于复利差异。各因子贡献数值保留原模型结果。</div>`
-    :!isAnnualized
-    ?`<div class="method-note" style="margin-top:10px">
-        <b>本窗口未年化</b>：「${esc(FAC_WIN_LABEL[curFacWin])}」不满整年，这里的"合计"是<b>今年以来实际已经赚到的真实收益</b>
-        （未做年化处理），各分项直接相加=合计。
-        ${realCum!=null
-          ?`可以直接与「业绩表现」→「阶段表现」→「${esc(FAC_WIN_LABEL[curFacWin])}」行的累计收益对照：此处 <b>${P(arithAnn,2)}</b> vs 业绩表现tab <b>${P(realCum,2)}</b>——两者概念一致、数值高度吻合，仅差${Math.abs(arithAnn-realCum)>=0.0001?(Math.abs(arithAnn-realCum)*100).toFixed(2):"0.00"}个百分点，属于模型拆解的正常误差范围，不影响作为收益来源构成的参考。`
-          :""}
-      </div>`
-    :`<div class="method-note" style="margin-top:10px">
-        <b>「合计」≠「业绩表现」tab的年化收益</b>：瀑布图"合计"是<b>算术年化</b>(每日收益率直接求和/年数)，
-        不是<b>复利年化</b>(CAGR，真实年化收益率要看"业绩表现"→"阶段表现"里的对应行)。
-        ${realAnn!=null
-          ?`本窗口两者对比：算术年化 <b>${P(arithAnn,2)}</b> vs 真实复利年化 <b>${P(realAnn,2)}</b>——数值接近但不相等，差额是"复利 vs 算术"的数学差异（波动率损耗），纯债基金波动小所以差得不多。`
-          :`「${esc(FAC_WIN_LABEL[curFacWin])}」不满整年，业绩表现tab不对其做真实年化（显示"—"），故此处无法给出数字对比，仅提示口径差异本身存在。`}
-        用算术年化是因为只有它能被五因子β<b>线性拆解</b>（分项相加=合计）；复利收益涉及交叉项，拆不了。
-      </div>`;
-  // ★2026-07-30用户要求:窗口选择器从"收益贡献分解"卡片内挪到整个tab最上方(基金画像自动总结之上),
-  // 因为这个选择器同时控制画像总结句/瀑布图两处联动,放在tab顶部更符合"先选窗口再看结果"的操作顺序。
+  const capNote=arithAnn==null?"":`<p class="method-note">贡献合计 ${P(arithAnn,2)} · ${isAnnualized?"算术年化":"日收益之和"} · ${esc(fr.start||"—")}—${esc(fr.end||"—")}${stageMatch?`<br>业绩窗口 ${esc(stageMatch.d0||"—")}—${esc(stageMatch.d1||"—")} · ${isAnnualized?"复利年化":"累计收益"} ${P(isAnnualized?realAnn:realCum,2)}`:""}</p>`;
   const winSelectorBlock=`<div class="fac-win-bar"><span>选择窗口</span><select class="period" data-pb-onchange="switchFacWin(this.value)">${winOpts}</select></div>`;
   const contribBlock=sub("收益贡献分解",`${isAnnualized?"年化":"未年化·实际累计"} · β×Σ因子 · ${fr.start}→${fr.end}（${fr.years||""}年,n=${fr.n},R²=${NN(fr.r2,3)}）`,
     `<div>${waterfallChart(fr.contrib,{w:700,h:220})}</div>`+capNote);
@@ -1335,8 +1283,8 @@ function renderCampisi(d){
   // 自动生成的画像总结句
   const sentence=(c.profile_sentences&&c.profile_sentences[curFacWin])||null;
   const profileBlock=sentence
-    ?`<div class="data-boundary" style="background:var(--navy)"><p class="eyebrow">基金画像自动总结</p><h3 style="font-size:17px">${esc(sentence)}</h3><p>基于「${FAC_WIN_LABEL[curFacWin]}」窗口的五因子${isAnnualized?"年化":"未年化·实际"}贡献分解自动生成，随上方窗口切换同步更新。</p></div>`
-    :`<div class="method-note">该窗口贡献数据不足，无法生成画像总结。</div>`;
+    ?`<div class="campisi-profile-summary"><strong>基金画像</strong><p>${esc(sentence)}</p><small>${esc(FAC_WIN_LABEL[curFacWin])} · 五因子收益贡献</small></div>`
+    :`<p class="method-note">该窗口暂无贡献数据。</p>`;
   // ★2026-07-30用户要求:五因子含义说明改分段展示(每个因子独立一行,不再挤在一段话里),
   // 字体从method-note默认的11.5px放大,跟"基金画像自动总结"的字号呼应,视觉权重更接近。
   // ★2026-08-05用户要求:五因子说明改成表格,补「多头/空头」两列,原释义挪到第四列。
@@ -1345,7 +1293,7 @@ function renderCampisi(d){
   // 「多CBA00611(1年以下)+CBA00651 / 空CBA00631+CBA00641」,那是已被推翻的早期方案:
   // CBA00611在Choice没有INDEXCR/久期数据(bond_five_factor.py第48行注明),短翼实际改用了1-3年。
   // 以 bond_five_factor.py 为准。
-  const factorGlossary=sub("五因子含义说明","多空腿取自 因子库/bond_five_factor.py",`<div class="rt-wrap"><table class="rt rt-text">
+  const factorGlossary=sub("五因子含义说明","债券指数与多空权重",`<div class="rt-wrap"><table class="rt rt-text">
       <thead><tr><th>因子</th><th>多头</th><th>空头</th><th>含义</th></tr></thead>
       <tbody>
         <tr><td>利率水平 level</td><td>国债总 <span class="fg-code">CBA00601</span></td><td>—（不做空）</td><td>收益率曲线<b>平行移动</b>的变化，反映久期的暴露</td></tr>
@@ -1369,7 +1317,7 @@ function renderCampisi(d){
   const ts=c.peer_beta_ts;
   let pctlBlock;
   if(!ts||!ts.dt||!ts.dt.length){
-    pctlBlock=sub("同类百分位定位","",`<div class="method-note">同类数据不足，无法定位分位（或数据仍是旧版季末结构，需重跑 build.py）。</div>`);
+    pctlBlock=sub("同类百分位定位","",`<div class="method-note">暂无同类分位数据。</div>`);
   }else{
     const T=ts.dt.length;
     if(curPeerIdx==null||curPeerIdx<0||curPeerIdx>=T)curPeerIdx=T-1;   // 默认停在最新净值日
@@ -1382,34 +1330,16 @@ function renderCampisi(d){
     setTimeout(()=>{wirePeerCursor([id1,id2],ts);linkChartsMulti([id1,id2]);},0);
     pctlBlock=sub("同类百分位定位",
       `日频 · 60交易日滚动窗 · vs 中长期纯债同类（${esc(ts.dt[0])} ~ ${esc(ts.dt[T-1])}，共 ${T} 个交易日锚点）`,
-      `<div class="subpanel-note">① 分位视角：五个因子的同类百分位怎么随时间变
+      `<div class="subpanel-note">五因子同类分位
         <span class="fac-chips" id="peerPctlChips">${peerPctlChips()}</span></div>`+
       `<div id="peerPctlWrap">${c1}</div>`+
-      `<div class="subpanel-note" style="margin-top:18px">② 绝对值视角：是<b>它自己变了</b>，还是<b>整个同类都在变</b>
+      `<div class="subpanel-note" style="margin-top:18px">因子暴露与同类分布
         <select class="period" id="peerFacSel" style="margin-left:10px" data-pb-onchange="switchPeerFac(this.value)">${facOpts}</select></div>`+
       `<div id="peerBetaWrap">${c2}</div>`+
       `<div class="peer-cursor" id="peerCursorLabel">定位到 <b>${esc(cur.dt)}</b>（当日同类 <b>n=${cur.n}</b> · 产品口径）</div>`+
       `<div class="auto-note" id="peerSentence">${esc(peerPctlSentence(cur.dt,cur))}</div>`+
       `<div class="pctl-rows" id="pctlRows" style="margin-top:12px">${FAC_KEYS.map(k=>distStrip(k,cur[k])).join("")}</div>`+
-      `<div class="method-note">
-        <b>怎么看</b>：分位越高＝该因子β数值在同类分布中越大（未反转风险方向）；不直接等于信用下沉、收益贡献或管理能力更强；
-        越低＝相对越保守。50分位＝与同类中位打平。图①灰虚线就是50分位。<br>
-        <b>图②为什么要单独画一幅</b>：分位是相对量，只看图①分不清"分位上升"是本基金自己加了暴露、
-        还是同类集体降暴露把它衬托上去了。图②画了<b>双层分布带</b>——深色＝同类P25~P75（中间50%）、
-        浅色＝同类P10~P90（中间80%），灰线＝同类中位，粗线＝本基金。
-        带子整体上移就是全行业在动，粗线穿出<b>外</b>带才算这只基金真的走极端。<br>
-        <b>为什么用分位而不是极值[最小,最大]</b>：极值带宽会被<b>同类只数</b>机械撑大（同类池从2013年的124只长到现在的3566只，
-        抽到极端值的概率必然上升），跟"同类分歧变大"没关系，正好废掉这幅图的用途；
-        且尾部多是<b>低频披露基金</b>（定开/摊余成本法，净值非逐日真实变动）在60天窗口回归下炸出的伪值
-        （实测2026-07-14同类信用β最大值13.48，而P99才2.52），会把纵轴撑到看不成图。<br>
-        <b>下方分位条</b>：在任意一幅图上移动鼠标，会定位到那一天并重画这5根条（深色块＝P25~P75，浅色块＝P10~P90，竖线＝P50，圆点＝本基金位置）。默认停在该序列最后一个可用日期。<br>
-        <b>频率与口径</b>：<b>日频</b>（每个交易日一个锚点），β 由该日往前 <b>60 个交易日</b>的净值日收益对五因子回归得到；
-        同类池按 PIT 逐日判定（当日属于中长期纯债、且窗口内 60 天净值齐全），故 n 会逐日小幅变动；并按<b>产品口径</b>去重——同一产品的 A/C/D/E 只算一票，取 Wind 初始份额为代表（<b>为什么必须去重</b>：A/C 是同一个组合，β 几乎相同，重复计票等于给多份额的大厂主力产品更高权重，而这类产品风格系统性更保守，会把整个分布往下拽）。
-        本模块<b>完全不使用季报持仓数据</b>，输入只有全池复权净值日收益和债券指数日收益。<br>
-        <b>必须注意</b>：相邻两天的 β 共享 60 天窗口里的 59 天数据，序列自相关约 98%——
-        <b>曲线平滑是滚动窗构造出来的，不代表基金每天在调仓</b>；有意义的是趋势和穿越分布带的时刻，不是日间的小抖动。
-        另外同类池成分逐日变化，也会给曲线带来与 β 无关的轻微抖动。
-      </div>`);
+      `<p class="method-note">深色带 P25–P75 · 浅色带 P10–P90 · 灰线 P50 · 实线为本基金</p>`);
   }
 
   setTimeout(wireCmpBox,0);
@@ -1549,7 +1479,7 @@ function doCompare(){
 function betaRadar(A,B,ra,rb){
   const W=560,H=380,cx=W/2,cy=H/2+6,R=126;
   const vals=[];
-  FAC_KEYS.forEach(k=>{[ra,rb].forEach(r=>{const v=r&&r.betas?r.betas[k]:null;if(v!=null)vals.push(v);});});
+  FAC_KEYS.forEach(k=>{[ra,rb].forEach(r=>{const v=r&&r.betas?r.betas[k]:null;if(Number.isFinite(v))vals.push(v);});});
   // ★B 可为 null(只画本基金)
   if(!vals.length)return `<div class="method-note">无可比 β 数据。</div>`;
   const vmax=Math.max(...vals,0)*1.15||1, vmin=Math.min(...vals,0)*1.15;
@@ -1578,20 +1508,18 @@ function betaRadar(A,B,ra,rb){
   // 两只基金的多边形
   [[ra,'var(--navy)'],[rb,'#c06a58']].forEach(([r,col])=>{
     if(!r||!r.betas)return;
-    const pts=FAC_KEYS.map((k,i)=>pt(i,r.betas[k]!=null?r.betas[k]:vmin));
-    s+=`<polygon points="${pts.map(p=>p.map(x=>x.toFixed(1)).join(',')).join(' ')}" fill="${col}" fill-opacity="0.13" stroke="${col}" stroke-width="2.2" stroke-linejoin="round"/>`;
+    const pts=FAC_KEYS.map((k,i)=>Number.isFinite(r.betas[k])?pt(i,r.betas[k]):null);
+    if(pts.every(Boolean))s+=`<polygon points="${pts.map(p=>p.map(x=>x.toFixed(1)).join(',')).join(' ')}" fill="${col}" fill-opacity="0.13" stroke="${col}" stroke-width="2.2" stroke-linejoin="round"/>`;
     FAC_KEYS.forEach((k,i)=>{
-      const t=r.tstat?r.tstat[k]:null, sig=t!=null&&Math.abs(t)>=2;
       const p=pts[i];
-      // 不显著 -> 空心点(与表格标灰一致)
-      s+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4.2" fill="${sig?col:'#fff'}" stroke="${col}" stroke-width="1.8"/>`;
+      if(!p)return;
+      s+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4.2" fill="${col}" stroke="${col}" stroke-width="1.8"/>`;
     });
   });
   s+=`</svg>`;
   const lg=`<div class="chart-legend">
     <span><i class="sw" style="background:var(--navy)"></i>${esc(A.head.name||A.code)}</span>`+
     (B?`<span><i class="sw" style="background:#c06a58"></i>${esc(B.head.name||B.code)}</span>`:"")+`
-    <span><i class="sw" style="background:#fff;border:1.8px solid #8a99a8;height:9px;border-radius:50%;width:9px"></i>空心＝|t|&lt;2 不显著</span>
     <span style="color:var(--muted)">虚线圈＝β&thinsp;=&thinsp;0，圈内为负暴露</span>
   </div>`;
   return `<div class="radar-wrap">${s}</div>${lg}`;
@@ -1623,14 +1551,10 @@ function renderCompare(){
   if(ra&&!B){
     // ★单只模式:只列本基金的 β 与 t 值,没有差值列
     tbl=`<div class="rt-wrap"><table class="rt"><thead><tr>
-        <th>因子</th><th>β</th><th>t 值</th><th>显著性</th></tr></thead><tbody>`;
+        <th>因子</th><th>β</th></tr></thead><tbody>`;
     FAC_KEYS.forEach(k=>{
-      const b=ra.betas?ra.betas[k]:null, t=ra.tstat?ra.tstat[k]:null;
-      const sig=t!=null&&Math.abs(t)>=2;
-      tbl+=`<tr><td><b style="color:var(--f-${k})">${FACN[k]}</b></td>
-        <td${sig?"":' class="cmp-dim"'}>${b!=null?NN(b,3):"—"}</td>
-        <td${sig?"":' class="cmp-dim"'}>${t!=null?NN(t,1):"—"}</td>
-        <td>${t==null?"—":(sig?"<b>显著</b>":"<span class=\"cmp-dim\">不显著</span>")}</td></tr>`;
+      const b=ra.betas?ra.betas[k]:null;
+      tbl+=`<tr><td><b style="color:var(--f-${k})">${FACN[k]}</b></td><td>${Number.isFinite(b)?NN(b,3):"—"}</td></tr>`;
     });
     tbl+=`</tbody></table></div>`;
     warn=`<div class="cmp-range">区间 <b>${esc(ra.start)} ~ ${esc(ra.end)}</b> · R² ${NN(ra.r2,2)} · n ${ra.n}</div>`;
@@ -1642,20 +1566,15 @@ function renderCompare(){
         <th>因子</th><th>${esc(A.head.name||A.code)}</th><th>${esc(B.head.name||B.code)}</th><th>差值 Δβ</th><th>谁更高</th></tr></thead><tbody>`;
     FAC_KEYS.forEach(k=>{
       const ba=ra.betas?ra.betas[k]:null, bb=rb.betas?rb.betas[k]:null;
-      const ta=ra.tstat?ra.tstat[k]:null, tb=rb.tstat?rb.tstat[k]:null;
-      // |t|<2 的 β 不显著,标灰——拿噪声比大小没有意义
-      const dim=v=>v!=null&&Math.abs(v)<2?' class="cmp-dim" title="|t|<2，该因子暴露不显著"':'';
       const dv=(ba!=null&&bb!=null)?ba-bb:null;
       tbl+=`<tr><td><b style="color:var(--f-${k})">${FACN[k]}</b></td>
-        <td${dim(ta)}>${ba!=null?NN(ba,3):"—"}<small class="cmp-t">t=${ta!=null?NN(ta,1):"—"}</small></td>
-        <td${dim(tb)}>${bb!=null?NN(bb,3):"—"}<small class="cmp-t">t=${tb!=null?NN(tb,1):"—"}</small></td>
+        <td>${Number.isFinite(ba)?NN(ba,3):"—"}</td>
+        <td>${Number.isFinite(bb)?NN(bb,3):"—"}</td>
         <td class="${dv==null?"":(dv>0?"value-positive":"value-negative")}"><b>${dv!=null?(dv>0?"+":"")+NN(dv,3):"—"}</b></td>
         <td>${dv==null?"—":(Math.abs(dv)<0.05?"接近":(dv>0?esc(A.head.name||A.code):esc(B.head.name||B.code)))}</td></tr>`;
     });
     tbl+=`</tbody></table></div>`;
-    warn=`<div class="cmp-range">${mismatch?"日期交集（未按交集重新回归）":"相同回归区间"} <b>${esc(s)} ~ ${esc(e)}</b>`+
-      (mismatch?` · <span class="cmp-warn">两只基金起止日期不同，β 来自各自原始窗口，非严格同期。</span>`:``)+
-      ` · R² ${NN(ra.r2,2)} / ${NN(rb.r2,2)} · n ${ra.n} / ${rb.n}</div>`;
+    warn=`<div class="cmp-range">${esc(A.head.name||A.code)}：${esc(ra.start)}—${esc(ra.end)} · ${esc(B.head.name||B.code)}：${esc(rb.start)}—${esc(rb.end)} · R² ${NN(ra.r2,2)} / ${NN(rb.r2,2)} · n ${ra.n} / ${rb.n}</div>`;
   }
 
   // ---- ② 日频 β 演变叠加 ----
@@ -1679,14 +1598,7 @@ function renderCompare(){
   w.innerHTML=head+campisiDateNote(A,ra,`${A.head.name||A.code} · ${FAC_WIN_LABEL[cmpWin]||cmpWin}回归`)+(B?campisiDateNote(B,rb,`${B.head.name||B.code} · ${FAC_WIN_LABEL[cmpWin]||cmpWin}回归`):"")+radar+tbl+warn+
     `<div class="subpanel-note" style="margin-top:16px">β 演变${B?"对比":""}
        <select class="period" style="margin-left:8px" data-pb-onchange="cmpFac=this.value;renderCompare()">${facOpts}</select></div>`+
-    chart+
-    `<div class="method-note">
-      <b>只比 β，不比收益</b>。β 是各自净值对五因子回归的结果，<b>与同类池无关</b>——只有"分位"才需要池子，所以两只基金即使子类不同也能比 β。<br>
-      <b>灰色数字</b>＝该因子 |t|&lt;2，暴露不显著，拿它比大小没有意义。<br>
-      ${secNote?secNote+"<br>":""}
-      <b>对比范围仅限纯债</b>（中长期+短期）。一级/二级债基、可转债、被动指数债基不在预生成范围内，也不应与纯债直接比 β——资产类别不同，差异主要来自类别而非主动风格。<br>
-      <b>低频披露基金要当心</b>：定开/摊余成本法基金净值非逐日真实变动，60 日窗口回归会炸出伪值（实测同类信用 β 最大到 13.48 而 P99 仅 2.52）。若某只基金 β 异常大，先看它是不是这类产品。
-    </div>`;
+    chart;
 }
 function loadCompareFund(code,cb){
   loadPBShard("fund",code,"https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_funds/"+code+".js",()=>{
