@@ -2616,3 +2616,25 @@ body[data-list-view="portfolio"] .industry-filter-heading{min-width:210px}body[d
   .blue-workbench.compact-home:is([data-list-view="portfolio"],[data-list-view="changes"]) .decision-filters { order:3; flex-basis:100%; padding-top:2px; }
   .blue-workbench.compact-home:is([data-list-view="portfolio"],[data-list-view="changes"]) .page-density { margin-left:auto; }
 }
+
+/* 六项资产配置摘要：桌面单行，窄屏按三列/两列排列。 */
+.blue-workbench #panel-assets > .fund-page-metrics:has(> :nth-child(6)) {
+  margin-top:12px;
+  border-radius:8px;
+}
+.blue-workbench #panel-assets > .fund-page-metrics:has(> :nth-child(6)) > .research-metric {
+  min-width:0;
+  padding:10px 12px;
+}
+.blue-workbench #panel-assets > .fund-page-metrics:has(> :nth-child(6)) strong {
+  margin-top:6px;
+  font-size:clamp(17px,1.65vw,22px);
+  line-height:1.25;
+  white-space:nowrap;
+}
+@media(min-width:1000px) {
+  .blue-workbench #panel-assets > .fund-page-metrics:has(> :nth-child(6)) { grid-template-columns:repeat(6,minmax(0,1fr)); }
+}
+@media(min-width:761px) and (max-width:999px) {
+  .blue-workbench #panel-assets > .fund-page-metrics:has(> :nth-child(6)) { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
