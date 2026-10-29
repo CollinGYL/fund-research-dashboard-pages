@@ -80,7 +80,7 @@
         else resolve(root.FUND_LIFECYCLE_RANKS);
       };
       const timer = setTimeout(() => finish(Error('同类排名加载超时，请刷新重试。')), 15000);
-      script.src = 'https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_lifecycle_ranks.js';
+      script.src = 'https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_lifecycle_ranks.js?v='+encodeURIComponent(data().catalog_generated_at);
       script.onload = () => finish(); script.onerror = () => finish(Error('同类排名未能加载，请刷新重试。'));
       document.head.append(script);
     }).catch(error => { rankPromise = null; throw error; });

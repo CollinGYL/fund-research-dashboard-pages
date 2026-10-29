@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-29T10:16:59+08:00",
+  "generatedAt": "2026-10-29T10:35:48+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "app.js": {
-      "size": 99265,
-      "sha256": "e1a8bdf12f7184e58f2d14b17c1f115e593b50bacd0cf40bad7e26e8ca49c9c2"
+      "size": 100013,
+      "sha256": "a5a54e09231b47cc14851ff4e4375b6e4d255eea2af2d9639e129bf5e5239894"
     },
     "bond-cb-fusion.css": {
       "size": 2251,
@@ -78,7 +78,7 @@
     },
     "compare.html": {
       "size": 4956,
-      "sha256": "3a17b140d653ca4bf592282f958018315442de21a24c25792b1e20b0eafc3f8f"
+      "sha256": "28e71d03506af8e0442174812835591f66f204da7ddb628e57a155d05c964367"
     },
     "compare.js": {
       "size": 6781,
@@ -113,12 +113,12 @@
       "sha256": "0650bd1ceefaa30de8f1fae939bbf5acb1d0c62c69dca153bb3c52de95f3ced8"
     },
     "fund-lifecycle.js": {
-      "size": 7002,
-      "sha256": "c1de46aa7b42192f91eddd1ea6e0b741132acd837597783dfa5cbeb807106d9d"
+      "size": 7053,
+      "sha256": "935daf516ae9b517946c303caa6ee69589112dd6caee852ce6d8b919046c5ef5"
     },
     "fund.html": {
       "size": 5096,
-      "sha256": "4e3dc99eacf0aede92084de559d9eefa21789a4e6c335f507bec9f8c7894b79b"
+      "sha256": "31085bba679d35aaffc3b7f16865a2e9ed1d5aa9ead13fdbd2be635ed14cbbe6"
     },
     "fund.js": {
       "size": 603907,
@@ -126,15 +126,15 @@
     },
     "index.html": {
       "size": 14701,
-      "sha256": "41764022ec1d51d75139f13c2863d27164ba9dd46f5ce1e0b25e25839669c49e"
+      "sha256": "b59310768566586a02c8f849034995f6a31379a122230ca90f5c7b6749dee962"
     },
     "industry-bars.js": {
       "size": 6987,
       "sha256": "1cf79a3891c2f02ace1faa567e9c8ecc48fa3bbc102f4087a2ee92d34c7c3536"
     },
     "integration-bootstrap.js": {
-      "size": 1673,
-      "sha256": "d3f12a2ff8fe99d2ba1e6239d85312fd0eac64b1edce5d1abbceb463ad672935"
+      "size": 1694,
+      "sha256": "4b0d956b224d4da52d600d5083e3e2669c61c9c1e13e1d3c3b58a39c8aad1414"
     },
     "profile-integration.js": {
       "size": 5959,
