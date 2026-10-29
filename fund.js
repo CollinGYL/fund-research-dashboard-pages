@@ -438,7 +438,7 @@ function renderPairProfileComparison(left, right, key, base, peer, errors = {}) 
   const existing=a.lw?.peers?.find(x=>x.code===peer.code);
   const rank=existing ? 1+(a.lw.peers||[]).filter(x=>x.distance<existing.distance).length : null;
   const rankText=rank ? `已保存画像候选第${rank}名` : '按选中两只基金的已有画像即时对比；未入前5不代表没有画像';
-  const summary=ready ? `<div class="profile-pair-distance"><div><span>画像差异（原综合距离）</span><strong>${a.distance.toFixed(3)}<small>越低越接近</small></strong></div><p>${escapeHTML(rankText)}<br>行业 ${a.industry.toFixed(3)} · 股票风格 ${a.style.toFixed(3)} · 投资行为 ${a.behavior===null?'未使用':a.behavior.toFixed(3)}</p></div>` : `<div class="profile-pair-distance profile-pair-unavailable"><div><span>画像差异</span><strong>暂不可合并</strong></div><ul>${reasons.map(x=>`<li>${escapeHTML(x)}</li>`).join('')}</ul></div>`;
+  const summary=ready ? `<div class="profile-pair-distance"><div><span>画像差异</span><strong>${a.distance.toFixed(3)}<small>越低越接近</small></strong></div><p>${escapeHTML(rankText)}<br>行业 ${a.industry.toFixed(3)} · 股票风格 ${a.style.toFixed(3)} · 投资行为 ${a.behavior===null?'未使用':a.behavior.toFixed(3)}</p></div>` : `<div class="profile-pair-distance profile-pair-unavailable"><div><span>画像差异</span><strong>暂不可合并</strong></div><ul>${reasons.map(x=>`<li>${escapeHTML(x)}</li>`).join('')}</ul></div>`;
   const coverage=(r,w)=>!r?'档案未加载':!w?.dates?.length?'窗口无有效披露':`${w.first_date} 至 ${w.last_date} · ${w.dates.length}期 · ${w.market_group}`;
   const specs=[['market_cap','股票市值'],['pb','估值 PB'],['roe','盈利 ROE'],['activity','调仓活跃度'],['concentration','持仓集中度'],['persistence','持股延续率'],['industry_stability','行业稳定性']];
   const cell=(w,k)=>{
@@ -2927,7 +2927,7 @@ function renderResearchOverview(fund, detail) {
   const durationNote = `${fund.duration?.report_date || '暂无数据'}${lag ? ` · 较配置报告滞后${lag}期` : ''}`;
   const ddNote = s ? (s.current_drawdown < -1e-8 ? `距可得历史高点${s.underwater_days}天 · 尚未修复` : '可得历史高点已修复 / 创新高') : '摘要未加载或版本不匹配';
   const returnValue = index ? relative.excess_returns?.['1y'] : fundPerformanceValue(fund, '1y', 'returns');
-  const tiles = [metric(index ? '近1年超额收益' : '近1年收益', pct(returnValue, 1, true), index ? (isFiniteValue(returnValue) ? '相对跟踪指数' : '待计算 · 基准行情缺失') : rank), metric('当前回撤', pct(s?.current_drawdown, 1), ddNote), metric('规模', money(a.net_asset), `${a.report_date || '暂无披露'} · 较上期${pct(s?.size_change, 1, true)}`)];
+  const tiles = [metric(index ? '近1年超额收益' : '近1年收益', pct(returnValue, 1, true), index ? (isFiniteValue(returnValue) ? '相对跟踪指数' : '待计算 · 基准行情缺失') : rank), metric('当前回撤', pct(s?.current_drawdown, 1), ddNote), metric('合计规模', money(a.net_asset), `${a.report_date || '暂无披露'} · 较上期${pct(s?.size_change, 1, true)}`)];
   if (index) tiles.push(metric('跟踪误差 / 信息比率', isFiniteValue(relative.tracking_error) && isFiniteValue(relative.information_ratio) ? `${pct(relative.tracking_error, 1)} / ${num(relative.information_ratio, 2)}` : '待计算', fund.tracking_index || '基准行情缺失'));
   else if (bond) tiles.push(metric('杠杆 / 最近可得久期', `${isFiniteValue(a.leverage) ? num(a.leverage, 2) + 'x' : '—'} / ${isFiniteValue(fund.duration?.value) ? num(fund.duration.value, 2) + '年' : '—'}`, durationNote));
   else tiles.push(metric('股票仓位', pct(a.stock_weight, 1), `${a.report_date || '暂无披露'} · 较上期${change(s?.stock_change)}`));
@@ -2968,7 +2968,7 @@ function foldResearchHistory() {
 function prepareResearchOverview(fund, detail) {
   document.body.classList.add('decision-detail');
   const hero = page.querySelector('.fund-page-hero');
-  if (hero) hero.innerHTML = `<div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.subtype || fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.fund_company || '')}</p></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join('、') || '—')}</dd></div><div><dt>资产规模 · ${escapeHTML(fund.asset?.report_date || '暂无披露')}</dt><dd>${money(fund.asset?.net_asset)}</dd></div></dl>`;
+  if (hero) hero.innerHTML = `<div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.subtype || fund.category_label)}</p><h1>${escapeHTML(FundResearch.portfolioName?.(fund) || fund.name)}</h1>${sharePresentationNote(fund)}<p class="fund-page-summary">${escapeHTML(fund.fund_company || '')}</p></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join('、') || '—')}</dd></div><div><dt>合计规模 · ${escapeHTML(fund.asset?.report_date || '暂无披露')}</dt><dd>${money(fund.asset?.net_asset)}</dd></div></dl>`;
   page.querySelector('.fund-page-metrics')?.remove();
   const nav = page.querySelector('.fund-tab-nav');
   nav.querySelectorAll('button').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
@@ -3076,7 +3076,7 @@ function bindHeavyStockTrend(analysis) {
 }
 
 function renderFund(fund, summaryData, detailData, analysisData, analysis, fundDocuments, canonicalDetail) {
-  document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
+  document.title = `${FundResearch.portfolioName?.(fund) || fund.name}详细分析 · 财富产品部-基金研究系统看板`;
   const managerNames = analysis.current_managers.map((item) => item.name).join("、");
   const catalogFund = canonicalDetail?.fund || (window.FUND_DASHBOARD_CATALOG?.funds || []).find((item) => item.code === fund.code)
     || { code: fund.code, category: "active-equity", name: fund.name };
@@ -3085,11 +3085,11 @@ function renderFund(fund, summaryData, detailData, analysisData, analysis, fundD
     <section class="fund-page-hero">
       <div>
         <p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category)}</p>
-        <h1>${escapeHTML(fund.name)}</h1>
+        <h1>${escapeHTML(FundResearch.portfolioName?.(fund) || fund.name)}</h1>${sharePresentationNote(fund)}
         <p class="fund-page-summary">${escapeHTML(fund.summary)}</p>
         <div class="tag-row">${fund.tags.map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}</div>
       </div>
-      <dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML(managerNames)}</dd></div><div><dt>最新规模</dt><dd>${money(analysis.latest_net_asset)}</dd></div><div><dt>数据更新</dt><dd>${escapeHTML(analysisData.analysisDate)}</dd></div></dl>
+      <dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML(managerNames)}</dd></div><div><dt>合计规模</dt><dd>${money(analysis.latest_net_asset)}</dd></div><div><dt>数据更新</dt><dd>${escapeHTML(analysisData.analysisDate)}</dd></div></dl>
     </section>
     <section class="fund-page-metrics" aria-label="核心指标">
       ${metric("近1年收益", pct(analysis.period_returns["1y"], 1, true))}${metric("近5年收益", pct(analysis.period_returns["5y"], 1, true))}${metric("五年最大回撤", pct(analysis.performance.max_drawdown, 1))}${metric("最新股票仓位", pct(analysis.assets.latest.stock_to_nav, 1))}${metric("最新前十大集中度", pct(analysis.latest_top10.summary.top10_weight, 1))}
@@ -4820,13 +4820,13 @@ function genericPureBondDeepResearchPanelLegacy(fund, detail, research, campisi,
       ${metric("五因子R²", campisiWindow ? num(campisiWindow.r2, 3) : "—", campisiWindow ? `${campisiWindow.start}至${campisiWindow.end}` : "")}
     </section>${campisiWindow && campisi ? `<div class="pure-bond-deep-campisi">${renderCampisiPeerPosition(campisi, campisiWindow)}</div>` : '<p class="empty-copy">五因子共同样本不足。</p>'}<p class="method-note">Kalman只使用截至当日净值和债券指数，是在线估计；Campisi是收益法因子归因。二者都不能替代逐券真实持仓或披露久期。</p></article>`;
   const operationSection = `<div class="research-grid two-column-grid pure-bond-deep-grid">
-      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>规模演变</h3><span>基金主体口径，不重复加总份额</span></div></div>${scaleSeries.length > 1 ? renderMiniLineChart(scaleSeries, [{ key: "scale", label: "基金规模", color: "#102c45", width: 3, format: "number" }], `${fund.name}规模演变`) : '<p class="empty-copy">规模历史不足。</p>'}<p class="method-note">纵轴单位为亿元；资产配置表中的净资产已是基金主体合计口径。</p></article>
+      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>规模演变</h3><span>基金主体口径，不重复加总份额</span></div></div>${scaleSeries.length > 1 ? renderMiniLineChart(scaleSeries, [{ key: "scale", label: "合计规模", color: "#102c45", width: 3, format: "number" }], `${fund.name}规模演变`) : '<p class="empty-copy">规模历史不足。</p>'}<p class="method-note">纵轴单位为亿元；资产配置表中的净资产已是基金主体合计口径。</p></article>
       <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>申赎压力</h3><span>季度净申购率 · 各存续份额合计</span></div></div>${renderSignedBarChart(flows, `${fund.name}季度净申购率`)}<section class="research-metric-grid metric-two">${metric("近四期净流量", `${rollingFlow >= 0 ? "+" : ""}${num(rollingFlow, 2)}亿份`)}${metric("最新净申购率", latestFlow ? pct(latestFlow.net_rate, 2, true) : "—")}</section>${flowRows.length ? renderTable(["报告期", "申购", "赎回", "净流量", "净申购率"], flowRows, "pure-bond-flow-table") : ""}<p class="method-note">只保留跨度不超过100天的季度记录；正值为净申购、负值为净赎回。份额流量不是资金流金额。</p></article>
       <article class="subpanel"><div class="subpanel-heading"><div><h3>券种结构同类定位</h3><span>最新报告期截面</span></div></div>
         ${pureBondPeerPositionRow("金融债仓位", peer.financial_bond, (value) => pct(value, 1), "按占基金净资产比例比较。")}
         ${pureBondPeerPositionRow("企业债仓位", peer.corporate_bond, (value) => pct(value, 1), "按占基金净资产比例比较；不能直接等同信用评级下沉。")}
         ${pureBondPeerPositionRow("国债及政府债仓位", peer.government_bond, (value) => pct(value, 1), "按资产配置表官方汇总字段比较。")}
-        ${pureBondPeerPositionRow("基金规模", peer.net_asset, (value) => money(value), "同类规模分位只描述产品体量。")}
+        ${pureBondPeerPositionRow("合计规模", peer.net_asset, (value) => money(value), "同类规模分位只描述产品体量。")}
       </article>
       <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>回购融资</h3><span>卖出回购负债 · 杠杆资金来源</span></div></div>${repoSeries.length > 1 ? renderMiniLineChart(repoSeries, [
         { key: "repo_to_nav", label: "回购融资/净资产", color: "#bd4046", width: 2.8 },
@@ -5209,7 +5209,7 @@ function genericAssetPanel(fund, detail, holdingHistory, kalmanDuration = null) 
   const latestFull = holdingConcentration(holdingHistory?.full?.at(-1));
   return `
     <div class="panel-intro"><div><p class="eyebrow">ASSET ALLOCATION</p><h2>${active ? "资产配置与持股集中度" : "资产配置、杠杆与久期"}</h2></div><p>${active ? "观察季度资产分布、股票仓位及前十大/完整持仓两套集中度口径。" : "配置为报告期披露快照；杠杆按总资产/净资产计算，久期来自利率敏感性披露。"}</p></div>
-    <section class="fund-page-metrics">${metric("配置报告期", asset.report_date || "—")}${metric("基金规模", money(asset.net_asset))}${active ? `${metric("股票仓位", pct(asset.stock_weight, 1))}${metric("港股仓位", pct(history.at(-1)?.hk_stock_to_nav, 1))}${metric("债券仓位", pct(asset.bond_weight, 1))}${metric("现金仓位", pct(asset.cash_weight, 1))}` : `${metric("杠杆", isFiniteValue(asset.leverage) ? `${num(asset.leverage, 2)}x` : "—", asset.leverage_status === "extreme_reconciled" ? "特殊报告期" : "总资产/净资产")}${metric("久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—", fund.duration?.report_date || "")}`}</section>
+    <section class="fund-page-metrics">${metric("配置报告期", asset.report_date || "—")}${metric("合计规模", money(asset.net_asset))}${active ? `${metric("股票仓位", pct(asset.stock_weight, 1))}${metric("港股仓位", pct(history.at(-1)?.hk_stock_to_nav, 1))}${metric("债券仓位", pct(asset.bond_weight, 1))}${metric("现金仓位", pct(asset.cash_weight, 1))}` : `${metric("杠杆", isFiniteValue(asset.leverage) ? `${num(asset.leverage, 2)}x` : "—", asset.leverage_status === "extreme_reconciled" ? "特殊报告期" : "总资产/净资产")}${metric("久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—", fund.duration?.report_date || "")}`}</section>
     ${leverageDisclosure}
     ${allocationDisclosure}${sourceDisclosure}
     <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>资产分布连续变化</h3><span>100%堆叠面积 · 每一期披露日期</span></div></div>${renderAssetAllocationAreaChart(history)}</article>
@@ -5231,7 +5231,7 @@ function genericAssetPanel(fund, detail, holdingHistory, kalmanDuration = null) 
     </div>` : ""}
     ${active && holdingHistory ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>持股重仓集中度</h3><span>季度前十大与半年报/年报完整持仓分别计算</span></div></div><section class="research-metric-grid metric-four">${metric("最新季度前十大", pct(latestQuarterly.top10, 1))}${metric("完整持仓前十大", pct(latestFull.top10, 1))}${metric("完整持仓前二十", pct(latestFull.top20, 1))}${metric("前二十以外长尾", pct(Math.max(0, latestFull.total - latestFull.top20), 1))}</section><p class="method-note">季度前十大用于高频跟踪；完整持仓只使用半年报/年报全部披露股票，两者不拼接。</p></article><article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>季度前十大集中度趋势</h3><span>占基金净值</span></div></div>${quarterlyConcentration.length ? renderMiniLineChart(quarterlyConcentration, [{ key: "top10_concentration", label: "前十大集中度", color: "#0b7774", width: 3 }], "季度前十大持仓集中度变化") : '<p class="empty-copy">暂无持仓集中度历史。</p>'}</article>` : ""}
     <article class="subpanel"><div class="subpanel-heading"><div><h3>最新资产分布</h3><span>按净资产比例；超过100%可能来自杠杆</span></div></div>${renderBarList(allocation)}</article>
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>${active ? "季度资产配置轨迹" : "历史配置、杠杆与久期"}</h3><span>${active ? '全部可得报告期' : '最近二十个报告期'}</span></div></div>${active ? renderTable(["报告期", "规模", "股票", "港股", "债券", "基金投资", "现金", "公告日"], history.slice().reverse().map((item) => [item.report_date, money(item.net_asset), pct(item.stock_to_nav, 1), pct(item.hk_stock_to_nav, 1), pct(item.bond_to_nav, 1), pct(item.fund_to_nav, 1), pct(item.cash_to_nav, 1), item.announcement_date || "—"]), "", 8) : renderTable(["报告期", "规模", "股票", "债券", "基金投资", "现金", "转债", "杠杆", "久期"], history.slice(-20).reverse().map((item) => { const duration = (detail?.duration_history || []).find((value) => value.date === item.report_date); return [item.report_date, money(item.net_asset), pct(item.stock_to_nav, 1), pct(item.bond_to_nav, 1), pct(item.fund_to_nav, 1), pct(item.cash_to_nav, 1), pct(item.convertible_bond_to_nav, 1), isFiniteValue(item.leverage) ? `${num(item.leverage, 2)}x` : "—", isFiniteValue(duration?.duration) ? `${num(duration.duration, 2)}年` : "—"]; }), "", 8)}</article>`;
+    <article class="subpanel"><div class="subpanel-heading"><div><h3>${active ? "季度资产配置轨迹" : "历史配置、杠杆与久期"}</h3><span>${active ? '全部可得报告期' : '最近二十个报告期'}</span></div></div>${active ? renderTable(["报告期", "合计规模", "股票", "港股", "债券", "基金投资", "现金", "公告日"], history.slice().reverse().map((item) => [item.report_date, money(item.net_asset), pct(item.stock_to_nav, 1), pct(item.hk_stock_to_nav, 1), pct(item.bond_to_nav, 1), pct(item.fund_to_nav, 1), pct(item.cash_to_nav, 1), item.announcement_date || "—"]), "", 8) : renderTable(["报告期", "合计规模", "股票", "债券", "基金投资", "现金", "转债", "杠杆", "久期"], history.slice(-20).reverse().map((item) => { const duration = (detail?.duration_history || []).find((value) => value.date === item.report_date); return [item.report_date, money(item.net_asset), pct(item.stock_to_nav, 1), pct(item.bond_to_nav, 1), pct(item.fund_to_nav, 1), pct(item.cash_to_nav, 1), pct(item.convertible_bond_to_nav, 1), isFiniteValue(item.leverage) ? `${num(item.leverage, 2)}x` : "—", isFiniteValue(duration?.duration) ? `${num(duration.duration, 2)}年` : "—"]; }), "", 8)}</article>`;
 }
 
 function genericBondHistoryTable(period, compact = false) {
@@ -6553,14 +6553,14 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
 
 function renderPureBondReferenceFund(fund, detail, currentDuration) {
   if (!window.__PB) return false;
-  document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
+  document.title = `${FundResearch.portfolioName?.(fund) || fund.name}详细分析 · 财富产品部-基金研究系统看板`;
   document.body.classList.remove("pure-bond-reference-page");
   const tabs = GENERIC_TABS["pure-bond"];
   const content = Object.fromEntries(tabs.map(([id, label]) => [id, genericTabLoadingPanel(label)]));
   const overviewMetrics = `${metric("近1年收益", pct(fundPerformanceValue(fund, "1y", "returns"), 1, true))}${metric("近3年收益", pct(fundPerformanceValue(fund, "3y", "returns"), 1, true))}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 1))}${metric("最新杠杆", isFiniteValue(fund.asset?.leverage) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—")}`;
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
-    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
+    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(FundResearch.portfolioName?.(fund) || fund.name)}</h1>${sharePresentationNote(fund)}<p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>合计规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
     ${detail?.pure_bond_duration_error ? `<p class="simulation-warning" role="status">最新日频久期未能加载，其他数据仍可查看。${escapeHTML(detail.pure_bond_duration_error)} 刷新页面可重试。</p>` : ""}
     <section class="fund-page-metrics">${overviewMetrics}</section>
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
@@ -6735,9 +6735,17 @@ function bindPureBondReferenceInteractions() {
   });
 }
 
+function sharePresentationNote(fund) {
+  const meta=FundResearch.shareInfo?.(fund);
+  const code=String(query.get('share') || '').toUpperCase().replace(/^(\d{6})$/,'$1.OF');
+  const alias=meta?.aliases?.find(a=>a.code===code && a.code!==fund.code);
+  const matched=alias ? ` · 匹配${escapeHTML(alias.share_class ? alias.share_class+'份额' : alias.name)}（${escapeHTML(alias.code)}），研究代表${escapeHTML(meta.representative_class ? meta.representative_class+'份额' : fund.name)}` : '';
+  return `<p class="method-note" data-share-nav-basis title="${escapeHTML(fund.name)}">净值及收益：${escapeHTML(FundResearch.representativeShare?.(fund) || fund.code)}${matched}</p>`;
+}
+
 function renderGenericFund(fund, detail, pureBondDuration = null) {
   if (fund.category === "pure-bond" && renderPureBondReferenceFund(fund, detail, pureBondDuration)) return;
-  document.title = `${fund.name}详细分析 · 财富产品部-基金研究系统看板`;
+  document.title = `${FundResearch.portfolioName?.(fund) || fund.name}详细分析 · 财富产品部-基金研究系统看板`;
   document.body.classList.remove("pure-bond-reference-page");
   const tabs = fund.category === "pure-bond"
     ? [["research", "纯债研究报告"], ["documents", "公告原文"]]
@@ -6757,7 +6765,7 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
   const navSource = "基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充";
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
-    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
+    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(FundResearch.portfolioName?.(fund) || fund.name)}</h1>${sharePresentationNote(fund)}<p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>合计规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
     ${detail?.pure_bond_reference_error ? `<p class="simulation-warning" role="status">纯债详细分析数据加载失败，已显示通用研究报告。${escapeHTML(detail.pure_bond_reference_error)} <button type="button" class="button" data-pure-bond-retry>重新加载完整分析</button></p>` : ""}
     ${detail?.pure_bond_duration_error ? `<p class="simulation-warning" role="status">最新日频久期未能加载，其他数据仍可查看。${escapeHTML(detail.pure_bond_duration_error)} 刷新页面可重试。</p>` : ""}
     <section class="fund-page-metrics">${overviewMetrics}</section>

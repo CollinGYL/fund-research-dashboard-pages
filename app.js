@@ -224,6 +224,8 @@ function searchableText(fund) {
   if (searchTextByCode.has(fund.code)) return searchTextByCode.get(fund.code);
   const value = [
     fund.name,
+    FundResearch.portfolioName?.(fund) || fund.name,
+    FundResearch.shareSearchText?.(fund) || '',
     fund.code,
     ...Object.keys(FundLifecycle.data().aliases).filter(code => FundLifecycle.canonicalCode(code) === fund.code),
     displayCategoryLabel(fund),
@@ -304,7 +306,7 @@ function classificationNames(level) {
 
 function fundSizeHeader() {
   const options = FUND_SIZE_FILTERS.map(([value, label]) => `<option value="${value}"${value === fundSizeFilterState ? " selected" : ""}>${label}</option>`).join("");
-  return `<th class="table-filter-heading size-filter-heading"><span>基金规模</span><select id="fund-size-filter" class="table-header-select" aria-label="筛选基金规模">${options}</select></th>`;
+  return `<th class="table-filter-heading size-filter-heading"><span>合计规模</span><select id="fund-size-filter" class="table-header-select" aria-label="筛选合计规模">${options}</select></th>`;
 }
 
 function classificationDirectionButton(level) {
@@ -391,8 +393,22 @@ function matchesActiveEquityProfile(fund) {
   return profile.groups?.[keys[dimension]] === label;
 }
 
+function matchedShareAlias(fund) {
+  const keyword=search.value.trim();
+  if (!keyword || ReviewCore.matches([fund.name,fund.code].join(' '),keyword)) return null;
+  return (FundResearch.shareInfo?.(fund)?.aliases || []).find(a => a.code!==fund.code && ReviewCore.matches([a.code,a.name,a.full_name,a.share_class ? a.full_name+a.share_class : ''].join(' '),keyword)) || null;
+}
+
+function shareAliasNotice(fund) {
+  const alias=matchedShareAlias(fund);
+  if (!alias) return '';
+  const representative=FundResearch.shareInfo?.(fund)?.representative_class;
+  return `<small class="share-match-note">匹配${escapeHtml(alias.share_class ? alias.share_class+'份额' : alias.name)}（${escapeHtml(alias.code)}） · 研究代表${escapeHtml(representative ? representative+'份额' : fund.name)}</small>`;
+}
+
 function fundHref(fund) {
-  return `fund.html?code=${encodeURIComponent(fund.code)}&id=${encodeURIComponent(fund.code.split(".")[0])}&list=${encodeURIComponent(window.location.search)}`;
+  const alias=matchedShareAlias(fund);
+  return `fund.html?code=${encodeURIComponent(fund.code)}&id=${encodeURIComponent(fund.code.split(".")[0])}${alias ? '&share='+encodeURIComponent(alias.code) : ''}&list=${encodeURIComponent(window.location.search)}`;
 }
 
 function hasFullReturnPeriod(fund, key) {
@@ -446,7 +462,7 @@ function bondStructureCell(asset) {
 
 function commonCells(fund) {
   return `
-    <td class="fund-name-cell"><a href="${fundHref(fund)}"><strong>${escapeHtml(fund.name)}</strong>${FundLifecycle.badge(fund)}<small>${escapeHtml(fund.code)} · ${escapeHtml(fund.subtype)}</small></a></td>
+    <td class="fund-name-cell"><a href="${fundHref(fund)}"><strong>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</strong>${FundLifecycle.badge(fund)}<small title="${escapeHtml(fund.name)}">${escapeHtml(fund.subtype)} · 净值及收益：${escapeHtml(FundResearch.representativeShare?.(fund) || fund.code)}</small>${shareAliasNotice(fund)}</a></td>
     <td><strong>${escapeHtml((fund.manager || []).join("、") || "—")}</strong><small>${escapeHtml(fund.fund_company || "")}</small></td>
     <td>${escapeHtml(fund.inception_date || "—")}</td>
     <td><strong>${formatMoney(fund.asset?.net_asset)}</strong><small>${escapeHtml(fund.asset?.report_date || "无配置披露")}</small></td>
@@ -456,10 +472,10 @@ function commonCells(fund) {
 function activeEquityOverviewCells(fund) {
   const managers = (fund.manager || []).join('、') || '暂无经理信息';
   return `<td class="fund-name-cell equity-overview-cell">
-    <a href="${fundHref(fund)}"><strong>${escapeHtml(fund.name)}</strong>${FundLifecycle.badge(fund)}<small>${escapeHtml(fund.code)} · ${escapeHtml(fund.subtype)}</small></a>
+    <a href="${fundHref(fund)}"><strong>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</strong>${FundLifecycle.badge(fund)}<small title="${escapeHtml(fund.name)}">${escapeHtml(fund.subtype)} · 净值及收益：${escapeHtml(FundResearch.representativeShare?.(fund) || fund.code)}</small>${shareAliasNotice(fund)}</a>
     ${managerDates(fund)}
     <details class="fund-row-details"><summary>资料与基准</summary><dl>
-      <dt>基金名称</dt><dd>${escapeHtml(fund.name)}</dd>
+      <dt>基金名称</dt><dd>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</dd>
       <dt>基金经理</dt><dd>${escapeHtml(managers)}</dd>
       <dt>基金公司</dt><dd>${escapeHtml(fund.fund_company || '—')}</dd>
       <dt>成立日期</dt><dd>${escapeHtml(fund.inception_date || '—')}</dd>
@@ -476,7 +492,7 @@ function equityPeriodHeader(key, label) {
 function allFundOverviewCell(fund) {
   return `
     <td class="fund-name-cell all-fund-overview-cell">
-      <a href="${fundHref(fund)}"><strong>${escapeHtml(fund.name)}</strong>${FundLifecycle.badge(fund)}<small>${escapeHtml(fund.code)} · ${escapeHtml(fund.subtype)}</small></a>
+      <a href="${fundHref(fund)}"><strong>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</strong>${FundLifecycle.badge(fund)}<small title="${escapeHtml(fund.name)}">${escapeHtml(fund.subtype)} · 净值及收益：${escapeHtml(FundResearch.representativeShare?.(fund) || fund.code)}</small>${shareAliasNotice(fund)}</a>
       <div class="all-fund-overview-meta">
         <span><b>基金经理</b>${escapeHtml((fund.manager || []).join("、") || "—")}</span>
         <span><b>成立时间</b>${escapeHtml(fund.inception_date || "—")}</span>
@@ -702,8 +718,8 @@ function prepareMobileFundCards() {
   const headers = [...listHead.querySelectorAll("th")];
   headers.forEach((header) => header.classList.toggle("mobile-control-heading", Boolean(header.querySelector("button, select"))));
   const primaryLabels = listView !== 'complete' ? ['近1年', '当前回撤', '股票 / 转债', '主要行业', '规模变化', '仓位变化'] : listPeriodMode === "long"
-    ? ["基金规模", "近1年", "近3年", "近5年"]
-    : ["基金规模", "近1月", "近1年", "今年以来"];
+    ? ["合计规模", "近1年", "近3年", "近5年"]
+    : ["合计规模", "近1月", "近1年", "今年以来"];
   if (activeCategory === "active-equity" && listView === 'complete') primaryLabels.push("基金画像");
   grid.querySelectorAll("tr[data-fund-code]").forEach((row) => {
     const cells = [...row.children];
@@ -1001,7 +1017,7 @@ function renderSuggestions() {
   if (!keyword) return closeSuggestions();
   suggestedFunds = funds.filter((fund) => ReviewCore.matches(searchableText(fund), keyword)).slice(0, 10);
   if (!suggestedFunds.length) return closeSuggestions();
-  suggestionList.innerHTML = suggestedFunds.map((fund, index) => `<a id="fund-search-suggestion-${index}" class="fund-search-suggestion" href="${fundHref(fund)}" role="option" aria-selected="false"><span class="fund-search-suggestion-main"><strong>${escapeHtml(fund.name)}</strong>${FundLifecycle.badge(fund)}<small>${escapeHtml(fund.code)} · ${escapeHtml(displayCategoryLabel(fund))} · ${escapeHtml(fund.subtype)}</small></span><span class="fund-search-suggestion-meta">${escapeHtml((fund.manager || []).join("、") || fund.fund_company || "")}</span></a>`).join("");
+  suggestionList.innerHTML = suggestedFunds.map((fund, index) => `<a id="fund-search-suggestion-${index}" class="fund-search-suggestion" href="${fundHref(fund)}" role="option" aria-selected="false"><span class="fund-search-suggestion-main"><strong>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</strong>${FundLifecycle.badge(fund)}<small title="${escapeHtml(fund.name)}">${escapeHtml(displayCategoryLabel(fund))} · 净值及收益：${escapeHtml(FundResearch.representativeShare?.(fund) || fund.code)}</small>${shareAliasNotice(fund)}</span><span class="fund-search-suggestion-meta">${escapeHtml((fund.manager || []).join("、") || fund.fund_company || "")}</span></a>`).join("");
   suggestionList.hidden = false;
   search.setAttribute("aria-expanded", "true");
 }
@@ -1253,8 +1269,8 @@ function initializeCatalog() {
 initializeCatalog();
 
 const DECISION_COLUMNS = {
-  performance: [['1y','近1年 / 同类位置','return'], ['current_drawdown','当前回撤','decision'], ['risk1y','近1年最大回撤','decision'], ['size','基金规模','decision']],
-  portfolio: [['size','基金规模','decision'], ['exposure','股票 / 转债'], ['industry','主要行业'], ['concentration','前十大 / 杠杆'], ['duration','久期 / 持仓日期']],
+  performance: [['1y','近1年 / 同类位置','return'], ['current_drawdown','当前回撤','decision'], ['risk1y','近1年最大回撤','decision'], ['size','合计规模','decision']],
+  portfolio: [['size','合计规模','decision'], ['exposure','股票 / 转债'], ['industry','主要行业'], ['concentration','前十大 / 杠杆'], ['duration','久期 / 持仓日期']],
   changes: [['size_change','规模变化','decision'], ['stock_change','仓位变化','decision'], ['industry_change','行业变化','decision'], ['entries','完整持仓名单变化']],
 };
 
@@ -1305,7 +1321,7 @@ function decisionFundRow(fund) {
     industry_change: cell(s?.industry ? `${escapeHtml(s.industry)} ${change(s.industry_change)}` : '无可比行业披露', `${s?.previous_full_date || '—'} → ${s?.full_date || '—'}`),
     entries: cell(s?.previous_full_date ? `新出现 ${s.entry_count} · 不再出现 ${s.exit_count}` : '不足两期完整披露', `${s?.previous_full_date || '—'} → ${s?.full_date || '—'}`),
   };
-  return `<tr data-fund-code="${escapeHtml(fund.code)}"><td class="fund-name-cell"><a href="${fundHref(fund)}" title="${escapeHtml(fund.benchmark || '业绩基准未提供')}"><strong>${escapeHtml(fund.name)}</strong>${FundLifecycle.badge(fund)}<small>${escapeHtml(fund.code)} · ${escapeHtml(fund.subtype)}</small></a>${fund.category==='active-equity'?managerDates(fund):`<small>${escapeHtml((fund.manager || []).join('、') || '暂无经理信息')}</small>`}</td>${decisionColumns().map(([key]) => `<td>${fields[key] || '—'}</td>`).join('')}</tr>`;
+  return `<tr data-fund-code="${escapeHtml(fund.code)}"><td class="fund-name-cell"><a href="${fundHref(fund)}" title="${escapeHtml(fund.benchmark || '业绩基准未提供')}"><strong>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</strong>${FundLifecycle.badge(fund)}<small title="${escapeHtml(fund.name)}">${escapeHtml(fund.subtype)} · 净值及收益：${escapeHtml(FundResearch.representativeShare?.(fund) || fund.code)}</small>${shareAliasNotice(fund)}</a>${fund.category==='active-equity'?managerDates(fund):`<small>${escapeHtml((fund.manager || []).join('、') || '暂无经理信息')}</small>`}</td>${decisionColumns().map(([key]) => `<td>${fields[key] || '—'}</td>`).join('')}</tr>`;
 }
 
 function sortSummaryText() {
@@ -1438,9 +1454,9 @@ grid.addEventListener("click", (event) => {
 
 function visiblePeriods(){return activeCategory==='active-equity'?[...PERIOD_SETS[listPeriodMode],['tenure','现任经理任期']]:PERIOD_SETS[listPeriodMode];}
 function categoryDecisionColumns(){
-  if(activeCategory==='active-equity'&&listView==='portfolio')return [['size','基金规模','decision'],['exposure','股票仓位'],['industry','主要行业'],['concentration','前十大权重'],['duration','完整持仓日期']];
+  if(activeCategory==='active-equity'&&listView==='portfolio')return [['size','合计规模','decision'],['exposure','股票仓位'],['industry','主要行业'],['concentration','前十大权重'],['duration','完整持仓日期']];
   if(activeCategory==='pure-bond'){
-    if(listView==='portfolio')return [['size','基金规模','decision'],['bond_structure','券种分布'],['concentration','杠杆'],['duration','披露久期']];
+    if(listView==='portfolio')return [['size','合计规模','decision'],['bond_structure','券种分布'],['concentration','杠杆'],['duration','披露久期']];
     if(listView==='changes')return [['size_change','规模变化','decision'],['bond_change','券种权重变化'],['leverage_change','杠杆变化'],['duration_change','披露久期变化']];
   }
   return DECISION_COLUMNS[listView]||[];

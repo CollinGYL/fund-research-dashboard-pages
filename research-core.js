@@ -40,7 +40,15 @@
     return Math.max(0, q(reference) - q(date));
   };
   const peerWindow = campisi => ['all', '5y', '3y', '1y', 'ytd'].map(k => campisi.windows?.[k]).find(Boolean);
-  const api = { finite, monthStart, range, weekly, uniquePeriods, quarterLag, peerWindow };
+  const shareInfo = fund => root.FUND_LIFECYCLE_DATA?.share_classes?.[fund?.code] || null;
+  const portfolioName = fund => shareInfo(fund)?.display_name || fund?.name || fund?.code || '';
+  const representativeShare = fund => {
+    const label=shareInfo(fund)?.representative_class;
+    return `${label ? label+'类' : '代表份额'}（${fund?.code || '—'}）`;
+  };
+  const shareSearchText = fund => (shareInfo(fund)?.aliases || []).map(a =>
+    [a.code,a.name,a.full_name,a.share_class ? a.full_name+a.share_class : ''].join(' ')).join(' ');
+  const api = { finite, monthStart, range, weekly, uniquePeriods, quarterLag, peerWindow, shareInfo, portfolioName, representativeShare, shareSearchText };
   root.FundResearch = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
