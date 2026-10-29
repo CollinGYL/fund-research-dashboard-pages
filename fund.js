@@ -2292,15 +2292,21 @@ function bindHeavyStockRange(stock, root) {
 }
 
 function renderHeavyStockTrendSection(trends) {
+  const missing = Array.isArray(trends?.unavailable_stocks) ? trends.unavailable_stocks : [];
+  const plotted = trends?.stocks?.length || 0;
+  const requested = Number(trends?.requested_stock_count) || plotted + missing.length;
+  const coverage = missing.length ? `<p class="heavy-stock-price-coverage" style="margin:0 0 12px;font-size:13px;line-height:1.6;color:var(--muted)">可绘制 ${plotted} / ${requested} 只。暂缺行情：${missing.map((stock) => `${escapeHTML(stock.name || stock.code)}（${escapeHTML(stock.code)}）`).join("、")}。</p>` : "";
   if (!trends?.stocks?.length) return `
     <article class="subpanel heavy-stock-trend-panel">
       <div class="subpanel-heading heavy-stock-trend-control"><div><h3>最新披露前十大：股价、基金净值与持仓</h3><span>本模块统一限定最新报告期真实前十大，不使用后续名次或示例行情补足</span></div></div>
+      ${coverage}
       <p class="empty-copy">该基金最新前十大为空、证券代码暂不可定价，或股价与基金净值没有足够的共同历史，因此暂不绘制关系图；其他历史持仓仍可在下方查看持仓轨迹。</p>
     </article>`;
   const tabs = trends.stocks.map((stock, index) => `<button class="heavy-stock-tab ${index === 0 ? "active" : ""}" type="button" role="tab" aria-selected="${index === 0}" data-heavy-stock-code="${escapeHTML(stock.code)}"><small>${String(index + 1).padStart(2, "0")}</small><strong>${escapeHTML(stock.name)}</strong><span>${escapeHTML(stock.code)}</span></button>`).join("");
   return `
     <article class="subpanel heavy-stock-trend-panel">
       <div class="subpanel-heading heavy-stock-trend-control"><div><h3>最新披露前十大：股价、基金净值与持仓</h3><span>点击下方股票标签切换；关系图严格限定最新报告期真实前十大，其他历史持仓只在下方展示持仓轨迹</span></div></div>
+      ${coverage}
       <div class="heavy-stock-tabs" role="tablist" aria-label="切换最新披露前十大股票">${tabs}</div>
       <div id="heavy-stock-chart-output" aria-live="polite">${renderHeavyStockTrendChartV2(trends.stocks[0])}</div>
     </article>`;

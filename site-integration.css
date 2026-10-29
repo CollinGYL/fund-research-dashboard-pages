@@ -33,3 +33,17 @@ body.workbench.warm-workbench.desktop-detail :is(.fund-tab-nav,.quick-metrics,.r
 body.workbench.warm-workbench .research-sidebar>.header-fund-search{flex:0 0 250px;max-width:250px}
 @media(max-width:1100px){body.workbench.warm-workbench .research-sidebar>.header-fund-search{flex-basis:185px;max-width:185px}}
 @media(max-width:760px){body.workbench.warm-workbench .research-sidebar>.header-fund-search{display:none!important}}
+
+/* Keep action states visible above the shared warm button palette. */
+body.compact-home.workbench.warm-workbench.desktop-home .list-toolbar button.overview-return-button {background:#245f9d!important;color:#fff!important;border-color:#245f9d!important;}
+body.compact-home.workbench.warm-workbench.desktop-home .list-toolbar button.overview-return-button:hover:not(:disabled) {background:#1c4d81!important;color:#fff!important;border-color:#1c4d81!important;}
+body.compact-home.workbench.warm-workbench.desktop-home #clear-decision-filters {background:#f9e8e8!important;color:#9c2430!important;border-color:#deb4b4!important;font-weight:600;}
+body.compact-home.workbench.warm-workbench.desktop-home #clear-decision-filters:hover:not(:disabled) {background:#f3dada!important;color:#9c2430!important;}
+body.compact-home.workbench.warm-workbench.desktop-home .fund-list-table .period-cell small.positive {color:#b01625;}
+body.compact-home.workbench.warm-workbench.desktop-home .fund-list-table .period-cell small.negative {color:#16854a;}
+body.compact-home.workbench.warm-workbench.desktop-home .fund-list-table .period-cell small.value-zero {color:#302e29;}
+@media(min-width:761px) {
+ body.workbench.warm-workbench.desktop-detail.decision-detail .fund-tab-nav.all-functions {padding-left:20px;padding-right:20px;}
+ body.workbench.warm-workbench.desktop-detail .research-decision-metrics>div,
+ body.workbench.warm-workbench.desktop-detail .research-decision-metrics>div:first-child {padding-left:20px;padding-right:20px;}
+}

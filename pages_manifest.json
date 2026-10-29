@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-29T11:44:50+08:00",
+  "generatedAt": "2026-10-29T14:13:00+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "app.js": {
-      "size": 100013,
-      "sha256": "a5a54e09231b47cc14851ff4e4375b6e4d255eea2af2d9639e129bf5e5239894"
+      "size": 100197,
+      "sha256": "37fdcaabe8fee9666690c22328c86066312083168f8970afe6a5af75f5f6809f"
     },
     "bond-cb-fusion.css": {
       "size": 2251,
@@ -66,7 +66,7 @@
     },
     "bond-original-single.html": {
       "size": 729080,
-      "sha256": "5a61cd8e9ff944d4ae43e1f25e49337be0ee2b04cf4a7ffa1c411a128a11837e"
+      "sha256": "e96ab1020c0909ef77e17f1cb6fd953d7fe693331be7b099d38582179863697e"
     },
     "bond-research.html": {
       "size": 6193,
@@ -78,7 +78,7 @@
     },
     "compare.html": {
       "size": 4956,
-      "sha256": "28e71d03506af8e0442174812835591f66f204da7ddb628e57a155d05c964367"
+      "sha256": "9bd79527330641ee4b89a8145db1d069d22b7d5f5b2b653da0d9e0dbb433d0da"
     },
     "compare.js": {
       "size": 6781,
@@ -118,15 +118,15 @@
     },
     "fund.html": {
       "size": 5096,
-      "sha256": "3f378a22e2099d893002f56661ca02335b3d4460d09975520e20b6994f63a528"
+      "sha256": "b65fdae80158c4ed105edde3f39213444a9fdeb43fb8600ff73a383604100d21"
     },
     "fund.js": {
-      "size": 605250,
-      "sha256": "f8413bfade7f709e4aefbd4ddae725f0d69fc5ae7d60d8d90b191511578e1b44"
+      "size": 605846,
+      "sha256": "2ea2d913181e4d2607ec525af0643ecc35dd82405d24ac756badbb5bce6fd437"
     },
     "index.html": {
-      "size": 14701,
-      "sha256": "b59310768566586a02c8f849034995f6a31379a122230ca90f5c7b6749dee962"
+      "size": 14705,
+      "sha256": "71df9ffb465fa14eef015e70209ecf4e3ea916fd3a319a7af34ac44b53203c15"
     },
     "industry-bars.js": {
       "size": 6987,
@@ -165,8 +165,8 @@
       "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
     },
     "site-integration.css": {
-      "size": 4060,
-      "sha256": "688506fd5117dad8f9f26554d9785862db339e2f4e96623cbf55f473cef3410a"
+      "size": 5582,
+      "sha256": "9f7a88029297b1f2f231ecb9e1ac29e6d452d9d615220edae261902b86b51042"
     },
     "site-integration.js": {
       "size": 6977,

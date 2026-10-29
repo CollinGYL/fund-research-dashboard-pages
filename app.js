@@ -422,7 +422,7 @@ function relativeMetrics(fund) {
 
 function periodCell(fund, key, relative = false) {
   if (isHistoricalDate() && !historicalMetric(fund)) return '<td class="period-cell pending-cell"><strong>—</strong><small>正在读取历史净值</small></td>';
-  if(key === "tenure"){const t=viewMetric(fund)?.tenure;return `<td class="period-cell"><strong class="${returnClass(t?.return)}">${formatPercent(t?.return,1,true)}</strong><small>回撤 ${formatPercent(t?.drawdown)}</small><small>${escapeHtml(t?.start? t.start+"起" : t?.reason || "任职日期待加载")}</small>${t?.reason?`<small>${escapeHtml(t.reason)}</small>`:""}</td>`;}
+  if(key === "tenure"){const t=viewMetric(fund)?.tenure;return `<td class="period-cell"><strong class="${returnClass(t?.return)}">${formatPercent(t?.return,1,true)}</strong><small class="${returnClass(t?.drawdown)}">回撤 ${formatPercent(t?.drawdown)}</small><small>${escapeHtml(t?.start? t.start+"起" : t?.reason || "任职日期待加载")}</small>${t?.reason?`<small>${escapeHtml(t.reason)}</small>`:""}</td>`;}
   if (!hasFullReturnPeriod(fund, key)) return `<td class="period-cell pending-cell"><strong>—</strong><small>${isHistoricalDate() ? '区间数据不足' : '成立未满该区间'}</small></td>`;
   if (relative) {
     const relativeData = relativeMetrics(fund);
@@ -431,11 +431,11 @@ function periodCell(fund, key, relative = false) {
     if (!FundResearch.finite(value)) {
       return '<td class="period-cell pending-cell"><strong>待计算</strong><small>基准行情缺失</small></td>';
     }
-    return `<td class="period-cell"><strong class="${returnClass(value)}">${formatPercent(value, 1, true)}</strong><small>超额回撤 ${formatPercent(drawdown)}</small></td>`;
+    return `<td class="period-cell"><strong class="${returnClass(value)}">${formatPercent(value, 1, true)}</strong><small class="${returnClass(drawdown)}">超额回撤 ${formatPercent(drawdown)}</small></td>`;
   }
   const value = performanceMetric(fund, key, "return");
   const drawdown = performanceMetric(fund, key, "drawdown");
-  return `<td class="period-cell"><strong class="${returnClass(value)}">${formatPercent(value, 1, true)}</strong><small>回撤 ${formatPercent(drawdown)}</small></td>`;
+  return `<td class="period-cell"><strong class="${returnClass(value)}">${formatPercent(value, 1, true)}</strong><small class="${returnClass(drawdown)}">回撤 ${formatPercent(drawdown)}</small></td>`;
 }
 
 function bondStructureCell(asset) {
@@ -529,7 +529,7 @@ function fundRow(fund) {
     return `<tr data-fund-code="${escapeHtml(fund.code)}">${allFundOverviewCell(fund)}
       <td><strong>${formatMoney(fund.asset?.net_asset)}</strong><small>${escapeHtml(fund.asset?.report_date || "无配置披露")}</small></td>
       ${periods.map(([key]) => periodCell(fund, key)).join("")}
-      <td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small>年度回撤 ${formatPercent(annual?.drawdown)}</small></td>
+      <td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small class="${returnClass(annual?.drawdown)}">年度回撤 ${formatPercent(annual?.drawdown)}</small></td>
       <td><strong>${escapeHtml(displayCategoryLabel(fund))}</strong><small>${escapeHtml(fund.subtype)}</small></td>
       <td class="all-fund-core-cell"><div class="all-fund-core-grid">${allFundCoreCell(fund)}</div></td>
       <td class="benchmark-cell">${escapeHtml(fund.benchmark || "—")}</td>
@@ -582,7 +582,7 @@ function fundRow(fund) {
     extras = `<td><strong>${escapeHtml(displayCategoryLabel(fund))}</strong><small>${escapeHtml(fund.subtype)}</small></td><td><strong>${performanceFor(fund)?.latest_date || "—"}</strong></td>`;
   }
   if(activeCategory==='active-equity'){const m=viewMetric(fund);extras=`<td><strong>${formatPercent(m?.current_drawdown)}</strong><small>近1年收益同类${Number.isFinite(m?.return_top_pct)?"前"+Math.ceil(m.return_top_pct*100)+"%":"样本不足"}</small></td>`+extras;}
-  return `<tr data-fund-code="${escapeHtml(fund.code)}">${activeCategory === 'active-equity' ? activeEquityOverviewCells(fund) : commonCells(fund)}${periods.map(([key]) => periodCell(fund, key, relative)).join("")}<td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small>年度回撤 ${formatPercent(annual?.drawdown)}</small></td>${extras}</tr>`;
+  return `<tr data-fund-code="${escapeHtml(fund.code)}">${activeCategory === 'active-equity' ? activeEquityOverviewCells(fund) : commonCells(fund)}${periods.map(([key]) => periodCell(fund, key, relative)).join("")}<td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small class="${returnClass(annual?.drawdown)}">年度回撤 ${formatPercent(annual?.drawdown)}</small></td>${extras}</tr>`;
 }
 
 function extraHeaders() {
