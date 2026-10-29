@@ -7148,6 +7148,10 @@ if (!fundId && !fundCode) {
         fallbackFund = (catalogData.funds || []).find((item) => item.id === fundId || item.code.split(".")[0] === fundId);
         normalizedCode = String(fallbackFund?.code || "").toUpperCase();
       }
+      if (fallbackFund?.category === 'index-enhanced') {
+        window.location.replace("index.html?notice=category-updated#samples");
+        return;
+      }
       if (!normalizedCode) throw new Error("没有找到该基金的研究数据");
       await ensureFundPresentationHelpers();
       await ensureFundLifecycleData();
@@ -7162,6 +7166,10 @@ if (!fundId && !fundCode) {
         );
       }
       if (!catalogFund) throw new Error("没有找到该基金的研究数据");
+      if (catalogFund.category === 'index-enhanced') {
+        window.location.replace("index.html?notice=category-updated#samples");
+        return;
+      }
       if (!genericDetail) throw new Error("该基金的净值详情尚未生成");
       renderGenericFund(catalogFund, genericDetail);
       page.insertAdjacentHTML("afterbegin", FundLifecycle.notice(catalogFund, fundCode));

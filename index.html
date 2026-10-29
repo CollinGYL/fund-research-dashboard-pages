@@ -42,7 +42,6 @@
         <div class="category-tabs" role="tablist" aria-orientation="horizontal" aria-label="基金分类">
           <button class="active" data-category="all" role="tab" aria-selected="true">基金总览</button>
           <button data-category="active-equity" role="tab" aria-selected="false">主动权益基金</button>
-          <button data-category="index-enhanced" role="tab" aria-selected="false">指数增强基金</button>
           <button data-category="pure-bond" role="tab" aria-selected="false">纯债基金</button>
           <button data-category="hybrid-bond" role="tab" aria-selected="false">混合债基</button>
           <button data-category="convertible-bond" role="tab" aria-selected="false">转债基金</button>
@@ -77,7 +76,7 @@
           />
           <div id="fund-search-suggestions" class="fund-search-suggestions" role="listbox" aria-label="基金联想结果" hidden></div>
         </div>
-        <select id="mobile-category" class="mobile-only-control" aria-label="基金分类"><option value="all">基金总览</option><option value="active-equity">主动权益基金</option><option value="index-enhanced">指数增强基金</option><option value="pure-bond">纯债基金</option><option value="hybrid-bond">混合债基</option><option value="convertible-bond">转债基金</option></select>
+        <select id="mobile-category" class="mobile-only-control" aria-label="基金分类"><option value="all">基金总览</option><option value="active-equity">主动权益基金</option><option value="pure-bond">纯债基金</option><option value="hybrid-bond">混合债基</option><option value="convertible-bond">转债基金</option></select>
       </section>
       <section id="bond-market-overview" class="section-shell section-block" hidden></section>
 
@@ -88,6 +87,7 @@
             <h2 id="fund-list-title">基金总览</h2>
           </div>
           <p id="fund-list-description">按基金主体合并份额，点击基金进入对应研究模块。</p>
+          <p id="category-update-notice" class="method-note" role="status" hidden>分类已调整，当前显示基金总览。</p>
         </div>
 
         <div class="fund-table-region">
@@ -166,11 +166,11 @@
       <section id="notes" class="section-shell site-data-notes">
         <details class="home-note-group"><summary>数据说明</summary>
           <div id="data-scope-details"><h3>数据范围与日期</h3>
-<p>目录保存8589个历史基金主体；列表按所选类别、基金范围与实际净值日期筛选。下表列出六类代表基金的数据日期。净值截至2026-10-27；持仓、久期、模型估计分别使用页面所示实际日期。同类排名与分布按相应完整同类池统计，六类代表基金日期表不参与排名重算。其他基金按需载入既有研究数据。公告 PDF 原文可通过公开链接查看。</p><div class="scope-table"><table><thead><tr><th>类型</th><th>基金</th><th>代码</th><th>净值日数量</th><th>净值截止日</th><th>最新配置期</th><th>最近久期披露期</th></tr></thead><tbody><tr><td>主动权益</td><td>华夏成长</td><td>000001.OF</td><td>4103</td><td>2026-10-27</td><td>2026-06-30</td><td>2025-12-31</td></tr><tr><td>纯债</td><td>易方达信用债A</td><td>000032.OF</td><td>3276</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>一级债</td><td>嘉实增强信用</td><td>000005.OF</td><td>3339</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>二级债</td><td>广发聚鑫A</td><td>000118.OF</td><td>3239</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>转债</td><td>鹏华可转债A</td><td>000297.OF</td><td>2834</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>指数增强</td><td>嘉实沪深300增强A</td><td>000176.OF</td><td>2860</td><td>2026-10-27</td><td>2026-06-30</td><td>2025-12-31</td></tr></tbody></table></div>
+<p id="visible-scope-note">当前展示主动权益、纯债、混合债基和转债四类基金；数量和数据日期将在目录加载后显示。</p><div class="scope-table"><table><thead><tr><th>类型</th><th>基金</th><th>代码</th><th>净值日数量</th><th>净值截止日</th><th>最新配置期</th><th>最近久期披露期</th></tr></thead><tbody><tr><td>主动权益</td><td>华夏成长</td><td>000001.OF</td><td>4103</td><td>2026-10-27</td><td>2026-06-30</td><td>2025-12-31</td></tr><tr><td>纯债</td><td>易方达信用债A</td><td>000032.OF</td><td>3276</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>一级债</td><td>嘉实增强信用</td><td>000005.OF</td><td>3339</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>二级债</td><td>广发聚鑫A</td><td>000118.OF</td><td>3239</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>转债</td><td>鹏华可转债A</td><td>000297.OF</td><td>2834</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr></tbody></table></div>
 </div>
           <p id="fund-list-methodology" class="method-note home-classification-note">净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。</p>
           <p>净值、资产配置、季度前十大与完整持仓各用各自可得日期，不能将报告期当作公告日。半年报、年报画像不代表今天的实际持仓。</p>
-          <p>当前目录保留8589个历史组合；已核清算2个，其余8587个存续状态待核。默认筛选、排名和当前对比采用同一份资格标志。</p>
+          <p>当前基金与历史资料按同一份资格标志区分；各分类数量与列表使用相同展示范围。</p>
           <p>同产品多份额合并展示；缺失值为“—”，不等于零。收益、回撤与画像均不是评级或投资建议。主动权益画像目前是披露后描述，尚未上线实时个股识别成绩。</p>
           <p>同产品多份额合并展示；缺失值为“—”，不等于零。收益、回撤与画像均不是评级或投资建议。主动权益画像基于已披露资料，不包含实时个股识别成绩。</p>
           <p id="classification-summary-status" class="method-note" role="status" hidden></p>
@@ -190,7 +190,7 @@
     <script src="industry-bars.js?v=1cf79a3891c2" defer></script>
     <script src="desktop-nav.js?v=9bf2f577b735" defer></script>
     <script src="integration-bootstrap.js?v=4b0d956b224d" defer></script>
-    <script src="app.js?v=37fdcaabe8fe" defer></script>
+    <script src="app.js?v=d76055e6f717" defer></script>
     <script src="desktop-home.js?v=d07f111b7579" defer></script>
   <script src="site-integration.js?v=566b3e2dd4f3" defer></script>
 <script src="profile-integration.js?v=9de56d3b5560" defer></script>

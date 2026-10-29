@@ -17,13 +17,12 @@ const methodologyNote = document.querySelector("#fund-list-methodology");
 const CATEGORY_LABELS = {
   all: "基金总览",
   "active-equity": "主动权益基金",
-  "index-enhanced": "指数增强基金",
   "pure-bond": "纯债基金",
   "hybrid-bond": "混合债基",
   "convertible-bond": "转债基金",
 };
 
-const HIDDEN_WEBSITE_CATEGORIES = new Set();
+const HIDDEN_WEBSITE_CATEGORIES = new Set(["index-enhanced"]);
 const QUANTITATIVE_FUND_NAME_PATTERN = /量化|多因子|数据挖掘|智选|智胜|智航|智投|对冲|阿尔法/;
 
 function isVisibleWebsiteFund(fund) {
@@ -922,6 +921,13 @@ function saveListQuery() {
 
 function restoreListQuery() {
   const q=initialListQuery;
+  if (HIDDEN_WEBSITE_CATEGORIES.has(q.get('category'))) {
+    // Old category bookmarks return to the overview without stale category filters.
+    for (const key of ['category','q','subtype','profile','industry','level','page','sort','metric','dir','size','age','data','scroll','columns']) q.delete(key);
+    q.set('notice','category-updated');
+  }
+  const categoryNotice=document.querySelector('#category-update-notice');
+  if (categoryNotice) categoryNotice.hidden=q.get('notice')!=='category-updated';
   navDateScope=validCutoff(q.get('navDate')) && q.get('navDate') !== latestNavDate() ? q.get('navDate') : 'latest';
   lifecyclePoolScope=q.get("pool")==="history"?"history":"current";
   if (['performance','portfolio','changes','complete'].includes(q.get('view'))) listView=q.get('view')==='performance'?'complete':q.get('view');
@@ -975,10 +981,8 @@ function updateListCopy() {
   if (listDescription) listDescription.textContent = activeCategory === "active-equity"
     ? `按基金主体合并份额，当前主动权益范围共 ${categoryFunds().length.toLocaleString("zh-CN")} 只；已移除量化策略产品。`
     : `按基金主体合并份额，当前分类共 ${categoryFunds().length.toLocaleString("zh-CN")} 只；点击基金进入对应研究模块。`;
-  if (methodologyNote) methodologyNote.textContent = activeCategory === "index-enhanced"
-    ? "指数增强相对指标与跟踪指数的日收益对齐；缺少指数行情时显示缺失值。"
-    : activeCategory === "active-equity"
-      ? "主动权益口径排除指数增强和名称含量化策略的产品。任期按现任团队最后一位经理加入日计算；同类位置按相同净值日、同一子类排名。"
+  if (methodologyNote) methodologyNote.textContent = activeCategory === "active-equity"
+      ? "主动权益按所列产品范围展示。任期按现任团队最后一位经理加入日计算；同类位置按相同净值日、同一子类排名。"
     : activeCategory === "pure-bond"
       ? "券种权重占基金净资产；规模、持仓与久期分别标注报告日期。"
       : "净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。";
@@ -1223,6 +1227,8 @@ function initializeCatalog() {
     legacyFunds = [];
     analysisFunds = {};
     document.querySelector("#fund-count").textContent = funds.length.toLocaleString("zh-CN");
+    const visibleScopeNote=document.querySelector('#visible-scope-note');
+    if (visibleScopeNote) visibleScopeNote.textContent=`四类目录收录 ${funds.length.toLocaleString("zh-CN")} 个基金主体，覆盖主动权益、纯债、混合债基和转债；列表按基金范围与实际净值日期筛选。下表列出代表基金的数据日期，具体日期以各基金页面为准。`;
     document.querySelector("#update-date").textContent = catalogData.generated_at?.slice(0, 10) || catalogData.as_of;
     const completion = document.querySelector("#completed-category-label");
     if (completion) completion.textContent = "四类目录";

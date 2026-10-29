@@ -10,7 +10,7 @@
  function load(code){
   if(cache.has(code))return cache.get(code);
   const promise=new Promise((resolve,reject)=>{const script=document.createElement('script');let ended=false;
-   const finish=error=>{if(ended)return;ended=true;clearTimeout(timer);script.remove();if(error)reject(error);else{const d=window.FUND_DETAIL_DATA?.[code];d?.nav?.length?resolve(d):reject(Error(`${code} 没有净值数据`));}};
+   const finish=error=>{if(ended)return;ended=true;clearTimeout(timer);script.remove();if(error)reject(error);else{const d=window.FUND_DETAIL_DATA?.[code];if(d?.fund?.category==='index-enhanced'){const error=Error(`${code} 已移出当前展示范围，请返回基金总览重新选择。`);error.code='CATEGORY_REMOVED';reject(error);}else d?.nav?.length?resolve(d):reject(Error(`${code} 没有净值数据`));}};
    const timer=setTimeout(()=>finish(Error(`${code} 加载超时，请重试`)),15000);script.src=`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/funds/${encodeURIComponent(code)}.js`;
    script.onload=()=>finish();script.onerror=()=>finish(Error(`${code} 分片暂不可用`));document.head.append(script);
   }).catch(error=>{cache.delete(code);throw error;});cache.set(code,promise);return promise;
@@ -44,7 +44,7 @@
   const settled=await Promise.allSettled(list.map(load));
   if(version!==requestVersion)return;
   const failures=settled.filter(s=>s.status==='rejected');
-  if(failures.length){status.textContent=failures.map(s=>s.reason.message).join('；');$('#compare-run').disabled=false;return;}
+  if(failures.length){status.textContent=failures.map(s=>s.reason.message).join('；');if(failures.some(s=>s.reason.code==='CATEGORY_REMOVED'))output.innerHTML='<p class="empty-copy">分类已调整。<a href="index.html#samples">返回基金总览选择基金</a></p>';$('#compare-run').disabled=false;return;}
   current=settled.map(s=>historical?FundLifecycle.historicalNav(s.value):s.value);const url=new URL(location.href);url.searchParams.set('codes',list.join(','));url.searchParams.set('mode',historical?'history':'current');history.replaceState(null,'',url);
   status.textContent=`${list.length}只基金已加载 · ${historical?'历史资料对比，净值截到各组合最后运作日':'当前基金对比'} · 可调整区间`;$('#compare-run').disabled=false;draw();
  }

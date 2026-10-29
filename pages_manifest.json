@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-29T14:13:00+08:00",
+  "generatedAt": "2026-10-29T15:47:54+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "app.js": {
-      "size": 100197,
-      "sha256": "37fdcaabe8fee9666690c22328c86066312083168f8970afe6a5af75f5f6809f"
+      "size": 100894,
+      "sha256": "d76055e6f717cf40e5f9972545acafaa7748fdd748aed43bb959a3a1fe5e1dd1"
     },
     "bond-cb-fusion.css": {
       "size": 2251,
@@ -66,23 +66,23 @@
     },
     "bond-original-single.html": {
       "size": 729080,
-      "sha256": "e96ab1020c0909ef77e17f1cb6fd953d7fe693331be7b099d38582179863697e"
+      "sha256": "2aa041d06535eec434ac6d1a1f3c6c48af359a2da908ae5678a081347cdda696"
     },
     "bond-research.html": {
       "size": 6193,
       "sha256": "930b53eac45753b58f5bd1226381976291ec32cd0011feb51a5b98b5dd343d9a"
     },
     "changes.html": {
-      "size": 1320,
-      "sha256": "d89796b535ee0aac5a3d22b2d76e91e900eb8b8b6ee5e5fbacadcd7b2a65d537"
+      "size": 1305,
+      "sha256": "fbe4a572c133bef4a38785ecc5f08a5d4182848bd6c59382a5cf118216c0898e"
     },
     "compare.html": {
-      "size": 4956,
-      "sha256": "9bd79527330641ee4b89a8145db1d069d22b7d5f5b2b653da0d9e0dbb433d0da"
+      "size": 4798,
+      "sha256": "3f80bed753a1eba5ff43e033afbccd44b89200b38b7313b08f7ab2d9ab0a4b13"
     },
     "compare.js": {
-      "size": 6781,
-      "sha256": "79d3c173c996a42f8b3b89133ca1fb981ed6a535eae16d24167fef49ffa9d4df"
+      "size": 7151,
+      "sha256": "efffed61fea729ff067100b2f6f1a57acd3ac3c1d0fb9b21149ca66258863d48"
     },
     "demo-theme.css": {
       "size": 8000,
@@ -117,16 +117,16 @@
       "sha256": "935daf516ae9b517946c303caa6ee69589112dd6caee852ce6d8b919046c5ef5"
     },
     "fund.html": {
-      "size": 5096,
-      "sha256": "b65fdae80158c4ed105edde3f39213444a9fdeb43fb8600ff73a383604100d21"
+      "size": 4938,
+      "sha256": "fc379e83eb1c580ffcae7b00f323c44801fb1882eda34625d7dc87803e13b501"
     },
     "fund.js": {
-      "size": 605846,
-      "sha256": "2ea2d913181e4d2607ec525af0643ecc35dd82405d24ac756badbb5bce6fd437"
+      "size": 606164,
+      "sha256": "e4580f82ff4d39310e34ee7594adfee5808b81d6b58e54b5b89d7efc48708a8b"
     },
     "index.html": {
-      "size": 14705,
-      "sha256": "71df9ffb465fa14eef015e70209ecf4e3ea916fd3a319a7af34ac44b53203c15"
+      "size": 14174,
+      "sha256": "ba1d76542b6962ac41311f93df272c9c6d1c30079bca3e9492c0191f5f646ffd"
     },
     "industry-bars.js": {
       "size": 6987,
@@ -181,8 +181,8 @@
       "sha256": "fb308c4e90c397de37a9b6e051f4a28642b4090212e470b03c6cd580dee42af4"
     },
     "warm-performance.js": {
-      "size": 11965,
-      "sha256": "6bc95114b8a1277ec9a35ac5df0c68fdc3718ffa36e67ea535e198a2bb1b7898"
+      "size": 11935,
+      "sha256": "53a81064a920a56f9a29e5697f0bd7f2a63431f9686423b5072994e5485ab234"
     },
     "warm-ui-repair.css": {
       "size": 9711,
