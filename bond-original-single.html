@@ -1508,7 +1508,7 @@ function ls(src){return new Promise((res,rej)=>{const s=document.createElement("
     renderMeta();render();
   }catch(e){
     document.getElementById("app").innerHTML=`<div class="err"><b>数据加载失败：${esc(e.message)}</b><br>
-      请确认 <code>data/</code> 目录与 <code>index.html</code> 同级且完整（meta.js / fund.js / peer.js）。<br>
+      请确认 <code>data/</code> 目录与 <code>index.html</code> 同级且完整（meta.js / fund.js?v=f637959e05c9 / peer.js）。<br>
       本版数据以 <code>.js</code> 形式加载，正常情况下<b>直接双击 index.html 即可</b>，无需任何服务。<br>
       若要重新生成数据：双击 <code>更新数据.bat</code>（用 [同事本地数据目录]</div>`;
   }

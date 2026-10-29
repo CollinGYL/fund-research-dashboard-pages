@@ -1,0 +1,109 @@
+@media (min-width:761px) {
+  html:has(body.desktop-detail) {scroll-padding-top:0;}
+  body.workbench.warm-workbench.desktop-detail {
+    --desktop-header-height:60px;
+    --desktop-category-height:44px;
+    --desktop-top-height:calc(var(--desktop-header-height) + var(--desktop-category-height));
+    --desktop-detail-tabs-height:44px;
+  }
+
+  body.workbench.warm-workbench.desktop-detail .site-header {
+    position:sticky;
+    top:0;
+    z-index:50;
+    height:60px;
+    min-height:60px;
+    background:#fff;
+  }
+  body.workbench.warm-workbench.desktop-detail .site-header nav {display:flex;}
+  body.workbench.warm-workbench.desktop-detail .research-sidebar {
+    position:sticky!important;
+    inset:auto;
+    top:var(--desktop-header-height);
+    z-index:40;
+    margin:0;
+    padding:0 35px;
+    background:#f7f6f2;
+    border-bottom:1px solid #e3dfd8;
+    overflow:visible;
+  }
+  body.workbench.warm-workbench.desktop-detail .sidebar-links {
+    display:flex;
+    flex-direction:row;
+    flex-wrap:nowrap;
+    gap:22px;
+    align-items:stretch;
+    min-height:43px;
+    max-width:100%;
+    padding:0;
+    margin:0;
+    overflow-x:auto;
+    border:0;
+    background:none;
+  }
+  body.workbench.warm-workbench.desktop-detail .sidebar-links a {
+    flex:0 0 auto;
+    min-height:42px;
+    padding:11px 1px 10px;
+    border:0;
+    border-bottom:2px solid transparent;
+    border-radius:0;
+    background:transparent;
+    color:#625b55;
+    font-size:13px;
+    font-weight:400;
+    line-height:20px;
+    white-space:nowrap;
+  }
+  body.workbench.warm-workbench.desktop-detail .sidebar-links a:is(.active,[aria-current="page"]) {color:#b01625;border-bottom-color:#b01625;font-weight:600;}
+  body.workbench.warm-workbench.desktop-detail .sidebar-links a:hover {color:#b01625;border-bottom-color:#cf9298;background:transparent;}
+  body.workbench.warm-workbench.desktop-detail #fund-page > :is(.back-link,.data-boundary) {display:none;}
+
+  body.workbench.warm-workbench.desktop-detail .fund-tab-nav,
+  body.workbench.warm-workbench.desktop-detail.decision-detail .fund-tab-nav.all-functions {
+    position:sticky;
+    top:var(--desktop-top-height);
+    z-index:35;
+    display:flex;
+    flex-wrap:nowrap;
+    gap:23px;
+    padding:0;
+    margin:0 0 16px;
+    border:0;
+    border-bottom:1px solid #e3dfd8;
+    border-radius:0;
+    background:#fff;
+    box-shadow:0 5px 12px -9px #25324770;
+    backdrop-filter:none;
+    overflow-x:auto;
+    scrollbar-width:thin;
+    scroll-margin-top:calc(var(--desktop-top-height) + 12px);
+  }
+  body.workbench.warm-workbench.desktop-detail .fund-tab-nav button {flex:0 0 auto;white-space:nowrap;}
+  body.workbench.warm-workbench.desktop-detail .pb-report-toc {position:static;}
+  body.workbench.warm-workbench.desktop-detail #fund-page {scroll-margin-top:calc(var(--desktop-top-height) + 16px);}
+  body.workbench.warm-workbench.desktop-detail :is(.fund-tab-panel,.panel,.subpanel,[data-panel]) {scroll-margin-top:calc(var(--desktop-top-height) + var(--desktop-detail-tabs-height) + 12px);}
+
+  body.workbench.warm-workbench.desktop-detail .desktop-detail-table-wrap {position:relative;isolation:isolate;z-index:1;}
+  body.workbench.warm-workbench.desktop-detail .desktop-detail-table-head {position:relative;z-index:5;background:#eee9df;}
+  body.workbench.warm-workbench.desktop-detail .desktop-detail-table-head th {top:auto;}
+  body.workbench.warm-workbench.desktop-detail .desktop-detail-local-scroll .desktop-detail-table-head,
+  body.workbench.warm-workbench.desktop-detail .desktop-detail-table-head.desktop-detail-local-scroll {position:sticky;top:0;transform:none;}
+  body.workbench.warm-workbench.desktop-detail .desktop-detail-table-head.is-frozen th {box-shadow:inset 0 -1px #d7cfc4;}
+  body.workbench.warm-workbench.desktop-detail .desktop-detail-table-wrap :is(a,button,input,select) {scroll-margin-top:calc(var(--desktop-top-height) + var(--desktop-detail-tabs-height) + var(--desktop-detail-table-head-height,48px) + 12px);}
+  body.workbench.warm-workbench.desktop-detail > footer {
+    position:relative;
+    display:flex;
+    flex-direction:row;
+    justify-content:space-between;
+    align-items:center;
+    gap:24px;
+    box-sizing:border-box;
+    width:min(100%,1680px);
+    margin:0 auto;
+    padding:16px 35px 24px;
+    border:0;
+  }
+  body.workbench.warm-workbench.desktop-detail > footer::before {content:"";position:absolute;top:0;left:35px;right:35px;border-top:1px solid #e3dfd8;}
+  body.workbench.warm-workbench.desktop-detail > footer > p {margin:0;}
+}

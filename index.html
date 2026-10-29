@@ -3,16 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="覆盖主观权益、纯债、一级债基/二级债基与转债基金的分类研究看板。" />
+    <meta name="description" content="覆盖主动权益、纯债、混合债基与转债基金的分类研究看板。" />
     <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex" />
     <meta name="referrer" content="no-referrer" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; upgrade-insecure-requests" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
     <title>财富产品部-基金研究系统看板</title>
-    <link rel="preconnect" href="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" crossorigin />
-    <link rel="dns-prefetch" href="//fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" />
     <link rel="stylesheet" href="styles.css?v=0940f9f6514f" />
+    <link rel="stylesheet" href="review.css?v=f1d378a18a93" />
+    <script src="review-core.js?v=eb0f5ca56ecb" defer></script>
+    <link rel="stylesheet" href="fund-lifecycle.css?v=0650bd1ceefa">
+    <script src="fund-lifecycle.js?v=c1de46aa7b42" defer></script>
+    <link rel="stylesheet" href="bond-cb-fusion.css?v=4ccac0c74680">
+    <script src="bond-cb-fusion.js?v=bf411b303e40" defer></script>
+      <link rel="stylesheet" href="warm-ui-repair.css?v=23ad8276b80d">
+      <link rel="stylesheet" href="demo-theme.css?v=c22207d629e7">
+      <link rel="stylesheet" href="desktop-home.css?v=7a764b4f1082">
+    <link rel="stylesheet" href="ui-integration.css?v=fb308c4e90c3">
+    <link rel="stylesheet" href="bond-market-comparison.css?v=89bbb2816ab8">
+    <link rel="stylesheet" href="site-integration.css?v=688506fd5117">
   </head>
-  <body class="compact-home workbench blue-workbench">
+  <body class="compact-home workbench warm-workbench desktop-home">
     <header class="site-header">
       <a class="brand" href="#top" aria-label="返回首页">
         <span class="brand-mark">研</span>
@@ -22,7 +32,6 @@
         </span>
       </a>
       <nav aria-label="主导航">
-        <a href="bond-research.html">债基完整研究</a>
         <a href="#fund-categories">基金分类</a>
         <a href="#samples">基金列表</a>
       </nav>
@@ -30,11 +39,12 @@
 
     <aside class="research-sidebar" aria-label="研究目录">
       <p class="sidebar-label">研究目录</p>
-        <div class="category-tabs" role="tablist" aria-orientation="vertical" aria-label="基金分类">
-          <button class="active" data-category="all" role="tab" aria-selected="true">全部</button>
-          <button data-category="active-equity" role="tab" aria-selected="false">主观权益基金</button>
+        <div class="category-tabs" role="tablist" aria-orientation="horizontal" aria-label="基金分类">
+          <button class="active" data-category="all" role="tab" aria-selected="true">基金总览</button>
+          <button data-category="active-equity" role="tab" aria-selected="false">主动权益基金</button>
+          <button data-category="index-enhanced" role="tab" aria-selected="false">指数增强基金</button>
           <button data-category="pure-bond" role="tab" aria-selected="false">纯债基金</button>
-          <button data-category="hybrid-bond" role="tab" aria-selected="false">一级债基/二级债基</button>
+          <button data-category="hybrid-bond" role="tab" aria-selected="false">混合债基</button>
           <button data-category="convertible-bond" role="tab" aria-selected="false">转债基金</button>
         </div>
       <div class="sidebar-note"><span class="sidebar-note-mark" aria-hidden="true"></span><strong>从筛选到深入研究</strong><p>净值、持仓与久期<br>按产品查看和比较。</p><a href="#notes">数据说明 ↗</a></div>
@@ -42,7 +52,7 @@
 
     <main id="top">
       <div hidden aria-hidden="true"><span id="fund-count"></span><span id="completed-category-label"></span><span id="completed-category-note"></span></div>
-      <div class="section-shell workspace-intro"><div><p class="eyebrow">财富产品部 / FUND RESEARCH</p><h1>基金研究工作台</h1></div><p>查找产品，核对数据，深入研究。</p></div>
+      <div class="section-shell workspace-intro"><div><p class="eyebrow">财富产品部 / FUND RESEARCH</p><h1 id="workspace-category-title">基金总览</h1></div><p>查找产品，核对数据，深入研究。</p></div>
 
       <section id="fund-categories" class="section-shell section-block category-hub">
         <div class="section-heading">
@@ -57,7 +67,7 @@
           <input
             id="fund-search"
             type="search"
-            placeholder="搜索基金名称、代码或基金经理..."
+            placeholder="搜索名称、代码、经理 · 支持多个关键词"
             autocomplete="off"
             role="combobox"
             aria-autocomplete="list"
@@ -67,20 +77,20 @@
           />
           <div id="fund-search-suggestions" class="fund-search-suggestions" role="listbox" aria-label="基金联想结果" hidden></div>
         </div>
-        <select id="mobile-category" class="mobile-only-control" aria-label="基金分类"><option value="all">全部基金</option><option value="active-equity">主观权益</option><option value="pure-bond">纯债基金</option><option value="hybrid-bond">一级/二级债</option><option value="convertible-bond">转债基金</option></select>
+        <select id="mobile-category" class="mobile-only-control" aria-label="基金分类"><option value="all">基金总览</option><option value="active-equity">主动权益基金</option><option value="index-enhanced">指数增强基金</option><option value="pure-bond">纯债基金</option><option value="hybrid-bond">混合债基</option><option value="convertible-bond">转债基金</option></select>
       </section>
-
       <section id="bond-market-overview" class="section-shell section-block" hidden></section>
 
       <section id="samples" class="section-shell section-block">
         <div class="section-heading">
           <div>
             <p class="eyebrow">基金研究目录</p>
-            <h2 id="fund-list-title">全部基金全量列表</h2>
+            <h2 id="fund-list-title">基金总览</h2>
           </div>
           <p id="fund-list-description">按基金主体合并份额，点击基金进入对应研究模块。</p>
         </div>
 
+        <div class="fund-table-region">
         <div class="toolbar list-toolbar">
           <span class="toolbar-label">指标视图</span>
           <div class="period-switch decision-view-switch" aria-label="指标视图">
@@ -90,31 +100,49 @@
           </div>
           <button id="mobile-filter-toggle" class="mobile-only-control" aria-expanded="false" aria-controls="decision-filters">筛选条件</button>
           <select id="mobile-sort" class="mobile-only-control" aria-label="排序"></select>
-          <p id="view-metrics-status" class="method-note" hidden></p>
           <div id="decision-filters" class="decision-filters"></div>
-          <label class="page-density">每页<select id="page-size" aria-label="每页基金数量"><option>10</option><option>25</option><option>50</option></select></label>
-          <details class="column-settings"><summary>显示设置</summary><div id="decision-columns"></div></details>
+          <details class="column-settings">
+            <summary>指标设置</summary>
+            <div class="indicator-settings-panel">
+              <div class="settings-period-group">
+                <p class="settings-group-title">时间范围</p>
+                <div class="period-switch legacy-period-switch" aria-label="收益回撤时间维度">
+                  <button type="button" class="active" data-list-period="short" aria-pressed="true">近1月–1年</button>
+                  <button type="button" data-list-period="long" aria-pressed="false">近1–5年</button>
+                </div>
+              </div>
+              <div class="settings-columns-group">
+                <p class="settings-group-title">显示指标</p>
+                <div id="decision-columns"></div>
+              </div>
+              <div id="industry-bar-controls" title="中信证券三级行业分类标准2.0" class="industry-view-controls" aria-label="行业分布层级"><span>行业分布</span><button type="button" data-industry-level="sector" aria-pressed="false">板块</button><button type="button" data-industry-level="level1" aria-pressed="true">一级</button><button type="button" data-industry-level="level2" aria-pressed="false">二级</button><button type="button" data-industry-level="level3" aria-pressed="false">三级</button></div>
+              <button type="button" id="reset-display-settings">恢复默认显示</button>
+            </div>
+          </details>
+          <button type="button" id="clear-decision-filters">重置筛选</button>
+          <div class="sort-help">
+            <button type="button" id="sort-help-trigger" class="sort-help-trigger" aria-label="排序规则" aria-describedby="sort-rules-tooltip" aria-controls="sort-rules-tooltip" aria-expanded="false"><span aria-hidden="true">ⓘ</span></button>
+            <div id="sort-rules-tooltip" class="sort-help-tooltip" role="tooltip" hidden>
+              <div class="sort-help-content">
+                <strong>排序规则</strong>
+                <p id="list-sort-state" class="list-sort-state" aria-live="polite"></p>
+                <p>连续点击同一排序项：降序 → 升序 → 默认顺序。缺失值始终置后。</p>
+              </div>
+            </div>
+          </div>
           <select id="fund-filter" aria-label="按产品名称类型筛选" hidden>
             <option value="all">全部子类</option>
           </select>
-          <div id="fund-subtype-tabs" class="period-switch subtype-switch" aria-label="基金子类切换" hidden></div>
-          <div class="period-switch legacy-period-switch" aria-label="收益回撤时间维度">
-            <button class="active" data-list-period="short">近1月–1年</button>
-            <button data-list-period="long">近1–5年</button>
-          </div>
         </div>
 
         <div class="list-status-row">
         <p id="search-result-count" class="search-result-count" aria-live="polite"></p>
-        <p id="list-sort-state" class="list-sort-state" aria-live="polite"></p>
-        <nav id="fund-pagination-top" class="fund-pagination" aria-label="基金列表顶部分页"></nav>
+        <div id="fund-subtype-tabs" class="period-switch subtype-switch" aria-label="基金子类切换" hidden></div>
+        <div id="selected-filters" class="selected-filters" hidden></div>
+        <nav id="fund-pagination-top" class="fund-pagination" aria-label="基金列表顶部分页" hidden></nav>
         </div>
-        <div id="selected-filters" class="selected-filters"></div>
 
-        <p id="fund-list-methodology" class="method-note home-classification-note">净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。</p>
-
-        <p id="classification-summary-status" class="method-note" role="status" hidden></p>
-
+        <p id="historical-date-note" class="method-note historical-date-note" role="status" hidden></p>
         <p class="table-scroll-hint">左右滚动查看完整指标 <span aria-hidden="true">↔</span></p>
         <div id="table-top-scroll" class="table-top-scroll" tabindex="0" role="region" aria-label="表格顶部横向滚动"><div></div></div>
         <div class="fund-list-wrap" aria-live="polite" tabindex="0" role="region" aria-label="基金指标表，左右滚动查看全部列">
@@ -123,13 +151,30 @@
             <tbody id="fund-grid"><tr><td class="empty-state fund-search-empty">正在加载基金目录…</td></tr></tbody>
           </table>
         </div>
-        <nav id="fund-pagination" class="fund-pagination" aria-label="基金列表分页"></nav>
+        </div>
+        <div class="desktop-pagination-bar">
+          <div class="desktop-pagination-inner">
+            <div id="pagination-comparison-slot"></div>
+            <div class="pagination-controls">
+              <label class="page-density">每页<select id="page-size" aria-label="每页基金数量"><option>10</option><option>25</option><option>50</option></select><span>只</span></label>
+              <nav id="fund-pagination" class="fund-pagination" aria-label="基金列表分页"></nav>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section id="notes" class="section-shell site-data-notes">
-        <details><summary>数据说明</summary>
+        <details class="home-note-group"><summary>数据说明</summary>
+          <div id="data-scope-details"><h3>数据范围与日期</h3>
+<p>目录保存8589个历史基金主体；列表按所选类别、基金范围与实际净值日期筛选。下表列出六类代表基金的数据日期。净值截至2026-10-27；持仓、久期、模型估计分别使用页面所示实际日期。同类排名与分布按相应完整同类池统计，六类代表基金日期表不参与排名重算。其他基金按需载入既有研究数据。公告 PDF 原文可通过公开链接查看。</p><div class="scope-table"><table><thead><tr><th>类型</th><th>基金</th><th>代码</th><th>净值日数量</th><th>净值截止日</th><th>最新配置期</th><th>最近久期披露期</th></tr></thead><tbody><tr><td>主动权益</td><td>华夏成长</td><td>000001.OF</td><td>4103</td><td>2026-10-27</td><td>2026-06-30</td><td>2025-12-31</td></tr><tr><td>纯债</td><td>易方达信用债A</td><td>000032.OF</td><td>3276</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>一级债</td><td>嘉实增强信用</td><td>000005.OF</td><td>3339</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>二级债</td><td>广发聚鑫A</td><td>000118.OF</td><td>3239</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>转债</td><td>鹏华可转债A</td><td>000297.OF</td><td>2834</td><td>2026-10-27</td><td>2026-06-30</td><td>2026-06-30</td></tr><tr><td>指数增强</td><td>嘉实沪深300增强A</td><td>000176.OF</td><td>2860</td><td>2026-10-27</td><td>2026-06-30</td><td>2025-12-31</td></tr></tbody></table></div>
+</div>
+          <p id="fund-list-methodology" class="method-note home-classification-note">净值、资产配置和持仓使用各自最新可得日期；季度前十大与半年报/年报完整持仓严格分开。</p>
           <p>净值、资产配置、季度前十大与完整持仓各用各自可得日期，不能将报告期当作公告日。半年报、年报画像不代表今天的实际持仓。</p>
+          <p>当前目录保留8589个历史组合；已核清算2个，其余8587个存续状态待核。默认筛选、排名和当前对比采用同一份资格标志。</p>
           <p>同产品多份额合并展示；缺失值为“—”，不等于零。收益、回撤与画像均不是评级或投资建议。主动权益画像目前是披露后描述，尚未上线实时个股识别成绩。</p>
+          <p>同产品多份额合并展示；缺失值为“—”，不等于零。收益、回撤与画像均不是评级或投资建议。主动权益画像基于已披露资料，不包含实时个股识别成绩。</p>
+          <p id="classification-summary-status" class="method-note" role="status" hidden></p>
+          <p id="view-metrics-status" class="method-note" hidden></p>
         </details>
       </section>
     </main>
@@ -140,7 +185,14 @@
     </footer>
 
     <noscript><p class="section-shell loading-state">请启用 JavaScript 以搜索基金和查看研究数据。</p></noscript>
-    <script src="research-core.js?v=7c8c4039b06f" defer></script>
-    <script src="app.js?v=df818e7e6512" defer></script>
-  </body>
+    <script src="bond-market-comparison.js?v=1988206a24e7" defer></script>
+    <script src="research-core.js?v=6fb132095e30" defer></script>
+    <script src="industry-bars.js?v=1cf79a3891c2" defer></script>
+    <script src="desktop-nav.js?v=9bf2f577b735" defer></script>
+    <script src="integration-bootstrap.js?v=d3f12a2ff8fe" defer></script>
+    <script src="app.js?v=e1a8bdf12f71" defer></script>
+    <script src="desktop-home.js?v=d07f111b7579" defer></script>
+  <script src="site-integration.js?v=566b3e2dd4f3" defer></script>
+<script src="profile-integration.js?v=9de56d3b5560" defer></script>
+</body>
 </html>

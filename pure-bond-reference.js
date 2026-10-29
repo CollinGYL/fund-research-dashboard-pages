@@ -544,7 +544,7 @@ function navRangeBar(d){
       ${curBtn}
     </div>`+
     (segs.length?`<div class="rng-bar rng-bar2">
-      <span class="rng-lab">按任期<small>scan-line 切段，含共管/代管</small></span>${segBtns}
+      <span class="rng-lab">按任期<small>按任职变动分段，含共管与代管</small></span>${segBtns}
     </div>`:
     // ★全市场纯债有 51 只基金 Wind 无经理记录 —— 必须说明是"没数据"而不是功能坏了
     `<div class="rng-bar rng-bar2"><span class="rng-lab">按任期</span>
@@ -760,11 +760,10 @@ function durKFBlock(d){
               :PB_SHARD_LOADS.get("durkf:"+d.code)?.status==="error"?pbShardFailure("durkf",d.code,"久期日频拟合数据")
               :`<div class="method-note">久期日频拟合数据加载中…</div>`;
   }
-  const line=K.dates.map((dt,i)=>[dt,K.dur[i]]);
-  // 真值序列从 2016H2 起,模型要 120 交易日预热、最早 2018-08 才有值 —— 落在模型区间之外的
-  // 真值点画出来只会把 x 轴拖长一大段空白,故只画区间内的(区间外的本来也无从对照)。
+  const line=K.dates.map((dt,i)=>[dt,Number.isFinite(K.dur[i])?K.dur[i]:null]).filter(p=>p[0]>="2018-01-01");
+  // Only clip the displayed interval; retain the full model and disclosure histories.
   const truth=Array.isArray(K.core_evaluation?.points)?durKFPair(K).map(r=>({dt:r.dt,dur:r.real})):(K.truth||[]);
-  const tin=truth.filter(t=>t.dt>=K.meta.d0&&t.dt<=K.meta.d1);
+  const tin=truth.filter(t=>t.dt>="2018-01-01"&&t.dt>=K.meta.d0&&t.dt<=K.meta.d1&&Number.isFinite(t.dur));
   const series=[{name:"卡尔曼日频估计",color:"var(--teal)",points:line,dp:2,unit:"年",sw:1.5}];
   if(tin.length)series.push({name:"披露对照（半年频）",color:"var(--gold)",
     points:tin.map(t=>[t.dt,t.dur]),dp:2,unit:"年",sw:0,dots:true});
@@ -795,6 +794,7 @@ function refreshDurKF(){
   if(w&&CURRENT)w.innerHTML=durKFBlock(CURRENT);
 }
 function peerRankBlock(d){
+  if(window.WarmPerformance) return window.WarmPerformance.peer({code:d.code},(d.perf.curve.nav||[]).map(p=>({date:p[0]})));
   const rows=getRank(d);
   if(!rows.length)return `<div class="method-note">同类排名数据未生成（需重跑 build.py）。</div>`;
   let tbl=`<div class="rt-wrap"><table class="rt pb-rank-table"><thead><tr>
@@ -859,10 +859,10 @@ function renderPerf(d){
           白空 217px;而 ⑤同类排名 7列×4行、内容高 265px 却独占整行 1180px,又宽又扁。
           改成:①独占整行(净值图 528→1126 宽,13年走势看得清)、②与⑤并排(256 vs 265 天然等高)。
           ③阶段表现(8列)/④月度表现(14列热力图) 压到半幅必横滚,仍保持整行不动。 */""}
-    ${sub("净值走势 & 动态回撤","累计收益(青) + 回撤",navChart)}
+    ${sub("净值走势 & 动态回撤","累计收益 + 回撤",navChart)}
     <div class="two-column">
       ${sub("年度表现","分年度收益率",annBar+annNote)}
-      ${sub("同类排名","中长期纯债同类·今年以来/近1年/近3年/近5年",peerRankBlock(d))}
+      ${sub("同类排名","当前同类产品 · 相同净值截止日",peerRankBlock(d))}
     </div>
     ${sub("阶段表现","区间 · 累计收益 · 年化收益 · 年化波动 · 最大回撤 · Sharpe · Calmar",stageTbl)}
     ${sub("月度表现","年 × 月收益热力图",monthlyHeatmap(p.monthly))}
@@ -1257,7 +1257,7 @@ function campisiDateNote(d,reg,label){
 function renderCampisi(d){
   const c=d.campisi;
   if(!c||!c.full)return `<p class="tab-lead">五因子净值归因（Campisi / RBA）</p>`+campisiDateNote(d,null)+
-    sub("Campisi 归因","净值回归",`<div class="data-boundary"><p class="eyebrow">历史不足</p><h3>净值历史过短</h3><p>该基金净值有效观测 &lt;120，暂无五因子回归结果。</p></div>`);
+    sub("业绩归因","净值回归",`<div class="data-boundary"><p class="eyebrow">历史不足</p><h3>净值历史过短</h3><p>该基金净值有效观测 &lt;120，暂无五因子回归结果。</p></div>`);
   const regWin=c.reg_win||{};
   const availWins=Object.keys(FAC_WIN_LABEL).filter(k=>regWin[k]);
   if(!curFacWin||!regWin[curFacWin])curFacWin=availWins.includes("ytd")?"ytd":availWins[0];

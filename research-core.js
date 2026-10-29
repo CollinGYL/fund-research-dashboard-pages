@@ -64,15 +64,17 @@
     }).catch(e=>{promise=null;throw e;});
     return promise;
   }
-  function chart(host,series,{dual=false}={}){
-    series=series.filter(s=>s.points.some(p=>Number.isFinite(p[1])));dual=dual&&series.length===2;
+  function chart(host,series,{dual=false,rightUnit=null}={}){
+    series=series.map((s,i)=>({...s,axis:dual?(s.axis??Math.min(i,1)):0})).filter(s=>s.points.some(p=>Number.isFinite(p[1])));
+    dual=dual&&series.some(s=>s.axis===0)&&series.some(s=>s.axis===1);
+    if(!dual)series=series.map(s=>({...s,axis:0}));
     const points=series.flatMap(s=>s.points).filter(p=>Number.isFinite(p[1]));
     if(!points.length){host.innerHTML='<p class="method-note">暂无可用曲线。</p>';return;}
     const W=Math.max(360,Math.min(920,Math.round(host.getBoundingClientRect().width||920))),H=235,L=54,R=dual?54:18,T=24,B=34;
     const days=[...new Set(points.map(p=>p[0]))].sort(),x0=Date.parse(days[0]),x1=Date.parse(days.at(-1));
     const X=d=>L+(Date.parse(d)-x0)/(x1-x0||1)*(W-L-R);
-    const scales=series.map((s,i)=>{
-      const v=(dual?s.points:points).map(p=>p[1]).filter(Number.isFinite);let lo=Math.min(...v),hi=Math.max(...v);const pad=(hi-lo)*.12||.1;return [lo-pad,hi+pad];
+    const scales=(dual?[0,1]:[0]).map(axis=>{
+      const v=series.filter(s=>s.axis===axis).flatMap(s=>s.points).map(p=>p[1]).filter(Number.isFinite);const a=root.ReviewCore.scale(v);return [a.min,a.max];
     });
     const Y=(v,i)=>T+(1-(v-scales[i][0])/(scales[i][1]-scales[i][0]))*(H-T-B);
     let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(series.map(s=>s.label).join('与'))}" tabindex="0">`;
@@ -81,18 +83,18 @@
       svg+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#e3eaf1"/><text x="${L-8}" y="${y+4}" text-anchor="end">${fmt(scales[0][1]-(scales[0][1]-scales[0][0])*i/4)}</text>`;
       if(dual)svg+=`<text x="${W-R+8}" y="${y+4}">${fmt(scales[1][1]-(scales[1][1]-scales[1][0])*i/4)}</text>`;
     }
-    svg+=`<text x="${L}" y="14">${esc(series[0].unit)}</text>${dual?`<text x="${W-R}" y="14" text-anchor="end">${esc(series[1].unit)}</text>`:''}`;
+    svg+=`<text x="${L}" y="14">${esc(series[0].unit)}</text>${dual?`<text x="${W-R}" y="14" text-anchor="end">${esc(rightUnit||series.find(s=>s.axis===1).unit)}</text>`:''}`;
     const dateTicks=W<600?2:4;
-    for(let i=0;i<=dateTicks;i++){const n=Math.round((days.length-1)*i/dateTicks),d=days[n];svg+=`<text x="${X(d)}" y="${H-9}" text-anchor="middle">${esc(d)}</text>`;}
+    for(let i=0;i<=dateTicks;i++){const n=Math.round((days.length-1)*i/dateTicks),d=days[n];svg+=`<text x="${X(d)}" y="${H-9}" text-anchor="${i===0?'start':i===dateTicks?'end':'middle'}">${esc(d)}</text>`;}
     series.forEach((s,i)=>{let path='',last=null;s.points.forEach(([d,v])=>{
       if(!Number.isFinite(v)){last=null;return;}const gap=last&&(Date.parse(d)-Date.parse(last)>12*86400000);
-      path+=`${last&&!gap?'L':'M'}${X(d).toFixed(2)},${Y(v,i).toFixed(2)} `;last=d;
+      path+=`${last&&!gap?'L':'M'}${X(d).toFixed(2)},${Y(v,s.axis).toFixed(2)} `;last=d;
     });svg+=`<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2"/>`;});
     svg+=`<line data-cursor y1="${T}" y2="${H-B}" stroke="#8497a9" stroke-dasharray="3 3" visibility="hidden"/></svg>`;
     host.innerHTML=`<div class="market-chart">${svg}<div class="market-tooltip" role="status"></div></div><div class="market-chart-legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.label)}${dual?' · '+esc(s.unit):''}</span>`).join('')}</div>`;
     const graphic=host.querySelector('svg'),tip=host.querySelector('.market-tooltip'),cursor=host.querySelector('[data-cursor]');
     const maps=series.map(s=>new Map(s.points.map(p=>[p[0],p])));let pos=days.length-1;
-    const show=i=>{pos=Math.max(0,Math.min(days.length-1,i));const day=days[pos];cursor.setAttribute('x1',X(day));cursor.setAttribute('x2',X(day));cursor.setAttribute('visibility','visible');tip.innerHTML=`<b>${esc(day)}</b> `+series.map((s,j)=>{const p=maps[j].get(day);return `<span>${esc(s.label)} ${fmt(p?.[1])}${esc(s.unit)}${p?.[2]!=null?' · '+p[2]+'只':''}</span>`;}).join('');};
+    const show=i=>{pos=Math.max(0,Math.min(days.length-1,i));const day=days[pos];cursor.setAttribute('x1',X(day));cursor.setAttribute('x2',X(day));cursor.setAttribute('visibility','visible');tip.innerHTML=`<b>${esc(day)}</b> `+series.map((s,j)=>{const p=maps[j].get(day);return `<span>${esc(s.label)} ${fmt(Number.isFinite(p?.[1])?p[1]*(s.displayScale||1):null)}${esc(s.unit)}${p?.[2]!=null?' · '+p[2]+'只':''}</span>`;}).join('');};
     graphic.addEventListener('pointermove',e=>{const r=graphic.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,time=x0+(x-L)/(W-L-R)*(x1-x0);let lo=0,hi=days.length-1;while(lo<hi){const m=(lo+hi)>>1;Date.parse(days[m])<time?lo=m+1:hi=m;}if(lo&&Math.abs(Date.parse(days[lo-1])-time)<Math.abs(Date.parse(days[lo])-time))lo--;show(lo);});
     graphic.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();show(e.key==='Home'?0:e.key==='End'?days.length-1:pos+(e.key==='ArrowLeft'?-1:1));}});
     show(pos);
@@ -101,15 +103,13 @@
     const size=d.classes.reduce((a,c)=>a+c.size,0),sc=d.classes.reduce((a,c)=>a+c.size_count,0);
     host.innerHTML=`<div class="market-overview"><div class="section-heading"><div><p class="eyebrow">纯债基金</p><h2>纯债基金的市场概览</h2></div><p>${esc(d.date)} · 产品口径，A/C等份额合并</p></div>
       <div class="market-facts"><div><small>纯债组合</small><strong>${d.total.toLocaleString()}<em>只</em></strong></div><div><small>${esc(d.report_date)} 披露规模 · ${sc}只</small><strong>${fmt(size/1e12)}<em>万亿元</em></strong></div><div><small>日频久期可用</small><strong>${d.available.toLocaleString()}<em>只</em></strong></div><div><small>久期至 ${esc(d.date)}</small><strong>${d.current.toLocaleString()}<em>只</em></strong></div></div>
-      <div class="market-grid"><article class="subpanel"><h3>市场规模与分类结构</h3><p class="method-note">${esc(d.report_date)} · 净资产合计</p><div class="market-class-bars">${d.classes.map(c=>`<div><span>${esc(c.name)}</span><div><i style="width:${size?c.size/size*100:0}%"></i></div><b>${fmt(c.size/1e8,0)}亿元</b><small>${c.count}只 · 同期规模${c.size_count}只</small></div>`).join('')}</div><p class="method-note">${d.unavailable}只日频估计暂无可用结果 · ${d.available-d.current}只保留较早日期</p></article>
-      <article class="subpanel"><div class="market-panel-head"><h3>涨幅靠前的基金久期更长吗</h3><select data-market-period aria-label="收益比较区间"><option value="1m">近1月</option><option value="3m">近3月</option><option value="6m">近6月</option><option value="1y">近1年</option></select></div><div data-market-groups></div></article></div>
-      <article class="subpanel"><div class="market-panel-head"><h3>走势对照：聚合久期 vs 10Y 国债</h3><select data-market-range aria-label="市场走势区间"><option value="all">2025年以来</option><option value="1y">近1年</option><option value="6m">近6月</option><option value="3m">近3月</option></select></div><p class="method-note">${esc(d.history_scope)} · 左轴久期（年），右轴国债收益率（%）</p><div data-market-trend></div></article>
-      <article class="subpanel"><h3>10Y–2Y 国债利差</h3><p class="method-note">同日10年期减2年期到期收益率 · 基点（bp）</p><div data-market-spread></div><p class="method-note">${esc(d.yields.source)} · ${esc(d.yields.points?.[0]?.[0]||'—')}—${esc(d.yields.points?.at(-1)?.[0]||'—')}</p></article></div>`;
-    const groups=()=>{const key=host.querySelector('[data-market-period]').value,p=d.periods[key],max=Math.max(...p.groups.map(g=>g.duration||0),.1);host.querySelector('[data-market-groups]').innerHTML=`<p class="method-note">按区间收益分为五组 · 期末久期中位数 · ${p.n}只同日样本</p><div class="market-group-bars">${p.groups.map(g=>`<div><div class="market-bar-space"><i style="height:${g.duration==null?0:g.duration/max*90}%"><b>${fmt(g.duration)}年</b></i></div><strong>${esc(g.label)}</strong><small>收益 ${fmt(g.return==null?null:g.return*100)}%</small><small>${g.n}只</small></div>`).join('')}</div>`;};
+      <div class="market-grid market-comparison-layout"><article class="subpanel"><h3>市场规模与分类结构</h3><p class="method-note">${esc(d.report_date)} · 净资产合计</p><div class="market-class-bars">${d.classes.map(c=>`<div><span>${esc(c.name)}</span><div><i style="width:${size?c.size/size*100:0}%"></i></div><b>${fmt(c.size/1e8,0)}亿元</b><small>${c.count}只 · 同期规模${c.size_count}只</small></div>`).join('')}</div><p class="method-note">${d.unavailable}只日频估计暂无可用结果 · ${d.available-d.current}只保留较早日期</p></article>
+      <article class="subpanel market-comparison" data-market-comparison></article></div>
+      <article class="subpanel"><div class="market-panel-head"><h3>走势对照：聚合久期、10Y 国债与10Y−1Y期限利差</h3><select data-market-range aria-label="市场走势区间"><option value="all">2025年以来</option><option value="1y">近1年</option><option value="6m">近6月</option><option value="3m">近3月</option></select></div><p class="method-note">${esc(d.history_scope)} · 左轴久期（年），右轴收益率（%）与利差（百分点）；悬停显示利差基点值</p><div data-market-trend></div><p class="method-note">${esc(d.yields.source)} · ${esc(d.yields.points?.[0]?.[0]||'—')}—${esc(d.yields.points?.at(-1)?.[0]||'—')}</p></article></div>`;
     const curves=()=>{const key=host.querySelector('[data-market-range]').value,start=key==='all'?'2025-01-01':root.FundResearch.monthStart(d.date,{ '1y':12,'6m':6,'3m':3}[key]),inside=p=>p[0]>=start&&p[0]<=d.date;
-      chart(host.querySelector('[data-market-trend]'),[{label:'聚合久期中位数',unit:'年',color:'#255e98',points:d.aggregate.filter(inside)},{label:'10年期国债收益率',unit:'%',color:'#c58b34',points:(d.yields.points||[]).filter(inside).map(p=>[p[0],p[2]])}],{dual:true});
-      chart(host.querySelector('[data-market-spread]'),[{label:'10Y–2Y',unit:'bp',color:'#248f89',points:(d.yields.points||[]).filter(inside).map(p=>[p[0],p[3]])}]);};
-    host.querySelector('[data-market-period]').addEventListener('change',groups);host.querySelector('[data-market-range]').addEventListener('change',curves);groups();curves();
+      chart(host.querySelector('[data-market-trend]'),[{label:'聚合久期中位数',unit:'年',color:'#255e98',axis:0,points:d.aggregate.filter(inside)},{label:'10年期国债收益率',unit:'%',color:'#c58b34',axis:1,points:(d.yields.points||[]).filter(inside).map(p=>[p[0],p[2]])},{label:'10Y−1Y期限利差',unit:'bp',displayScale:100,color:'#248f89',axis:1,points:(d.yields.points||[]).filter(inside).map(p=>[p[0],Number.isFinite(p[5])?p[5]/100:null])}],{dual:true,rightUnit:'收益率% / 利差百分点'});};
+    root.FundMarketComparison.mount(host.querySelector('[data-market-comparison]'));
+    host.querySelector('[data-market-range]').addEventListener('change',curves);curves();
     let lastWidth=host.getBoundingClientRect().width;
     if(typeof ResizeObserver==='function')new ResizeObserver(()=>{const width=host.getBoundingClientRect().width;if(width>0&&Math.abs(width-lastWidth)>8){lastWidth=width;curves();}}).observe(host);
   }

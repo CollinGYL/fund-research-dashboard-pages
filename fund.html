@@ -6,14 +6,29 @@
     <meta name="description" content="基金分类详细研究：业绩回撤、资产配置、行业持仓、调仓、相关性与归因。" />
     <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex" />
     <meta name="referrer" content="no-referrer" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; upgrade-insecure-requests" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
     <title>基金详细分析 · 财富产品部-基金研究系统看板</title>
-    <link rel="preconnect" href="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" crossorigin />
-    <link rel="dns-prefetch" href="//fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com" />
     <link rel="stylesheet" href="styles.css?v=0940f9f6514f" />
     <link rel="stylesheet" href="pure-bond-reference.css?v=c88ab8454792" />
+    <link rel="stylesheet" href="review.css?v=f1d378a18a93" />
+    <script src="review-core.js?v=eb0f5ca56ecb" defer></script>
+    <link rel="stylesheet" href="fund-lifecycle.css?v=0650bd1ceefa">
+    <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_lifecycle_overlay.js" defer></script>
+    <script src="fund-lifecycle.js?v=c1de46aa7b42" defer></script>
+    <link rel="stylesheet" href="bond-cb-fusion.css?v=4ccac0c74680">
+    <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_fusion_index.js" defer></script>
+    <script src="bond-cb-fusion.js?v=bf411b303e40" defer></script>
+    <script src="bond-equity-fusion.js?v=1c9db28e374d" defer></script>
+    <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_market_index.js" defer></script>
+    <script src="bond-market-fusion.js?v=532821f5eed9" defer></script>
+      <link rel="stylesheet" href="warm-ui-repair.css?v=23ad8276b80d">
+      <link rel="stylesheet" href="demo-theme.css?v=c22207d629e7">
+      <link rel="stylesheet" href="desktop-detail.css?v=efe646dce1de">
+    <link rel="stylesheet" href="ui-integration.css?v=fb308c4e90c3">
+    <link rel="stylesheet" href="bond-complete.css?v=b28f2748bae8">
+    <link rel="stylesheet" href="site-integration.css?v=688506fd5117">
   </head>
-  <body class="workbench blue-workbench">
+  <body class="workbench warm-workbench desktop-detail">
     <header class="site-header">
       <a class="brand" href="index.html" aria-label="返回研究库首页">
         <span class="brand-mark">研</span>
@@ -23,22 +38,20 @@
         </span>
       </a>
       <nav aria-label="详情页导航">
-        <a href="bond-research.html">债基完整研究</a>
-        <a href="index.html#samples">返回基金列表</a>
-        <a href="index.html#notes">数据说明</a>
+        <a id="detail-return-list" href="index.html#samples">返回基金列表</a>
       </nav>
     </header>
 
     <aside class="research-sidebar detail-sidebar" aria-label="研究目录">
       <p class="sidebar-label">研究目录</p>
       <nav class="sidebar-links" aria-label="基金分类研究目录">
-        <a href="index.html?category=all#samples">全部基金</a>
-        <a href="index.html?category=active-equity#samples">主观权益基金</a>
-        <a href="index.html?category=pure-bond#bond-market-overview">纯债基金</a>
-        <a href="index.html?category=hybrid-bond#samples">一级债基/二级债基</a>
-        <a href="index.html?category=convertible-bond#samples">转债基金</a>
+        <a data-category-link="all" href="index.html?category=all&amp;view=portfolio&amp;navDate=latest#samples">基金总览</a>
+        <a data-category-link="active-equity" href="index.html?category=active-equity&amp;view=portfolio&amp;navDate=latest#samples">主动权益基金</a>
+        <a data-category-link="index-enhanced" href="index.html?category=index-enhanced&amp;view=portfolio&amp;navDate=latest#samples">指数增强基金</a>
+        <a data-category-link="pure-bond" href="index.html?category=pure-bond&amp;view=portfolio&amp;navDate=latest#samples">纯债基金</a>
+        <a data-category-link="hybrid-bond" href="index.html?category=hybrid-bond&amp;view=portfolio&amp;navDate=latest#samples">混合债基</a>
+        <a data-category-link="convertible-bond" href="index.html?category=convertible-bond&amp;view=portfolio&amp;navDate=latest#samples">转债基金</a>
       </nav>
-      <div class="sidebar-note"><span class="sidebar-note-mark" aria-hidden="true"></span><strong>基金详细研究</strong><p>净值、披露与模型<br>使用各自可得日期。</p><a href="index.html#notes">数据说明 ↗</a></div>
     </aside>
 
     <main id="fund-page" class="fund-page section-shell" aria-live="polite">
@@ -47,12 +60,17 @@
 
     <footer>
       <p>财富产品部-基金研究系统看板 · 基金详细分析</p>
-      <p><a href="index.html#samples">返回基金列表</a></p>
     </footer>
 
     <div id="tt" class="tooltip" aria-hidden="true"></div>
-    <script src="pure-bond-reference.js?v=2fb8e9942d5c" defer></script>
-    <script src="research-core.js?v=7c8c4039b06f" defer></script>
-    <script src="fund.js?v=74be1abc1838" defer></script>
-  </body>
+    <script src="pure-bond-reference.js?v=83d00d491dd3" defer></script>
+    <script src="research-core.js?v=6fb132095e30" defer></script>
+    <script src="warm-performance.js?v=69103e6a4c72" defer></script>
+    <script src="fund.js?v=f637959e05c9" defer></script>
+    <script src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_complete_index.js" defer></script>
+    <script src="bond-complete.js?v=8c00170af065" defer></script>
+    <script src="desktop-detail.js?v=df02349cbb9a" defer></script>
+  <script src="site-integration.js?v=566b3e2dd4f3" defer></script>
+<script src="profile-integration.js?v=9de56d3b5560" defer></script>
+</body>
 </html>

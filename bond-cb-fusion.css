@@ -1,0 +1,16 @@
+.fusion-date-strip{display:flex;flex-wrap:wrap;gap:7px 20px;padding:10px 0;margin:0 0 14px;border-bottom:1px solid #ddd7cd;color:#64727b;font-size:12px;line-height:1.7}
+.fusion-section{min-width:0;margin-bottom:16px}.fusion-section .subpanel-heading{margin-bottom:12px}.fusion-section details{margin:12px 0}.fusion-section summary{cursor:pointer;color:#713d36}
+.fusion-control{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;margin-bottom:12px}.fusion-control select{font:inherit;color:#344d60;background:#fff;border:1px solid #c9c1b5;padding:7px 10px;max-width:100%}
+.fusion-table-wrap{max-width:100%;overflow:auto}.fusion-table-wrap table{font-variant-numeric:tabular-nums}.fusion-duration{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.fusion-duration strong{font-size:25px;color:#793d36}.fusion-duration span{font-size:12px;color:#64727b}
+.fusion-section .mini-line-chart{max-height:300px}.fusion-section .method-note{font-size:12px;line-height:1.7}
+@media(max-width:760px){.fusion-section{padding:14px}.fusion-control select{width:100%}.fusion-date-strip{gap:5px 10px}.fusion-duration strong{font-size:22px}}
+
+/* The shared table renderer emits separate closed/open labels. */
+.fusion-section .research-table-more .table-more-open{display:none}
+.fusion-section .research-table-more[open] .table-more-closed{display:none}
+.fusion-section .research-table-more[open] .table-more-open{display:inline}
+/* Equity disclosures share the site cards, tables and heatmaps. */
+.equity-source{padding:12px 0;font-size:12px;line-height:1.7;color:#526777}.equity-source summary,.fusion-archive>summary{cursor:pointer;color:#7e343b;font-weight:600}.fusion-archive{padding:14px 0}.fusion-archive[open]>summary{margin-bottom:16px}.fusion-section .research-metric-grid{margin:10px 0}.fusion-section .research-metric{min-width:0}.fusion-section .research-table small{display:block;white-space:normal;margin-top:3px;font-size:11px;color:#64727b}
+@media(max-width:760px){.fusion-section .research-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.equity-source .fusion-table-wrap{max-width:100%}}
+
+body.workbench.warm-workbench .fusion-section .research-metric-grid.metric-two{grid-template-columns:repeat(2,minmax(0,1fr))}

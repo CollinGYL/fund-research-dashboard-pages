@@ -1,56 +1,36 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-27T09:15:25+08:00",
+  "generatedAt": "2026-10-29T10:16:59+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
-    "index.html": {
-      "size": 9215,
-      "sha256": "c0fe7aa57500089c9d384dd6dfa30616dc1f467af633ecdd6b6a4818b4348f88"
-    },
-    "fund.html": {
-      "size": 3362,
-      "sha256": "ff02c04d445ab15792e856bd21076add1b66f7a7e6a788a0634e83bea121558c"
-    },
-    "styles.css": {
-      "size": 226891,
-      "sha256": "0940f9f6514f72dd35ebe9963636574c01c55258e1e7cf7fed5e82ca682a83ab"
-    },
-    "pure-bond-reference.css": {
-      "size": 22114,
-      "sha256": "c88ab8454792d1365e868e4aafbc101d7114ac495360a8bb24816809e96813a3"
-    },
     "app.js": {
-      "size": 84397,
-      "sha256": "df818e7e65121002352372f2ed10d0ccf83595bea63122868859baa034ea88ba"
+      "size": 99265,
+      "sha256": "e1a8bdf12f7184e58f2d14b17c1f115e593b50bacd0cf40bad7e26e8ca49c9c2"
     },
-    "pure-bond-reference.js": {
-      "size": 114155,
-      "sha256": "2fb8e9942d5cf65617c5a3cb2c2a9cad242e2c56ab31ba36a5e65d5bb7481af8"
+    "bond-cb-fusion.css": {
+      "size": 2251,
+      "sha256": "4ccac0c74680afeae2f9634575105777513e2e9d7d01034c589f8df796c865ff"
     },
-    "fund.js": {
-      "size": 594431,
-      "sha256": "74be1abc183837da22e1b916ddd08919bc0d0523a2d0ec49eecd3dd162ee50a8"
+    "bond-cb-fusion.js": {
+      "size": 18356,
+      "sha256": "bf411b303e40434e3f91544c893ea2d53efd7500004981fea5e7a84667ccbef7"
     },
-    "research-core.js": {
-      "size": 12143,
-      "sha256": "7c8c4039b06f384a3bc949304b687dba3311370bf8d2ae64d2498f7de5bd6f41"
+    "bond-complete.css": {
+      "size": 1845,
+      "sha256": "b28f2748bae80bd3d99f1987acb9ffe4127d9eb3a4f11428ce75a4b1285d8da9"
     },
-    "robots.txt": {
-      "size": 26,
-      "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
+    "bond-complete.js": {
+      "size": 19029,
+      "sha256": "8c00170af0658be24f157865abad629044d60c4fe67a11149cd5c2f9fd8848d7"
     },
-    "bond-research.html": {
-      "size": 6178,
-      "sha256": "7a0d24de822a2de4fb7391a52fa8da71a9a9fb46a732221df689f944e7a12a07"
+    "bond-equity-fusion.js": {
+      "size": 20222,
+      "sha256": "1c9db28e374dd78c4f9474a378bcd9e658ae835245d89fb02bedd35385003634"
     },
-    "bond-original-single.html": {
-      "size": 729065,
-      "sha256": "71208bfaa8b9cf76172410d3f1f50a5eef6046add9dd47f26aac091c049d6df6"
-    },
-    "bond-original-hybrid.html": {
-      "size": 2828734,
-      "sha256": "e6a5f95c21fe366008f93569fb599614b61ca5b0d2c82aba180b66ff679d1b70"
+    "bond-lab-factors.html": {
+      "size": 44263,
+      "sha256": "dd681f0c69be574a872bce452a93dcc9bed1e6e2c473641346b9042fed4506e9"
     },
     "bond-lab-history.html": {
       "size": 4976059,
@@ -64,24 +44,183 @@
       "size": 52374,
       "sha256": "f1f3dcdc54fbfd005a4e302927b27a880703d9b7ec709ac7c08cf032398c1ef8"
     },
-    "bond-lab-factors.html": {
-      "size": 44263,
-      "sha256": "dd681f0c69be574a872bce452a93dcc9bed1e6e2c473641346b9042fed4506e9"
+    "bond-market-comparison.css": {
+      "size": 5453,
+      "sha256": "89bbb2816ab8a902163a9d8fe1b25d99aedce161726c168bb36fa86b9818c522"
+    },
+    "bond-market-comparison.js": {
+      "size": 15581,
+      "sha256": "1988206a24e71f6b1b065a8d2d38471fa0ea9dc277d85a46a990b48e26910d2b"
+    },
+    "bond-market-fusion.js": {
+      "size": 5805,
+      "sha256": "532821f5eed9307825aba2efdfb1a02a9dc046e380ef7bfa1e057a3630b683fa"
+    },
+    "bond-methodology.html": {
+      "size": 39804,
+      "sha256": "6e3ef82465285a0bb5e8a9bef789a584de30fd6bf73bbb8d38b5545bb0f04392"
+    },
+    "bond-original-hybrid.html": {
+      "size": 2828734,
+      "sha256": "e6a5f95c21fe366008f93569fb599614b61ca5b0d2c82aba180b66ff679d1b70"
+    },
+    "bond-original-single.html": {
+      "size": 729080,
+      "sha256": "cd3b04bb2ad1598e033434f2adcec3e31c34ceff73a8ff8137a8fcfde93c43fe"
+    },
+    "bond-research.html": {
+      "size": 6193,
+      "sha256": "930b53eac45753b58f5bd1226381976291ec32cd0011feb51a5b98b5dd343d9a"
+    },
+    "changes.html": {
+      "size": 1320,
+      "sha256": "d89796b535ee0aac5a3d22b2d76e91e900eb8b8b6ee5e5fbacadcd7b2a65d537"
+    },
+    "compare.html": {
+      "size": 4956,
+      "sha256": "3a17b140d653ca4bf592282f958018315442de21a24c25792b1e20b0eafc3f8f"
+    },
+    "compare.js": {
+      "size": 6781,
+      "sha256": "79d3c173c996a42f8b3b89133ca1fb981ed6a535eae16d24167fef49ffa9d4df"
+    },
+    "demo-theme.css": {
+      "size": 8000,
+      "sha256": "c22207d629e77179d4359c798acdaeacceee8edee225af2ab5d806be1cf4ccf8"
+    },
+    "desktop-detail.css": {
+      "size": 4510,
+      "sha256": "efe646dce1de61265d00fe2377ce5dc05b74e12a98ef21fa0a9df9beb2c4f667"
+    },
+    "desktop-detail.js": {
+      "size": 6610,
+      "sha256": "df02349cbb9aeec1a2ba905108b71281b2a0cde3814f1d2aea306727a8ba58bf"
+    },
+    "desktop-home.css": {
+      "size": 15228,
+      "sha256": "7a764b4f1082dbc2513b8a4b1aa2aa86801ade7a00f45579057b68dd5cda84ce"
+    },
+    "desktop-home.js": {
+      "size": 4776,
+      "sha256": "d07f111b7579c3bbb9dc647487d900029bad13c2ab257d2e7c53144a8ebe94a2"
+    },
+    "desktop-nav.js": {
+      "size": 11139,
+      "sha256": "9bf2f577b735847495c4cbd85adcd99a1b013d1c907b3137cb9f9aa0647712aa"
+    },
+    "fund-lifecycle.css": {
+      "size": 880,
+      "sha256": "0650bd1ceefaa30de8f1fae939bbf5acb1d0c62c69dca153bb3c52de95f3ced8"
+    },
+    "fund-lifecycle.js": {
+      "size": 7002,
+      "sha256": "c1de46aa7b42192f91eddd1ea6e0b741132acd837597783dfa5cbeb807106d9d"
+    },
+    "fund.html": {
+      "size": 5096,
+      "sha256": "4e3dc99eacf0aede92084de559d9eefa21789a4e6c335f507bec9f8c7894b79b"
+    },
+    "fund.js": {
+      "size": 603907,
+      "sha256": "f637959e05c99bc1206bddfffdca3be5624fa9a5c0812a9da779d19369d4ad5c"
+    },
+    "index.html": {
+      "size": 14701,
+      "sha256": "41764022ec1d51d75139f13c2863d27164ba9dd46f5ce1e0b25e25839669c49e"
+    },
+    "industry-bars.js": {
+      "size": 6987,
+      "sha256": "1cf79a3891c2f02ace1faa567e9c8ecc48fa3bbc102f4087a2ee92d34c7c3536"
+    },
+    "integration-bootstrap.js": {
+      "size": 1673,
+      "sha256": "d3f12a2ff8fe99d2ba1e6239d85312fd0eac64b1edce5d1abbceb463ad672935"
+    },
+    "profile-integration.js": {
+      "size": 5959,
+      "sha256": "9de56d3b5560d81a588d0224d2dfd3590bafbe2c5c38061bd661f6d48145acb7"
+    },
+    "pure-bond-reference.css": {
+      "size": 22114,
+      "sha256": "c88ab8454792d1365e868e4aafbc101d7114ac495360a8bb24816809e96813a3"
+    },
+    "pure-bond-reference.js": {
+      "size": 114212,
+      "sha256": "83d00d491dd327d7fc5aa72e023ec7b0338b3ff3f7f006e8a3b87a7d2c6f3c08"
+    },
+    "research-core.js": {
+      "size": 11486,
+      "sha256": "6fb132095e303f5eb3f500b1e3c42b6bceea9ed807784b1329e6d607761528c3"
+    },
+    "review-core.js": {
+      "size": 3797,
+      "sha256": "eb0f5ca56ecb3c0d9fff3db5e1f033a95a736837e4837bf5a2ca27af9496c054"
+    },
+    "review.css": {
+      "size": 30181,
+      "sha256": "f1d378a18a939cf343f6b3dd5642b4dc6eb7041f2ae58e6a1a9e5665701dc814"
+    },
+    "robots.txt": {
+      "size": 26,
+      "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
+    },
+    "site-integration.css": {
+      "size": 4060,
+      "sha256": "688506fd5117dad8f9f26554d9785862db339e2f4e96623cbf55f473cef3410a"
+    },
+    "site-integration.js": {
+      "size": 6977,
+      "sha256": "566b3e2dd4f3e1daba2a7be44a7874b6fc1c80a609ab9bc81f6ffe48302b756e"
+    },
+    "styles.css": {
+      "size": 226891,
+      "sha256": "0940f9f6514f72dd35ebe9963636574c01c55258e1e7cf7fed5e82ca682a83ab"
+    },
+    "ui-integration.css": {
+      "size": 7943,
+      "sha256": "fb308c4e90c397de37a9b6e051f4a28642b4090212e470b03c6cd580dee42af4"
+    },
+    "warm-performance.js": {
+      "size": 10806,
+      "sha256": "69103e6a4c72ad2edf27539d18f263e7ec979e4145b6a2418483d93c5e4672a6"
+    },
+    "warm-ui-repair.css": {
+      "size": 9711,
+      "sha256": "23ad8276b80d91a0486a2ac6d3a1cc78dc95514602e0c179f713fbf7732a8210"
     }
   },
   "pathReplacements": {
-    "index.html": 0,
-    "fund.html": 0,
     "app.js": 6,
-    "pure-bond-reference.js": 5,
-    "fund.js": 20,
-    "research-core.js": 1,
-    "bond-research.html": 0,
-    "bond-original-single.html": 0,
-    "bond-original-hybrid.html": 0,
+    "bond-cb-fusion.js": 1,
+    "bond-complete.js": 1,
+    "bond-equity-fusion.js": 1,
+    "bond-lab-factors.html": 0,
     "bond-lab-history.html": 0,
     "bond-lab-pit.html": 0,
     "bond-lab-threshold.html": 0,
-    "bond-lab-factors.html": 0
+    "bond-market-comparison.js": 1,
+    "bond-market-fusion.js": 1,
+    "bond-methodology.html": 0,
+    "bond-original-hybrid.html": 0,
+    "bond-original-single.html": 0,
+    "bond-research.html": 0,
+    "changes.html": 0,
+    "compare.html": 1,
+    "compare.js": 1,
+    "desktop-detail.js": 0,
+    "desktop-home.js": 0,
+    "desktop-nav.js": 3,
+    "fund-lifecycle.js": 1,
+    "fund.html": 4,
+    "fund.js": 21,
+    "index.html": 0,
+    "industry-bars.js": 1,
+    "integration-bootstrap.js": 1,
+    "profile-integration.js": 1,
+    "pure-bond-reference.js": 5,
+    "research-core.js": 1,
+    "review-core.js": 0,
+    "site-integration.js": 0,
+    "warm-performance.js": 1
   }
 }

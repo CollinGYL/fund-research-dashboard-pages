@@ -166,7 +166,8 @@ function safeDocumentUrl(value) {
 function pct(value, digits = 1, signed = false) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
   const number = Number(value) * 100;
-  return `${signed && number > 0 ? "+" : ""}${number.toFixed(digits)}%`;
+  const rounded=Number(number.toFixed(digits));
+  return rounded===0?"0%":`${signed && rounded > 0 ? "+" : ""}${rounded.toFixed(digits)}%`;
 }
 
 function num(value, digits = 1) {
@@ -250,7 +251,7 @@ function renderActiveEquityProfilePanel(fund) {
   const formatRaw = (value) => value !== null && value !== undefined && isFiniteValue(value) ? pct(Number(value), 1) : "—";
   return `<div class="panel-intro"><div><p class="eyebrow">POINT-IN-TIME PROFILE</p><h2>当前管理结构画像</h2></div><p>只使用当时已公开的半年报/年报完整持仓，对当前管理结构单独累积；经理加入或离任后重新冷启动。</p></div>
     <div class="active-profile-summary">
-      <article class="subpanel"><div class="subpanel-heading"><div><h3>行为分位</h3><span>主观权益当前可用画像横截面</span></div></div>
+      <article class="subpanel"><div class="subpanel-heading"><div><h3>行为分位</h3><span>主动权益当前可用画像横截面</span></div></div>
         ${activeProfilePercentileRow("调仓活跃度", groups.turnover_activity, percentiles.turnover_activity, formatRaw(values.turnover_activity), "最近完成区间相对价格自然漂移的持仓half-L1；是调仓代理，不是官方换手率。")}
         ${activeProfilePercentileRow("持仓集中度", groups.concentration, percentiles.concentration, formatRaw(values.concentration), "最新完整披露前十大A股占已披露A股权益的比例。")}
         ${activeProfilePercentileRow("持股延续性", groups.holding_persistence, percentiles.holding_persistence, formatRaw(values.holding_persistence), "上期净值权重不低于0.1%的A股在下期仍持有的比例。")}
@@ -259,7 +260,7 @@ function renderActiveEquityProfilePanel(fund) {
       <aside class="active-profile-status"><span>PROFILE RELIABILITY</span><strong>${status}</strong><p>当前结构：${escapeHTML((profile.manager_names || []).join("、") || "—")}<br>起始：${escapeHTML(profile.regime_start || "—")}<br>完整披露：${profile.full_disclosure_count || 0}期<br>合格转移：${profile.completed_transition_count || 0}个<br>画像可得：${escapeHTML(profile.profile_as_of || "—")}</p></aside>
     </div>
     <article class="subpanel"><div class="subpanel-heading"><div><h3>历史行业偏好</h3><span>当前管理结构内的长期平均持仓权重</span></div></div><ul class="active-profile-industry-list">${industries.length ? industries.map((item) => `<li>${escapeHTML(item.name)}<b>${pct(item.weight, 1)}</b></li>`).join("") : "<li>待积累</li>"}</ul><p class="method-note">行业偏好是历史持仓描述，不表示相对同类超配，也不预测下一期必然买入。</p></article>
-    <div class="calibration-note"><strong>解读边界</strong><p>分位是当前主观权益可用画像的横截面相对位置，不是评级或综合得分；不同维度的预测力不同，调仓活跃度的历史稳定性较强，集中度和行业偏好主要作描述性画像。</p></div>`;
+    <div class="calibration-note"><strong>解读边界</strong><p>分位是当前主动权益可用画像的横截面相对位置，不是评级或综合得分；不同维度的预测力不同，调仓活跃度的历史稳定性较强，集中度和行业偏好主要作描述性画像。</p></div>`;
 }
 
 function loadProfileDetails(code) {
@@ -271,16 +272,16 @@ function loadProfileDetails(code) {
     const value=window.FUND_PROFILE_DETAILS[code];
     if (value.code!==code || typeof value.status!=="string") throw new Error("画像文件格式异常，请重试");
     return value;
-  }, "画像档案未取得：文件可能尚未发布，或网络读取失败。现有画像主要覆盖主观权益产品；未覆盖不代表没有持仓。可重试，暂不判定画像是否相似", {timeoutMs:10000,maxAttempts:1}).catch(error => { profileDetailPromises.delete(code); throw error; });
+  }, "画像档案未取得：文件可能尚未发布，或网络读取失败。现有画像主要覆盖主动权益产品；未覆盖不代表没有持仓。可重试，暂不判定画像是否相似", {timeoutMs:10000,maxAttempts:1}).catch(error => { profileDetailPromises.delete(code); throw error; });
   profileDetailPromises.set(code, promise);
   return promise;
 }
 
 function disclosedProfileDimensions() {
   return [
-    ["log_cap", "股票市值", "偏小盘", "偏大盘"],
-    ["log_pb", "估值 PB", "偏低估值", "偏高估值"],
-    ["roe", "盈利 ROE", "较低", "较高"],
+    ["log_cap", "持仓公司市值", "偏小盘", "偏大盘"],
+    ["log_pb", "市净率", "偏低估值", "偏高估值"],
+    ["roe", "持仓公司净资产收益率", "较低", "较高"],
     ["activity", "调仓活跃度", "较低", "较高"],
     ["concentration", "持仓集中度", "较分散", "较集中"],
     ["persistence", "持股延续性", "较低", "较高"],
@@ -299,23 +300,25 @@ function renderDisclosedPercentiles(r) {
     const available = Number.isFinite(value) && value >= 0 && value <= 1;
     return `<div class="profile-percentile-row"><div class="profile-percentile-heading"><span>${label}</span><strong>${available ? `第${Math.round(value * 100)}百分位` : "暂不可比"}</strong></div>${available ? `<div class="profile-percentile-track" role="img" aria-label="${label}，第${Math.round(value * 100)}百分位"><i style="left:${(value * 100).toFixed(2)}%"></i></div><div class="profile-percentile-scale"><span>${low}</span><span>中位</span><span>${high}</span></div>` : '<p class="method-note">可比条件或有效样本不足，不以零分位代替。</p>'}</div>`;
   }).join("")}</div>`;
-  return `<article class="subpanel profile-percentiles"><div class="subpanel-heading"><div><h3>画像分位 · 在可比基金中的位置</h3><span>股票风格与投资行为分开看，不合成为总分</span></div></div><div class="profile-percentile-grid">${group("股票风格", dimensions.slice(0, 3))}${group("投资行为", dimensions.slice(3))}</div><p class="method-note">分位基于${escapeHTML(r.report_date)}同报告期、满足画像可比条件的主观权益产品，A/C份额合并；行为使用截至该期最近有效区间。分位越高只表示该特征越突出，不代表基金越好。PB是估值维度，不能直接当作成长性。</p></article>`;
+  return `<article class="subpanel profile-percentiles"><div class="subpanel-heading"><div><h3>画像分位 · 在可比基金中的位置</h3><span>股票风格与投资行为分开看，不合成为总分</span></div></div><div class="profile-percentile-grid">${group("股票风格", dimensions.slice(0, 3))}${group("组合结构与调整", dimensions.slice(3))}</div><p class="method-note">分位基于${escapeHTML(r.report_date)}同报告期、满足画像可比条件的主动权益产品，A/C份额合并；行为使用截至该期最近有效区间。分位越高只表示该特征越突出，不代表基金越好。PB是估值维度，不能直接当作成长性。</p></article>`;
 }
 
 // One pair drives the profile explanation, NAV chart and return statistics.
 function profilePairCandidates(r) {
   const w = r.windows?.[selectedProfileWindow(r)] || r;
   const data = window.FUND_CORRELATION_METRICS?.funds?.[r.code];
+  if (!FundLifecycle.currentCompareEligible(r)) return [];
   const all = [...(w.peers || []), ...(data?.peers || []), ...Object.values(data?.windows || {}).flatMap(x => x.peers || [])];
-  return [...new Map(all.filter(x => /^\d{6}\.(?:OF|SH|SZ)$/.test(x.code) && x.code !== r.code).map(x => [x.code, x])).values()];
+  return [...new Map(all.filter(x => FundLifecycle.currentCompareEligible(x.code) && /^\d{6}\.(?:OF|SH|SZ)$/.test(x.code) && x.code !== r.code).map(x => [x.code, x])).values()];
 }
 
 function profilePeerCards(peers, key = '') {
   const distance = v => Number.isFinite(v) ? v.toFixed(3) : '未使用';
-  return `<ul class="profile-peer-list profile-pair-candidates">${peers.map((x, i) => `<li class="profile-peer-card"><div class="profile-peer-identity"><span>画像候选 ${i + 1}</span><a href="fund.html?code=${encodeURIComponent(x.code)}&tab=profile${key ? `&profileWindow=${encodeURIComponent(key)}` : ''}">${escapeHTML(x.name)}</a><span>${escapeHTML(x.code)}</span></div><dl class="profile-peer-distances">${[['画像差异',x.distance],['行业',x.industry_distance],['股票风格',x.style_distance],['投资行为',x.behavior_distance]].map(([label,value])=>`<div><dt>${label}</dt><dd>${distance(value)}</dd></div>`).join('')}</dl><button type="button" class="profile-pair-button" data-peer-compare="${escapeHTML(x.code)}" aria-pressed="false">对比画像与净值</button></li>`).join('')}</ul>`;
+  return `<ul class="profile-peer-list profile-pair-candidates">${peers.map((x, i) => `<li class="profile-peer-card"><div class="profile-peer-identity"><span>${x.behavior_distance==null?"行业与股票特征对照":"三组画像对照"}</span><a href="fund.html?code=${encodeURIComponent(x.code)}&tab=profile${key ? `&profileWindow=${encodeURIComponent(key)}` : ''}">${escapeHTML(x.name)}</a><span>${escapeHTML(x.code)}</span></div><details class="profile-distance-method"><summary>计算依据 · ${x.behavior_distance==null?"行业2/3＋股票特征1/3":"行业50%＋股票特征25%＋结构调整25%"}</summary><dl class="profile-peer-distances">${[['画像差异',x.distance],['行业',x.industry_distance],['股票风格',x.style_distance],['组合结构与调整',x.behavior_distance]].map(([label,value])=>`<div><dt>${label}</dt><dd>${distance(value)}</dd></div>`).join('')}</dl></details><button type="button" class="profile-pair-button" data-peer-compare="${escapeHTML(x.code)}" aria-pressed="false">对比画像与净值</button></li>`).join('')}</ul>`;
 }
 
 function profilePairShell(r) {
+  if (!FundLifecycle.currentCompareEligible(r)) return '<p class="lifecycle-current-block">该组合已退出当前对比，历史净值可从页面上方的历史对比入口查看。</p>';
   if (!profilePairCandidates(r).length) return '';
   return `<section class="profile-pair-shell" data-profile-pair="${escapeHTML(r.code)}" aria-label="两只基金联动对比"><div class="subpanel-heading"><div><h3>同一对基金，一起看画像与净值</h3><span>选择上方候选或下方相关性榜单中的“画像与净值对比”</span></div><label class="history-window-label">净值区间 <select data-pair-window aria-label="两只基金净值对比区间">${[['1m','近1月'],['3m','近3月'],['6m','近6月'],['ytd','今年以来'],['1y','近1年'],['3y','近3年'],['5y','近5年'],['all','共同历史']].map(([key,label])=>`<option value="${key}">${label}</option>`).join('')}</select></label></div><div data-pair-output aria-live="polite"><p class="empty-copy">选择基金后加载两只基金的净值。</p></div></section>`;
 }
@@ -457,11 +460,17 @@ function renderProfilePairResult(r, peer, result) {
   if (!result.points.length) return heading + distance + `<p class="empty-copy">${escapeHTML(result.reason)}</p>`;
   const corr = Number.isFinite(result.correlation) ? result.correlation.toFixed(3) : '暂不可算';
   const corrHint = result.reason || '越接近 +1，历史涨跌越同步；接近0表示线性联动弱，接近 −1表示反向。';
-  return `${heading}${distance}<div class="profile-pair-metrics">${metric('日收益相关系数',corr,corrHint)}${metric(`${r.name} · 区间收益`,pct(result.leftReturn,2,true))}${metric(`${peer.name} · 区间收益`,pct(result.rightReturn,2,true))}${metric('区间收益差（百分点）',`${((result.leftReturn-result.rightReturn)*100).toFixed(2)}`,'本基金减对比基金，不是相关性')}</div><p class="profile-pair-dates">共同区间 ${escapeHTML(result.start)} 至 ${escapeHTML(result.end)} · ${result.points.length}个共同净值日 / ${result.observations}个同起止收益区间 · 起点均归一为1</p>${renderMiniLineChart(result.points,[{key:'fund',label:r.name,color:'#176bcb',format:'number'},{key:'peer',label:peer.name,color:'#b97b28',format:'number'}],'两只基金的复权净值对比，起点为1')}<details class="profile-pair-method"><summary>数据日期与计算口径</summary><p class="method-note">净值最新日：本基金 ${escapeHTML(result.leftLatest)}，对比基金 ${escapeHTML(result.rightLatest)}。图表与收益统计使用共同日期，起点取窗口边界当日或此前最近共同净值；今年以来从上一年末起算。不补齐缺失值，实际覆盖可能因成立时间而缩短。相关系数基于复权净值收益，按两端日期完全相同的区间配对，不使用净值水平计算；至少12个样本。与下方长期榜单的月收益口径不同。</p></details>`;
+  return `${heading}${distance}<div class="profile-pair-metrics">${metric('日收益相关系数',corr,corrHint)}${metric(`${r.name} · 区间收益`,pct(result.leftReturn,2,true))}${metric(`${peer.name} · 区间收益`,pct(result.rightReturn,2,true))}${metric('区间收益差（百分点）',`${((result.leftReturn-result.rightReturn)*100).toFixed(2)}`,'本基金累计收益减对比基金累计收益')}</div><p class="profile-pair-dates">共同区间 ${escapeHTML(result.start)} 至 ${escapeHTML(result.end)} · ${result.points.length}个共同净值日 / ${result.observations}个同起止收益区间 · 起点均归一为1</p>${renderMiniLineChart(result.points,[{key:'fund',label:r.name,color:'#176bcb',format:'number'},{key:'peer',label:peer.name,color:'#b97b28',format:'number'}],'两只基金的复权净值对比，起点为1')}<details class="profile-pair-method"><summary>数据日期与计算口径</summary><p class="method-note">净值最新日：本基金 ${escapeHTML(result.leftLatest)}，对比基金 ${escapeHTML(result.rightLatest)}。图表与收益统计使用共同日期，起点取窗口边界当日或此前最近共同净值；今年以来从上一年末起算。不补齐缺失值，实际覆盖可能因成立时间而缩短。相关系数基于复权净值收益，按两端日期完全相同的区间配对，不使用净值水平计算；至少12个样本。与下方长期榜单的月收益口径不同。</p></details>`;
 }
 
 async function updateProfilePair(fund, requestedCode, requestedWindow) {
   const panel = page.querySelector('[data-panel="correlation"]');
+  const requested = requestedCode || new URLSearchParams(location.search).get('compare');
+  if (!FundLifecycle.currentCompareEligible(fund) || requested && !FundLifecycle.currentCompareEligible(requested)) {
+    if (panel && !panel.querySelector('[data-current-pair-blocked]')) panel.insertAdjacentHTML('afterbegin', `<p class="lifecycle-current-block" data-current-pair-blocked>所选组合已退出当前基金对比。<a href="compare.html?mode=history&codes=${encodeURIComponent([fund.code,requested].filter(Boolean).join(','))}">查看历史净值对比</a></p>`);
+    return;
+  }
+  panel?.querySelector('[data-current-pair-blocked]')?.remove();
   const shell = panel?.querySelector('[data-profile-pair]');
   if (!shell) return;
   const r = window.FUND_PROFILE_DETAILS?.[fund.code] || fund;
@@ -522,7 +531,7 @@ function renderProfilePeers(r, errorMessage = "") {
   if (r?.windows) return renderWindowProfilePeers(r, selectedProfileWindow(r), true);
   const heading = '<div class="subpanel-heading"><div><h3>画像相似基金</h3><span>行业配置、股票风格与投资行为相近，不等同净值走势相关</span></div></div>';
   if (!r || r.status !== "available") return `<article class="subpanel profile-peers">${heading}<p class="empty-copy">${escapeHTML(errorMessage || "暂无可用的完整披露画像，暂不生成相似基金。")}</p></article>`;
-  const peers = r.peers || [];
+  const peers = FundLifecycle.currentCompareEligible(r) ? (r.peers || []).filter(x => FundLifecycle.currentCompareEligible(x.code)) : [];
   const distance = value => Number.isFinite(value) ? value.toFixed(3) : "—";
   const cards = profilePeerCards(peers);
   const dimensions = disclosedProfileDimensions();
@@ -541,7 +550,7 @@ function renderDisclosedProfile(r, evidenceOnly = false) {
   const rows = (body) => `<div class="table-scroll"><table class="profile-evidence-table">${body}</table></div>`;
   const style = rows(`<thead><tr><th>持仓加权中位数</th><th>本期</th><th>上期同结构</th><th>有效A股权重覆盖</th></tr></thead><tbody>${specs.map(([key,label,unit])=>{const f=r.style.fields[key];const before=r.previous_style?.fields?.[key];return `<tr><th scope="row">${label}</th><td>${n(f.value)}${f.value==null?"":unit}</td><td>${before?.value==null?"—":n(before.value)+unit}</td><td>${p(f.valid_weight_coverage)}</td></tr>`}).join("")}</tbody>`);
   const history = rows(`<thead><tr><th>指标</th><th>最近有效值</th><th>对应报告期</th><th>此前任期中位数</th><th>历史样本</th></tr></thead><tbody>${behavior.map(([key,label])=>{const h=r.historical_behavior[key];const date=key==="concentration"?r.report_date:(r.behavior_report_dates?.[key]||r.behavior_report_date);return `<tr><th scope="row">${label}</th><td>${p(r.behavior[key])}</td><td>${escapeHTML(Number.isFinite(r.behavior[key])?(date||"暂无"):"—")}</td><td>${p(h.median)}</td><td>${h.n}期</td></tr>`}).join("")}</tbody>`);
-  const industries = r.top_industries.map(([label,value])=>`<div class="profile-industry-row"><span>${escapeHTML(label)}</span><div class="profile-weight-track"><i style="width:${Math.max(0,Math.min(100,value*100))}%"></i></div><strong>${p(value)}</strong></div>`).join("");
+  const industries = r.top_industries.map(([label,value])=>`<div class="profile-industry-row"><span>${escapeHTML(label)}</span><div class="profile-weight-track"><i style="width:${Math.max(0,Math.min(100,value*(r.a_share_nav_weight??0)*100))}%"></i></div><strong>${p(Number.isFinite(r.a_share_nav_weight)?value*r.a_share_nav_weight:null)}</strong></div>`).join("");
   const changes = r.industry_changes?.length ? rows(`<thead><tr><th>行业</th><th>上期</th><th>本期</th><th>变化</th></tr></thead><tbody>${r.industry_changes.map(x=>`<tr><th scope="row">${escapeHTML(x.industry)}</th><td>${p(x.previous)}</td><td>${p(x.current)}</td><td>${x.change>0?"+":""}${(x.change*100).toFixed(1)}个百分点</td></tr>`).join("")}</tbody>`) : '<p class="method-note">暂无可比较的上一期同管理结构完整持仓。</p>';
   const mandate = r.mandate;
   const link = mandate && /^https:\/\//.test(mandate.source_url || "") ? `<a href="${escapeHTML(mandate.source_url)}" target="_blank" rel="noopener noreferrer">查看文件原文（${escapeHTML((mandate.pdf_pages||[]).join("、"))}页）</a>` : "";
@@ -551,7 +560,7 @@ function renderDisclosedProfile(r, evidenceOnly = false) {
     ${r.current_manager_match===false?'<div class="calibration-note"><strong>经理变更或任期待核对</strong><p>下方保留产品已披露持仓；旧经理行为不继承，当前经理画像仍待积累。</p></div>':""}
     ${evidenceOnly ? '' : renderDisclosedPercentiles(r)}
     <div class="profile-detail-grid"><article class="subpanel"><h3>实际股票风格</h3>${style}<p class="method-note">只统计A股，同报告期匹配；低于80%有效覆盖留空。PE/PB只取正值，ROE不等于完整质量评分。增长字段暂无可靠覆盖。</p></article>
-    <article class="subpanel"><h3>本期主要A股行业</h3>${industries}<p class="method-note">占已披露A股权重。A股占基金净资产${p(r.a_share_nav_weight)}；港股占股票资产${p(r.hk_share)}。</p></article></div>
+    <article class="subpanel"><h3>本期主要A股行业 · 占基金净值</h3>${industries}<p class="method-note">占已披露A股权重。A股占基金净资产${p(r.a_share_nav_weight)}；港股占股票资产${p(r.hk_share)}。</p></article></div>
     <article class="subpanel"><h3>近期行为与历史习惯</h3><p class="method-note">最近行为期：${escapeHTML(r.behavior_report_date||"暂无")}；此前历史不含最近一期，仅同连续管理结构比较。集中度的本期值来自${escapeHTML(r.report_date)}。</p>${history}<details><summary>这些指标如何理解</summary><p class="method-note">调仓活跃度是剔除价格漂移后的持仓距离，不是官方换手率；持股延续率衡量上期股票是否继续持有；行业稳定性为1减二级行业主动距离，不是稳定概率。历史中位数是描述性基线，不直接控制模型仓位。</p></details></article>
     <details class="subpanel"><summary>相对上期的行业变化 · ${escapeHTML(r.previous_report_date||"暂无上期")}</summary>${changes}<p class="method-note">披露截面变化包含股价涨跌，不等同主动增减仓，也不能据此识别期内所有交易。</p></details>
     <details class="subpanel"><summary>产品主题与合同依据</summary>${contract}</details>
@@ -570,7 +579,7 @@ function profileWindowControl(r, key) {
 function renderWindowProfilePeers(r, key, selector = false) {
   const w = r.windows[key];
   const distance = v => Number.isFinite(v) ? v.toFixed(3) : '未使用';
-  const peers = w.peers || [];
+  const peers = FundLifecycle.currentCompareEligible(r) ? (w.peers || []).filter(x => FundLifecycle.currentCompareEligible(x.code)) : [];
   return `<article class="subpanel profile-peers" data-window-peers="${escapeHTML(r.code)}"><div class="subpanel-heading"><div><h3>画像相似基金 · ${escapeHTML(w.label)}</h3><span>同实际披露区间、同A/H市场组；不按个股重合排序</span></div>${selector?profileWindowControl(r,key):''}</div>
     <p class="profile-distance-guide"><strong>0.1 该怎么看？</strong>画像差异越低，行业配置、股票风格与投资行为越接近；0表示纳入计算的画像特征无差异。0.1不等于“90%相似”，也没有统一的“很像”分界。结合候选排序，再看下方两只基金是否涨跌同步、收益是否接近。</p>
     ${peers.length?`${profilePeerCards(peers,key)}
@@ -580,7 +589,7 @@ function renderWindowProfilePeers(r, key, selector = false) {
 }
 
 function profileMetricComparison(r, key, metric) {
-  const w = r.windows[key], latest = r.history?.at(-1);
+  const w = r.windows[key], latest = r.history?.filter(p=>w.dates.includes(p.date)).at(-1);
   const source = ({market_cap:'log_cap',pb:'log_pb'})[metric] || metric;
   const behavior = ['activity','persistence','industry_stability'].includes(metric);
   const allowed = p => key !== 'tenure' || !behavior || (r.current_manager_match && w.requested_start && p.transition_start >= w.requested_start);
@@ -623,9 +632,11 @@ function renderHistoricalProfile(r, key) {
       ${current || historical ? `<div class="profile-percentile-track profile-dual-track" role="img" aria-label="${label}：本期${disclosedPercentileLabel(m.currentRank)}，此前平均位置${disclosedPercentileLabel(m.referenceRank)}">${historical?marker(m.referenceRank,'profile-reference-dot'):''}${current?marker(m.currentRank,'profile-current-dot'):''}</div><div class="profile-percentile-scale"><span>${low}</span><span>P50</span><span>${high}</span></div>` : '<div class="profile-axis-empty">暂无可绘制的分位</div>'}
       <div class="profile-reference-value"><span>此前均值 <strong>${format(k,m.referenceValue)}</strong></span><span>历史 ${disclosedPercentileLabel(m.referenceRank)}</span></div><p class="profile-metric-status">${escapeHTML(m.referenceNote)}</p></article>`;
   }).join('');
-  const latest = r.history?.at(-1), reference = (r.history || []).filter(p=>w.dates.includes(p.date) && p.date !== latest?.date);
-  const inds = Object.entries(latest?.industry || {}).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([name,value])=>{
-    const prior = reference.length ? reference.reduce((s,p)=>s+(p.industry[name]||0),0)/reference.length : null;
+  const latest = r.history?.filter(p=>w.dates.includes(p.date)).at(-1), reference = (r.history || []).filter(p=>w.dates.includes(p.date) && p.date !== latest?.date);
+  const inds = Object.entries(latest?.industry || {}).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([name,proportion])=>{
+    const value=Number.isFinite(latest?.a_weight)?proportion*latest.a_weight:null;
+    const validReference=reference.filter(p=>Number.isFinite(p.a_weight));
+    const prior=validReference.length?validReference.reduce((sum,p)=>sum+(p.industry[name]||0)*p.a_weight,0)/validReference.length:null;
     return `<div class="profile-industry-comparison"><div><span>${escapeHTML(name)}</span><strong>本期 ${pct(value,1)}</strong><small>此前 ${Number.isFinite(prior)?pct(prior,1):'—'}</small></div><div class="profile-weight-track"><i style="width:${Math.min(value*100,100)}%"></i></div>${Number.isFinite(prior)?`<div class="profile-weight-track profile-reference-weight"><i style="width:${Math.min(prior*100,100)}%"></i></div>`:''}</div>`;
   }).join('');
   const header = `<div class="profile-head"><div><h2>披露持仓画像</h2><p>最近一期为主，历史窗口为参照；不等同实时持仓或投资评级。</p></div>${profileWindowControl(r,key)}</div>`;
@@ -633,8 +644,8 @@ function renderHistoricalProfile(r, key) {
   return `<div data-historical-profile="${escapeHTML(r.code)}">${header}<div class="profile-date-strip"><span>最近完整持仓 <strong>${escapeHTML(latest.date)}</strong></span><span>公告 <strong>${escapeHTML(latest.announcement)}</strong></span><span>历史参照 <strong>${escapeHTML(w.label)} · 此前${reference.length}期</strong></span></div>
     <div class="profile-comparison-legend"><span><i class="profile-current-key"></i>本期分位</span><span><i class="profile-reference-key"></i>此前平均位置（不含本期）</span></div>
     <p class="method-note">历史参照范围：${escapeHTML(w.requested_start || '任期待核对')} 至 ${escapeHTML(w.as_of)}${reference.length?`；实际此前披露 ${escapeHTML(reference[0].date)} 至 ${escapeHTML(reference.at(-1).date)}`:''}。${key==='tenure' ? (w.requested_start ? escapeHTML(w.tenure_start_note) : '当前经理未核对一致；本期股票风格仅保留产品披露，不归属当前经理。') : '产品历史包含期间历任经理；跨经理转移不作为连续经理的行为样本。'} 不足年限只用实际可得部分。分位高低不是好坏评分。</p>
-    <div class="history-metric-grid">${cards}</div><div class="profile-detail-grid"><article class="subpanel"><h3>本期主要A股行业 · 对照此前均值</h3>${inds || '<p class="empty-copy">本期暂无有效A股行业。</p>'}<p class="method-note">按本期前十行业展示；${reference.length?`实色条为本期，细线条为此前${reference.length}期均值`:'仅展示本期，所选窗口尚无此前均值'}，均占已披露A股资产，不是基金净资产。港股占本期股票资产${pct(latest.hk_share,1)}，港股未混入A股风格。</p></article>
-    <article class="subpanel"><h3>怎样理解本期与历史的距离</h3><p>实心点看当前披露特征，空心点看此前习惯。两点分开是变化线索，不代表偏离越大越差，也不强制把当前持仓拉回历史均值。</p><p>本期分位逐项计算，不要求该基金已有多年历史。历史参照缺少有效期数时，只留实际均值，并说明原因。</p><details><summary>分位、样本不足与统计口径</summary><p class="method-note">每期先在同报告期、该指标有效的主观权益产品中算百分位，A/C份额合并，至少30只；只比较A股部分。空心点是窗口内本期之前各期百分位的等权平均，不对历史均值再次排名；有效分位须覆盖此前披露期的80%。不同年份样本构成会变化，因此这是相对位置对照，不是固定同一批基金的净变化。实际值与分位分别保留，缺失不当零。市值/PB/ROE为当期持仓加权中位数，股票特征有效权重覆盖须达80%；此前实际值为各期等权均值。集中度为前十大A股占A股比例，调仓活跃度是剔除价格漂移后的持仓距离，不是官方换手率。PB不是成长性。当前存续样本和修订档案不是严格PIT样本。</p></details><details><summary>画像与持仓识别如何配合</summary><p class="method-note">完整持仓公布后，先对同报告日的旧预测验真，再更新画像。Smoother使用事后信息，不能当作当时预测成绩。画像相似基金统一放在相关性分析页。</p></details></article></div>
+    <div class="history-metric-grid">${cards}</div><div class="profile-detail-grid"><article class="subpanel"><h3>主要A股投向 · 占基金净值</h3>${inds || '<p class="empty-copy">本期暂无有效A股行业。</p>'}<p class="method-note">按本期前十行业展示；${reference.length?`实色条为本期，细线条为此前${reference.length}期均值`:'仅展示本期，所选窗口尚无此前均值'}，每期先换算为占基金净值，再计算此前均值。港股占本期股票资产${pct(latest.hk_share,1)}，港股未混入A股风格。</p></article>
+    <article class="subpanel"><h3>怎样理解本期与历史的距离</h3><p>实心点看当前披露特征，空心点看此前习惯。两点分开是变化线索，不代表偏离越大越差，也不强制把当前持仓拉回历史均值。</p><p>本期分位逐项计算，不要求该基金已有多年历史。历史参照缺少有效期数时，只留实际均值，并说明原因。</p><details><summary>分位、样本不足与统计口径</summary><p class="method-note">每期先在同报告期、该指标有效的主动权益产品中算百分位，A/C份额合并，至少30只；只比较A股部分。空心点是窗口内本期之前各期百分位的等权平均，不对历史均值再次排名；有效分位须覆盖此前披露期的80%。不同年份样本构成会变化，因此这是相对位置对照，不是固定同一批基金的净变化。实际值与分位分别保留，缺失不当零。市值/PB/ROE为当期持仓加权中位数，股票特征有效权重覆盖须达80%；此前实际值为各期等权均值。集中度为前十大A股占A股比例，调仓活跃度是剔除价格漂移后的持仓距离，不是官方换手率。市净率描述估值。当前存续样本和修订档案不是严格PIT样本。</p></details><details><summary>画像与持仓识别如何配合</summary><p class="method-note">完整持仓公布后，先对同报告日的旧预测验真，再更新画像。Smoother使用事后信息，不能当作当时预测成绩。画像相似基金统一放在相关性分析页。</p></details></article></div>
     <details class="subpanel"><summary>最近完整披露与合同证据 · ${escapeHTML(r.report_date || '暂无')}</summary>${renderDisclosedProfile({...r,windows:null},true)}</details></div>`;
 }
 
@@ -840,11 +851,8 @@ function renderNavChart(points, fundName, benchmarkName) {
   const height = 330;
   const margin = { top: 28, right: 54, bottom: 42, left: 58 };
   const values = points.flatMap((point) => [point.fund, point.benchmark]).filter((value) => value !== null && isFiniteValue(value));
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const padding = Math.max((rawMax - rawMin) * 0.1, 0.03);
-  const min = rawMin >= 0 ? Math.max(0, rawMin - padding) : rawMin - padding;
-  const max = rawMax + padding;
+  const axis = ReviewCore.scale(values);
+  const {min,max} = axis;
   const x = (index) => margin.left + (index / (points.length - 1)) * (width - margin.left - margin.right);
   const y = (value) => margin.top + ((max - value) / Math.max(max - min, 0.01)) * (height - margin.top - margin.bottom);
   const lines = (key, className) => {
@@ -862,7 +870,7 @@ function renderNavChart(points, fundName, benchmarkName) {
     if (current.length) segments.push(current);
     return segments.filter((segment) => segment.length >= 2).map((segment) => `<polyline points="${segment.join(" ")}" class="${className}"/>`).join("");
   };
-  const ticks = Array.from({ length: 5 }, (_, index) => min + ((max - min) * index) / 4).reverse();
+  const ticks = [...axis.ticks].reverse();
   let peak = -Infinity;
   const drawdowns = points.map((point) => {
     peak = Math.max(peak, point.fund);
@@ -878,12 +886,12 @@ function renderNavChart(points, fundName, benchmarkName) {
   ].join(" ");
   const dateIndexes = [...new Set(Array.from({ length: 7 }, (_, index) => Math.round(index * (points.length - 1) / 6)))];
   return `
-    <div class="chart-legend"><span class="legend-fund">${escapeHTML(fundName)}</span><span class="legend-benchmark">${escapeHTML(benchmarkName)}</span><span class="legend-drawdown">基金回撤阴影</span></div>
+    <div class="chart-legend"><span class="legend-fund">${escapeHTML(fundName)}</span>${points.some(p=>isFiniteValue(p.benchmark))?`<span class="legend-benchmark">${escapeHTML(benchmarkName)}</span>`:""}<span class="legend-drawdown">基金回撤阴影</span></div>
     <div class="nav-chart-wrap performance-chart-wrap">
       <svg class="nav-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(fundName)}与${escapeHTML(benchmarkName)}日频归一化净值及回撤阴影">
         ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 10}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${tick.toFixed(2)}</text>`).join("")}
         ${drawdownTicks.map((tick) => `<text x="${width - margin.right + 9}" y="${shadowY(tick) + 4}" class="chart-axis-label">${pct(tick, 0)}</text>`).join("")}
-        ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label" text-anchor="${index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}">${points[index].date.slice(0, 7)}</text>`).join("")}
+        ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label" text-anchor="${index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}">${ReviewCore.dateLabel(points[index].date,(Date.parse(points.at(-1).date)-Date.parse(points[0].date))/86400000)}</text>`).join("")}
         <polygon points="${shadow}" class="drawdown-shadow"/>
         ${lines("benchmark", "chart-line chart-line-benchmark")}
         ${lines("fund", "chart-line chart-line-fund")}
@@ -916,7 +924,7 @@ function renderZoomableNavChart(points, fundName, benchmarkName) {
     </div>`;
 }
 
-function bindNavChartZoom(points, fundName, benchmarkName, root = document) {
+function bindNavChartZoom(points, fundName, benchmarkName, root = document, onRangeChange = null) {
   const shell = root.querySelector(".nav-zoom-shell");
   const plot = shell?.querySelector(".nav-zoom-plot");
   const startInput = shell?.querySelector(".nav-zoom-start");
@@ -958,6 +966,7 @@ function bindNavChartZoom(points, fundName, benchmarkName, root = document) {
     const selected = rebaseNavPoints(points.slice(start, end + 1));
     plot.innerHTML = renderNavChart(selected, fundName, benchmarkName);
     bindPerformanceChartHover(selected, fundName, benchmarkName, plot);
+    if (onRangeChange) onRangeChange(points[start].date, points[end].date);
     renderedStart = start;
     renderedEnd = end;
   };
@@ -1021,11 +1030,7 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
   const height = 330;
   const margin = { top: 28, right: 54, bottom: 42, left: 58 };
   const values = points.flatMap((point) => [point.fund, point.benchmark]).filter((value) => value !== null && isFiniteValue(value));
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const padding = Math.max((rawMax - rawMin) * 0.1, 0.03);
-  const min = Math.max(0, rawMin - padding);
-  const max = rawMax + padding;
+  const {min,max} = ReviewCore.scale(values);
   const x = (index) => margin.left + (index / (points.length - 1)) * (width - margin.left - margin.right);
   const y = (value) => margin.top + ((max - value) / Math.max(max - min, 0.01)) * (height - margin.top - margin.bottom);
   let peak = -Infinity;
@@ -1125,7 +1130,9 @@ function renderMonthlyReturnHeatmap(items = [], navPoints = []) {
     const values = Array.from({ length: 12 }, (_, index) => lookup.get(`${year}-${index + 1}`));
     const available = values.filter(Number.isFinite);
     const annual = available.length ? available.reduce((value, item) => value * (1 + item), 1) - 1 : null;
-    const stats = performanceStats(navPoints.filter((point) => point.date.startsWith(String(year))));
+    const yearPoints = navPoints.filter(point=>point.date.startsWith(String(year)));
+    const prior = navPoints.filter(point=>point.date < `${year}-01-01`).at(-1);
+    const stats = performanceStats(prior ? [prior,...yearPoints] : yearPoints);
     return [
       `<strong>${year}</strong>`,
       ...values.map((value) => Number.isFinite(value)
@@ -1137,7 +1144,7 @@ function renderMonthlyReturnHeatmap(items = [], navPoints = []) {
       stats ? (stats.recoveryDate ? `${stats.recoveryDate.slice(5)} / ${stats.recoveryDays}天` : "未修复") : "—",
     ];
   });
-  return renderTable(["年度", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "合计", "最大回撤", "峰值→低点", "修复日/天数"], rows, "monthly-return-heatmap");
+  return renderTable(["年度", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "合计", "最大回撤", "峰值→低点", "年内修复日/天数"], rows, "monthly-return-heatmap");
 }
 
 function monthlyReturnsFromNav(navPoints = []) {
@@ -1186,7 +1193,7 @@ function renderMultiIndexPlot(analysis, fundName, selectedKey) {
     <div class="mini-chart-legend">${series.map((item) => `<span style="--line-color:${INDEX_COLORS[item.key]}">${escapeHTML(item.label)}</span>`).join("")}</div>
     <div class="nav-chart-wrap multi-index-plot-wrap"><svg class="nav-chart multi-index-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(fundName)}与${escapeHTML(selectedLabel)}近五年归一化走势" data-min="${min}" data-max="${max}" data-labels="${escapeHTML(series.map((item) => item.label).join("|"))}">
       ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 10}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${tick.toFixed(2)}</text>`).join("")}
-      ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label" text-anchor="${index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}">${points[index].date.slice(0, 7)}</text>`).join("")}
+      ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label" text-anchor="${index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}">${ReviewCore.dateLabel(points[index].date,(Date.parse(points.at(-1).date)-Date.parse(points[0].date))/86400000)}</text>`).join("")}
       ${series.map((item) => `<polyline points="${points.map((point, index) => `${x(index).toFixed(1)},${y(Number(point[item.key])).toFixed(1)}`).join(" ")}" class="chart-line" style="stroke:${INDEX_COLORS[item.key]};stroke-width:${item.key === "fund" ? 3.2 : 2}"/>`).join("")}
       ${points.map((point, index) => `<g class="multi-index-data" data-date="${escapeHTML(point.date)}" data-values="${series.map((item) => Number(point[item.key])).join("|")}" data-x="${x(index).toFixed(2)}"></g>`).join("")}
       <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="mini-line-crosshair" hidden/>
@@ -1233,16 +1240,12 @@ function renderMiniLineChart(series, lines, ariaLabel, timeAxis = false) {
   const height = 250;
   const margin = { top: 24, right: 24, bottom: 42, left: 54 };
   const values = series.flatMap((item) => lines.map((line) => isFiniteValue(item[line.key]) ? Number(item[line.key]) : NaN).filter(Number.isFinite));
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
-  const padding = Math.max((rawMax - rawMin) * 0.12, 0.01);
-  const min = Math.max(0, rawMin - padding);
-  const max = rawMax + padding;
+  const {min, max, ticks: axisTicks} = ReviewCore.scale(values);
   const times = series.map(item => Date.parse(item.report_date));
   const x = (index) => margin.left + (timeAxis && times.at(-1) > times[0]
     ? (times[index] - times[0]) / (times.at(-1) - times[0]) : index / (series.length - 1)) * (width - margin.left - margin.right);
   const y = (value) => margin.top + ((max - value) / Math.max(max - min, 0.01)) * (height - margin.top - margin.bottom);
-  const ticks = Array.from({ length: 4 }, (_, index) => min + ((max - min) * index) / 3).reverse();
+  const ticks = [...axisTicks].reverse();
   const dateIndexes = timeAxis ? [...new Set(Array.from({length:7},(_,i)=>{
     const target=times[0]+(times.at(-1)-times[0])*i/6;
     return times.reduce((best,value,index)=>Math.abs(value-target)<Math.abs(times[best]-target)?index:best,0);
@@ -1255,13 +1258,16 @@ function renderMiniLineChart(series, lines, ariaLabel, timeAxis = false) {
       ${lines.map((line) => {
         const points=series.map((item,index)=>[index,isFiniteValue(item[line.key])?Number(item[line.key]):NaN]).filter(([,value])=>Number.isFinite(value));
         if (line.points) return points.map(([index,value])=>`<circle cx="${x(index).toFixed(1)}" cy="${y(value).toFixed(1)}" r="4" fill="${line.hollow?'white':line.color}" stroke="${line.color}" stroke-width="2"><title>${escapeHTML(series[index].report_date)} · ${escapeHTML(line.label)}：${miniLineValue(value,line.format)}</title></circle>`).join('');
-        return `<polyline points="${points.map(([index,value])=>`${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(' ')}" class="chart-line" style="stroke:${line.color};stroke-width:${line.width||2.5}"/>`;
+        const segments=[]; let segment=[];
+        series.forEach((item,index)=>{if(isFiniteValue(item[line.key])) segment.push([index,Number(item[line.key])]); else if(segment.length){segments.push(segment);segment=[];}});
+        if(segment.length) segments.push(segment);
+        return segments.map(part=>`<polyline points="${part.map(([index,value])=>`${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(' ')}" class="chart-line" style="stroke:${line.color};stroke-width:${line.width||2.5}"/>`).join('');
       }).join('')}
 
       ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label chart-axis-date" text-anchor="${index === 0 ? "start" : index === series.length - 1 ? "end" : "middle"}">${escapeHTML(series[index].report_date.slice(0, 7))}</text>`).join("")}
       ${series.map((item, index) => `<g class="mini-line-data" data-date="${escapeHTML(item.report_date)}" data-values="${lines.map((line) => isFiniteValue(item[line.key]) ? Number(item[line.key]) : "NaN").join("|")}" data-x="${x(index).toFixed(2)}"></g>`).join("")}
       <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="mini-line-crosshair" hidden/>
-      ${lines.map((line) => `<circle r="4" class="mini-line-hover-dot" style="stroke:${line.color}" hidden/>`).join("")}
+      ${lines.map((line) => `<circle r="4" class="mini-line-hover-dot" style="stroke:${line.color};${line.points&&!line.hollow?`fill:${line.color}`:""}" hidden/>`).join("")}
       <rect x="${margin.left}" y="${margin.top}" width="${width - margin.left - margin.right}" height="${height - margin.top - margin.bottom}" class="mini-line-hover-target"/>
     </svg><div class="mini-line-hover-card" data-formats="${escapeHTML(formats.join("|"))}" hidden></div></div>`;
 }
@@ -1567,23 +1573,11 @@ function renderConsistency(code, analysis, allData) {
 }
 
 function normalizedAssetAllocation(item) {
-  const stock = Math.max(0, Number(item.stock_to_nav) || 0);
-  const bond = Math.max(0, Number(item.bond_to_nav) || 0);
-  const cash = Math.max(0, Number(item.cash_to_nav) || 0);
-  const fund = Math.max(0, Number(item.fund_to_nav ?? item.fund) || 0);
-  const other = Math.max(0, Number(item.other_to_nav) || 0);
-  const disclosed = stock + bond + cash + fund + other;
-  const undisclosed = Math.max(0, 1 - disclosed);
-  const total = Math.max(disclosed + undisclosed, 1e-12);
-  return {
-    report_date: item.report_date,
-    stock: stock / total,
-    bond: bond / total,
-    cash: cash / total,
-    fund: fund / total,
-    other: other / total,
-    undisclosed: undisclosed / total,
-  };
+  const field=key=>isFiniteValue(item[key])?Math.max(0,Number(item[key])):null;
+  const result={report_date:item.report_date,stock:field('stock_to_nav'),bond:field('bond_to_nav'),cash:field('cash_to_nav'),fund:isFiniteValue(item.fund_to_nav??item.fund)?Math.max(0,Number(item.fund_to_nav??item.fund)):null,other:field('other_to_nav')};
+  result.total=Object.values(result).filter(Number.isFinite).reduce((a,b)=>a+b,0);
+  result.undisclosed=null;
+  return result;
 }
 
 function renderAssetAllocationAreaChart(history = []) {
@@ -1594,18 +1588,18 @@ function renderAssetAllocationAreaChart(history = []) {
   const margin = { top: 28, right: 28, bottom: 48, left: 58 };
   const plotBottom = height - margin.bottom;
   const x = (index) => margin.left + index / (data.length - 1) * (width - margin.left - margin.right);
-  const y = (value) => margin.top + (1 - value) * (plotBottom - margin.top);
+  const axis=ReviewCore.scale([1,...data.map(d=>d.total)]);
+  const y = (value) => margin.top + (1-value/axis.max)*(plotBottom-margin.top);
   const layers = [
     { key: "stock", label: "股票", className: "asset-area-stock" },
     { key: "bond", label: "债券", className: "asset-area-bond" },
     { key: "fund", label: "基金投资", className: "asset-area-fund" },
     { key: "cash", label: "现金", className: "asset-area-cash" },
     { key: "other", label: "已披露其他", className: "asset-area-other" },
-    { key: "undisclosed", label: "未披露分项", className: "asset-area-undisclosed" },
   ];
   let lower = data.map(() => 0);
   const areas = layers.map((layer) => {
-    const upper = data.map((item, index) => lower[index] + item[layer.key]);
+    const upper = data.map((item, index) => lower[index] + (item[layer.key]??0));
     const points = [
       ...upper.map((value, index) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`),
       ...lower.map((value, index) => `${x(index).toFixed(1)},${y(value).toFixed(1)}`).reverse(),
@@ -1613,21 +1607,21 @@ function renderAssetAllocationAreaChart(history = []) {
     lower = upper;
     return `<polygon points="${points}" class="asset-allocation-area ${layer.className}"/>`;
   }).join("");
-  const ticks = [1, 0.75, 0.5, 0.25, 0];
+  const ticks = [...axis.ticks].reverse();
   const dateIndexes = chartTickIndexes(data.length, 7);
   return `
     <div class="asset-allocation-legend">${layers.map((layer) => `<span class="${layer.className}">${layer.label}</span>`).join("")}</div>
     <div class="asset-allocation-chart-wrap">
-      <svg class="asset-allocation-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="季度资产配置百分之百堆叠面积图">
+      <svg class="asset-allocation-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="季度资产配置堆积面积图，占基金净值">
         ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 10}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${pct(tick, 0)}</text>`).join("")}
         ${areas}
-        ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 15}" class="chart-axis-label chart-axis-date" text-anchor="${index === 0 ? "start" : index === data.length - 1 ? "end" : "middle"}">${escapeHTML(data[index].report_date.slice(0, 7))}</text>`).join("")}
+        ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 15}" class="chart-axis-label chart-axis-date" text-anchor="${index === 0 ? "start" : index === data.length - 1 ? "end" : "middle"}">${escapeHTML(data[index].report_date.slice(0,4)+' Q'+Math.ceil(Number(data[index].report_date.slice(5,7))/3))}</text>`).join("")}
         <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${plotBottom}" class="asset-allocation-crosshair" hidden/>
         <rect x="${margin.left}" y="${margin.top}" width="${width - margin.left - margin.right}" height="${plotBottom - margin.top}" class="asset-allocation-hover-target"/>
       </svg>
       <div class="asset-allocation-hover-card" hidden></div>
     </div>
-    <p class="method-note">港股属于股票资产的组成部分，不重复堆叠；基金投资使用披露字段，不用差额反推。已披露分项不足100%时单列“未披露分项”；超过100%时按已知资产同比例归一化。</p>`;
+    <p class="method-note">港股属于股票资产的组成部分，不重复堆叠；基金投资使用披露字段，不用差额反推。各分项保留原披露比例；杠杆使合计可能超过100%。缺失分项在悬停明细中记为—。</p>`;
 }
 
 function bindAssetAllocationChart(history = []) {
@@ -1654,7 +1648,7 @@ function bindAssetAllocationChart(history = []) {
     const exactX = margin.left + index / (data.length - 1) * (width - margin.left - margin.right);
     crosshair.setAttribute("x1", exactX);
     crosshair.setAttribute("x2", exactX);
-    card.innerHTML = `<strong>${escapeHTML(item.report_date)}</strong><span>股票：${pct(item.stock, 1)}</span><span>债券：${pct(item.bond, 1)}</span><span>基金投资：${pct(item.fund, 1)}</span><span>现金：${pct(item.cash, 1)}</span><span>已披露其他：${pct(item.other, 1)}</span><span>未披露分项：${pct(item.undisclosed, 1)}</span><span>合计：100.0%</span>`;
+    card.innerHTML = `<strong>${escapeHTML(item.report_date)}</strong><span>股票：${pct(item.stock, 1)}</span><span>债券：${pct(item.bond, 1)}</span><span>基金投资：${pct(item.fund, 1)}</span><span>现金：${pct(item.cash, 1)}</span><span>已披露其他：${pct(item.other, 1)}</span><span>已披露分项合计：${pct(item.total, 1)}</span>`;
     card.style.left = `${Math.min(Math.max(exactX / width * 100, 16), 84)}%`;
     setVisible(true);
   };
@@ -1798,28 +1792,14 @@ function renderIndustryChanges(periods, dimension, selectedIndex) {
 }
 
 function renderTimelineHeatmap(periods, dimension, options = {}) {
-  if (!periods?.length) return '<p class="empty-copy">暂无可连续比较的披露期。</p>';
-  const rowLimit = options.rowLimit || 18;
-  const names = [...new Set(periods.flatMap((period) => Object.keys(period.weights?.[dimension] || {})))];
-  const ranked = names.map((name) => {
-    const values = periods.map((period) => Number(period.weights?.[dimension]?.[name] || 0));
-    return { name, values, max: Math.max(...values, 0), average: values.reduce((sum, value) => sum + value, 0) / values.length };
-  }).filter((item) => item.max >= 0.0005)
-    .sort((left, right) => right.max - left.max || right.average - left.average)
-    .slice(0, rowLimit);
-  if (!ranked.length) return '<p class="empty-copy">该层级没有非零行业权重。</p>';
-  const scale = Math.max(...ranked.flatMap((item) => item.values), 0.01);
-  const cells = ranked.map((item) => {
-    const values = item.values.map((value, index) => {
-      if (value < 0.0005) return '<td class="timeline-heatmap-empty" title="该期未披露或权重低于0.05%">—</td>';
-      const intensity = Math.min(value / scale, 1);
-      const alpha = 0.12 + intensity * 0.76;
-      const foreground = "#000000"; // Readable across the full translucent teal scale.
-      return `<td style="background:rgba(11,119,116,${alpha.toFixed(3)});color:${foreground}" title="${escapeHTML(periods[index].report_date)} · ${escapeHTML(item.name)} · ${pct(value, 2)}">${pct(value, 1)}</td>`;
-    }).join("");
-    return `<tr><th scope="row"><button class="timeline-heatmap-row-link" data-industry-name="${escapeHTML(item.name)}">${escapeHTML(item.name)}</button></th>${values}</tr>`;
-  }).join("");
-  return `<div class="timeline-heatmap-wrap"><table class="timeline-heatmap"><thead><tr><th>${escapeHTML(options.firstColumn || "行业")}</th>${periods.map((period) => `<th>${escapeHTML(period.report_date.slice(2, 7))}</th>`).join("")}</tr></thead><tbody>${cells}</tbody></table></div><p class="method-note">按历史最高权重展示前${ranked.length}项；色深表示占基金净值权重，横向滚动可查看全部披露期。空白表示权重低于0.05%或该口径未披露。</p>`;
+  if(!periods?.length)return '<p class="empty-copy">暂无可连续比较的披露期。</p>';
+  const names=[...new Set(periods.flatMap(p=>Object.keys(p.weights?.[dimension]||{})))];
+  const selected=Number.isInteger(options.sortIndex)?options.sortIndex:periods.length-1;
+  const ascending=options.direction==='asc';
+  const rows=names.map(name=>({name,values:periods.map(p=>Object.hasOwn(p.weights?.[dimension]||{},name)&&isFiniteValue(p.weights[dimension][name])?Number(p.weights[dimension][name]):null)}));
+  rows.sort((a,b)=>{const x=a.values[selected],y=b.values[selected];if(x===null||y===null)return x===y?a.name.localeCompare(b.name):x===null?1:-1;return (ascending?x-y:y-x)||a.name.localeCompare(b.name);});
+  const scale=Math.max(.01,...rows.flatMap(r=>r.values).filter(Number.isFinite));
+  return `<div class="timeline-heatmap-wrap"><table class="timeline-heatmap"><thead><tr><th>${escapeHTML(options.firstColumn||'行业')}</th>${periods.map((p,i)=>`<th aria-sort="${i===selected?(ascending?'ascending':'descending'):'none'}"><button class="heatmap-sort" data-heatmap-sort="${i}" aria-pressed="${i===selected}" title="点击按本期权重排序">${escapeHTML(p.report_date)} ${i===selected?(ascending?'↑':'↓'):'↕'}</button></th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr><th scope="row"><button class="timeline-heatmap-row-link" data-industry-name="${escapeHTML(r.name)}">${escapeHTML(r.name)}</button></th>${r.values.map((v,i)=>v===null?'<td class="timeline-heatmap-empty" title="该口径没有披露值">—</td>':`<td style="background:rgba(49,135,100,${(.08+v/scale*.6).toFixed(3)});color:#193b2b" title="${escapeHTML(periods[i].report_date+' · '+r.name)}：${pct(v,3)}">${pct(v,1)}</td>`).join('')}</tr>`).join('')}</tbody></table></div><p class="method-note">${rows.length}项 · 点击日期标题切换升降序；0.0%为已披露的零值，—为该口径无数据。</p>`;
 }
 
 function bindIndustryAnalysis(analysis) {
@@ -1864,9 +1844,11 @@ function bindIndustryAnalysis(analysis) {
     scopeNote.textContent = state.scope === "quarterly"
       ? "季度口径仅汇总当期真实前十大，不代表完整组合。"
       : "完整口径仅使用半年报和年报全部披露股票。";
-    distributionOutput.innerHTML = renderIndustryDistribution(current, state.dimension, state.industry, state.sortDirection);
+    if (current?.equity_meta) scopeNote.textContent += " " + BondEquityFusion.snapshotCaption(current.equity_meta);
+    if (distributionOutput) distributionOutput.innerHTML = "";
     changeOutput.innerHTML = renderIndustryChanges(currentPeriods, state.dimension, state.periodIndex);
-    trendOutput.innerHTML = renderTimelineHeatmap(currentPeriods, state.dimension, { firstColumn: holdingDimensionName(history, state.dimension) });
+    trendOutput.innerHTML = renderTimelineHeatmap(currentPeriods, state.dimension, { firstColumn: holdingDimensionName(history, state.dimension), sortIndex: state.periodIndex, direction: state.sortDirection });
+    trendOutput.querySelectorAll("[data-heatmap-sort]").forEach(button=>button.addEventListener("click",()=>{const index=Number(button.dataset.heatmapSort);state.sortDirection=index===state.periodIndex&&state.sortDirection==="desc"?"asc":"desc";state.periodIndex=index;draw();}));
     bindIndustryLinks();
   };
   dimensionButtons.forEach((button) => button.addEventListener("click", () => {
@@ -1910,14 +1892,13 @@ function renderIndustries(analysis) {
         </div>
       </div>
       <article class="subpanel">
-        <div class="subpanel-heading industry-period-control"><div><h3>行业权重分布</h3><span id="industry-scope-note"></span></div><div class="industry-heading-controls"><label><span>权重排序</span><select id="industry-sort-direction"><option value="desc">从高到低</option><option value="asc">从低到高</option></select></label><label><span>报告期</span><select id="industry-period-select"></select></label></div></div>
-        <div id="industry-distribution-output"></div>
+        <div class="subpanel-heading industry-period-control"><span id="industry-scope-note"></span><label>变化对比期 <select id="industry-period-select"></select></label></div>
       </article>
       <article class="subpanel">
-        <div class="subpanel-heading industry-trend-control"><div><h3>行业配置时间轴（热力图）</h3><span>连续展示历次披露权重；横向滚动查看完整历史</span></div></div>
+        <div class="subpanel-heading industry-trend-control"><div><h3>行业配置时间轴（热力图）</h3><span>点击日期标题排序 · 横向滚动查看历史</span></div></div>
         <div id="industry-trend-output"></div>
       </article>
-      <article class="subpanel"><div class="subpanel-heading"><h3>相邻披露期行业变化</h3><span>展示全部非零变化，并按变化绝对值排序；点击行业可查看连续走势</span></div><div id="industry-change-output"></div></article>
+      <article class="subpanel"><div class="subpanel-heading"><h3>相邻披露期行业变化</h3><span>与上一披露期比较 · 按变化幅度排序</span></div><div id="industry-change-output"></div></article>
     </div>
     <div class="calibration-note"><strong>历史口径</strong><p>近五年季度序列每期仅使用真实前十大；完整序列每年仅使用中报和年报全部股票。行业成员关系按报告期入退日期匹配，港股单列，不用最新分类回填历史。</p></div>`;
 }
@@ -2452,6 +2433,7 @@ function holdingDimensionName(history, dimension) {
 
 function renderHoldingSnapshot(period, dimension, scope) {
   if (!period) return '<p class="empty-copy">该报告期暂无持仓明细。</p>';
+  if (period.equity_meta?.status === "not_applicable_zero_stock") return '<p class="empty-copy">本报告期末无股票。期内股票买卖与历史披露另列。</p>';
   const entered = new Set((period.entered || []).map((item) => item.code));
   const rows = period.holdings.map((holding) => {
     const status = entered.has(holding.code)
@@ -2463,7 +2445,8 @@ function renderHoldingSnapshot(period, dimension, scope) {
       escapeHTML(holding.code),
       escapeHTML(holding.classifications?.[dimension] || "未映射"),
       status,
-      `<span class="holding-weight">${pct(holding.weight, 2)}</span>`,
+      `<span class="holding-weight" title="${pct(holding.weight, 6)}">${period.equity_meta ? BondEquityFusion.weightLabel(holding.weight) : pct(holding.weight, 2)}</span>`,
+      ...(period.equity_meta ? [money(holding.position_market_value_cny), BondEquityFusion.stockQuantity(holding.quantity)] : []),
       money(holding.characteristics?.market_value),
       num(holding.characteristics?.pe_ttm, 1),
       num(holding.characteristics?.pb_mrq, 1),
@@ -2472,7 +2455,7 @@ function renderHoldingSnapshot(period, dimension, scope) {
     ];
   });
   return renderTable(
-    ["排名", "股票", "代码", "行业/板块", "本期状态", "基金净值占比", "总市值", "PE(TTM)", "PB(MRQ)", "ROE(TTM)", "G（净利TTM同比）"],
+    ["排名", "股票", "代码", "行业/板块", "本期状态", "基金净值占比", ...(period.equity_meta ? ["持有市值", "持有股数"] : []), "股票总市值", "PE(TTM)", "PB(MRQ)", "ROE(TTM)", "G（净利TTM同比）"],
     rows,
     `holdings-table-wrap heavy-characteristics-table ${scope === "full" ? "full-holdings-scroll" : ""}`,
   );
@@ -2601,7 +2584,7 @@ function bindHoldingAnalysis(analysis) {
   const history = analysis.holding_analysis_history;
   const root = document.querySelector("#holding-analysis-interactive");
   if (!history || !root) return;
-  const initialScope = history.quarterly?.length ? "quarterly" : "full";
+  const initialScope = history.default_scope || (history.quarterly?.length ? "quarterly" : "full");
   const state = { scope: initialScope, dimension: "sector", periodIndex: (history[initialScope] || []).length - 1, stockCode: null };
   const scopeButtons = [...root.querySelectorAll("[data-holding-scope]")];
   const dimensionButtons = [...root.querySelectorAll("[data-holding-dimension]")];
@@ -2643,6 +2626,7 @@ function bindHoldingAnalysis(analysis) {
     scopeNote.textContent = state.scope === "quarterly"
       ? "每季真实前十大；表中标注相对上期新进与退出。"
       : "仅使用半年报和年报全部披露股票。";
+    if (current?.equity_meta) scopeNote.textContent += " " + BondEquityFusion.snapshotCaption(current.equity_meta);
     tableOutput.innerHTML = renderHoldingSnapshot(current, state.dimension, state.scope);
     changesOutput.innerHTML = renderHoldingChanges(current, state.scope);
     trendOutput.innerHTML = renderHoldingTrajectoryHeatmap(currentPeriods, state.scope);
@@ -2863,6 +2847,10 @@ function bindTabs(onActivate = null) {
     url.searchParams.set("tab", target);
     url.searchParams.delete("navigation");
     try { history.replaceState(null, "", url); } catch (_) { /* standalone file viewer */ }
+    const tabNav = button.closest('.fund-tab-nav');
+    if (tabNav && tabNav.scrollWidth > tabNav.clientWidth) {
+      tabNav.scrollTo({left: Math.max(0, button.offsetLeft - tabNav.clientWidth / 2 + button.offsetWidth / 2), behavior: 'smooth'});
+    }
     document.querySelector(".fund-tab-nav")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
   buttons.forEach((button,index) => {
@@ -2881,7 +2869,7 @@ function bindTabs(onActivate = null) {
   });
   const saved = new URLSearchParams(query.get('list')||'');
   const allowed = new URLSearchParams();
-  for(const key of ['q','category','period','page','size','subtype','profile','sort','metric','dir','industry','level','view','perPage','scroll','columns','age','data']) if(saved.has(key)) allowed.set(key,saved.get(key).slice(0,200));
+  for(const key of ['q','category','period','page','size','subtype','profile','sort','metric','dir','industry','level','view','perPage','scroll','columns','age','data','pool','navDate']) if(saved.has(key)) allowed.set(key,saved.get(key).slice(0,200));
   if(allowed.size) document.querySelectorAll('a[href="index.html#samples"]').forEach(a=>{a.href=`index.html?${allowed}${allowed.has('scroll') ? '' : '#samples'}`;});
   const requested=buttons.find(b=>b.dataset.tab===query.get('tab'));
   if(requested && requested.getAttribute('aria-selected')!=='true') requested.click();
@@ -2890,32 +2878,34 @@ function bindTabs(onActivate = null) {
 function researchSummary(fund, detail) {
   const shard = (Number(fund.code.split(".")[0]) % 64).toString(16);
   const value = window.FUND_RESEARCH_SUMMARIES?.[shard]?.[fund.code] || window.FUND_RESEARCH_SUMMARY?.funds?.[fund.code];
-  return value && value.nav_date === fund.performance?.latest_date && value.asset_date === (fund.asset?.report_date || null) && value.latest_nav === detail?.nav?.at(-1)?.[1] ? value : null;
+  return value && value.nav_date === fund.performance?.latest_date && value.asset_date === (fund.asset?.report_date || null) && value.latest_nav === detail?.nav?.at(-1)?.[1] ? {...value, ...FundLifecycle.rankSummary(fund)} : null;
 }
 
 function loadResearchSummary(code) {
   const shard = (Number(code.split(".")[0]) % 64).toString(16);
-  if (window.FUND_RESEARCH_SUMMARIES?.[shard] || window.FUND_RESEARCH_SUMMARY?.funds?.[code]) return Promise.resolve();
+  if (window.FUND_RESEARCH_SUMMARIES?.[shard] || window.FUND_RESEARCH_SUMMARY?.funds?.[code]) return FundLifecycle.loadRanks();
   return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/research_summaries/${shard}.js?v=${DASHBOARD_DATA_VERSION}`, "基金概览", () => {
     if (!window.FUND_RESEARCH_SUMMARIES?.[shard]?.[code]) throw new Error("该基金概览尚未生成，请稍后重试");
-  });
+  }).then(() => FundLifecycle.loadRanks());
 }
 
 function researchNavPreview(detail) {
   const source = genericFundNavPoints(detail);
   if (source.length < 2) return '<p class="empty-copy">净值历史不足。</p>';
   const points = FundResearch.range(source, FundResearch.monthStart(source.at(-1).date, 12));
-  const first = points[0].fund;
-  const values = points.map(p => p.fund / first - 1);
-  const low = Math.min(0, ...values), high = Math.max(0, ...values), span = Math.max(high - low, 0.005);
-  const x = i => 44 + i / Math.max(1, points.length - 1) * 610;
-  const y = v => 24 + (high - v) / span * 182;
-  let peak = first;
-  const drawdowns = points.map(p => { peak = Math.max(peak, p.fund); return p.fund / peak - 1; });
-  const ddSpan = Math.max(0.01, -Math.min(...drawdowns));
-  const path = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  const ddPath = drawdowns.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${(240 - v / ddSpan * 46).toFixed(1)}`).join(' ');
-  return `<svg class="research-nav-preview" viewBox="0 0 700 326" role="img" aria-label="最近一年可得净值累计收益和区间回撤，非基准超额"><line x1="44" x2="654" y1="${y(0)}" y2="${y(0)}" stroke="#cbd5df" stroke-dasharray="4 4"/><text x="8" y="30">${pct(high, 0)}</text><text x="8" y="210">${pct(low, 0)}</text><path d="${path}" fill="none" stroke="#087f80" stroke-width="2.5"/><text x="44" y="230">区间回撤</text><path d="${ddPath} L654,240 L44,240 Z" fill="#7e93ab" fill-opacity="0.18"/><path d="${ddPath}" fill="none" stroke="#7e93ab" stroke-width="1.3"/><text x="44" y="316">${escapeHTML(points[0].date)}</text><text x="654" y="316" text-anchor="end">${escapeHTML(points.at(-1).date)}</text></svg>`;
+  return `<div class="overview-nav"><div class="period-switch" aria-label="概览净值区间">${[['3','近3月'],['6','近6月'],['12','近1年'],['all','全部']].map(([key,label])=>`<button data-overview-range="${key}" class="${key==='12'?'active':''}">${label}</button>`).join('')}</div><div data-overview-plot>${renderZoomableNavChart(points,'基金净值','基准')}</div></div>`;
+}
+function bindResearchOverview(detail) {
+  const root=page.querySelector('.overview-nav');if(!root)return;
+  const source=genericFundNavPoints(detail);if(source.length<2)return;
+  const draw=key=>{
+    const points=key==='all'?source:FundResearch.range(source,FundResearch.monthStart(source.at(-1).date,Number(key)));
+    const plot=root.querySelector('[data-overview-plot]');plot.innerHTML=renderZoomableNavChart(points,'基金净值','基准');
+    root.querySelectorAll('[data-overview-range]').forEach(button=>{button.classList.toggle('active',button.dataset.overviewRange===key);button.setAttribute('aria-pressed',String(button.dataset.overviewRange===key));});
+    bindNavChartZoom(points,'基金净值','基准',plot);
+  };
+  root.querySelectorAll('[data-overview-range]').forEach(button=>button.addEventListener('click',()=>draw(button.dataset.overviewRange)));
+  draw('12');
 }
 
 function renderResearchOverview(fund, detail) {
@@ -2924,8 +2914,8 @@ function renderResearchOverview(fund, detail) {
   const relative = fund.relative_metrics || {};
   const index = fund.category === 'index-enhanced';
   const bond = ['pure-bond', 'hybrid-bond', 'convertible-bond'].includes(fund.category);
-  const change = (v, unit = 'pct') => isFiniteValue(v) ? (unit === 'pct' ? `${v > 0 ? '+' : ''}${num(v * 100, 1)}pct` : `${v > 0 ? '+' : ''}${num(v, 2)}x`) : '待比较';
-  const rank = isFiniteValue(s?.return_top_pct) ? `同类前${Math.max(1, Math.ceil(s.return_top_pct * 100))}% · ${s.return_top_pct_n}个产品` : '同日同类样本或历史不足';
+  const change = (v, unit = 'pct') => isFiniteValue(v) ? (unit === 'pct' ? `${v > 0 ? '+' : ''}${num(v * 100, 1)}个百分点` : `${v > 0 ? '+' : ''}${num(v, 2)}x`) : '待比较';
+  const rank = !FundLifecycle.currentEligible(fund) ? '已退出当前排名' : isFiniteValue(s?.return_top_pct) ? `同类前${Math.max(1, Math.ceil(s.return_top_pct * 100))}% · ${s.return_top_pct_n}个产品` : '同日同类样本或历史不足';
   const lag = FundResearch.quarterLag(fund.duration?.report_date, a.report_date);
   const durationNote = `${fund.duration?.report_date || '暂无数据'}${lag ? ` · 较配置报告滞后${lag}期` : ''}`;
   const ddNote = s ? (s.current_drawdown < -1e-8 ? `距可得历史高点${s.underwater_days}天 · 尚未修复` : '可得历史高点已修复 / 创新高') : '摘要未加载或版本不匹配';
@@ -2936,20 +2926,20 @@ function renderResearchOverview(fund, detail) {
   else tiles.push(metric('股票仓位', pct(a.stock_weight, 1), `${a.report_date || '暂无披露'} · 较上期${change(s?.stock_change)}`));
   const dates = [['净值', p.latest_date], ['资产配置', a.report_date], ...(fund.category === 'pure-bond' ? [] : [['季度前十大股票', s?.top10_date], ['完整股票持仓', s?.full_date]]), ...(bond ? [['久期', fund.duration?.report_date]] : [])];
   const recentStock = s?.full_date && s.full_date >= (a.report_date || '');
-  const industryText = s?.industry ? `${s.industry} ${pct(s.industry_weight, 1)}（占NAV）` : a.stock_weight === 0 ? '无股票持仓 / 不适用' : '无可用完整股票行业披露';
+  const industryText = s?.industry ? `${s.industry} ${pct(s.industry_weight, 1)}（占净值）` : a.stock_weight === 0 ? '无股票持仓 / 不适用' : '无可用完整股票行业披露';
   const signals = [
     ['资产配置', `${a.report_date || '—'} 对比 ${s?.previous_asset_date || '—'}`, `股票 ${change(s?.stock_change)} · 债券 ${change(s?.bond_change)}${bond ? ` · 转债 ${change(s?.convertible_bond_change)}` : ''}`],
     [bond ? '杠杆变化' : '主要A股行业', bond ? `较上期 ${change(s?.leverage_change, 'x')}` : industryText, bond ? durationNote : `${s?.full_date || '暂无披露'} · 同行业较前次完整披露 ${change(s?.industry_change)}`],
-    ['完整披露名单变化', s?.previous_full_date ? `新出现 ${s.entry_count}只 · 不再出现 ${s.exit_count}只` : '不足两个完整披露期', s?.previous_full_date ? `${s.previous_full_date} → ${s.full_date}` : '不把前十大新进当作首次买入'],
+    ['完整披露名单变化', s?.previous_full_date ? `新出现 ${s.entry_count}只 · 不再出现 ${s.exit_count}只` : '不足两个完整披露期', s?.previous_full_date ? `${s.previous_full_date} → ${s.full_date}` : '等待前一期完整披露'],
   ];
   if (fund.category === 'pure-bond') signals.splice(0, signals.length,
-    ['债券仓位', `${pct(a.bond_weight, 1)} · 较上期 ${change(s?.bond_change)}`, `${a.report_date || '—'} 对比 ${s?.previous_asset_date || '—'} · 占NAV`],
+    ['债券仓位', `${pct(a.bond_weight, 1)} · 较上期 ${change(s?.bond_change)}`, `${a.report_date || '—'} 对比 ${s?.previous_asset_date || '—'} · 占净值`],
     ['杠杆变化', `${isFiniteValue(a.leverage) ? num(a.leverage, 2) + 'x' : '—'} · 较上期 ${change(s?.leverage_change, 'x')}`, '总资产 / 净资产；重仓券与信用归因见组合透视和对标与归因'],
     ['最近可得久期', isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : '暂无久期', durationNote]);
   else if (['hybrid-bond','convertible-bond'].includes(fund.category)) signals[0] = ['权益与转债风险预算', `股票 ${pct(a.stock_weight, 1)} / 转债 ${pct(a.convertible_bond_weight, 1)}`, `${a.report_date || '—'} · 较上期 股票${change(s?.stock_change)} / 转债${change(s?.convertible_bond_change)}`];
-  const risks = [index && !isFiniteValue(relative.tracking_error) ? '跟踪指数行情未补齐，超额、跟踪误差和信息比率待计算。' : '', bond && lag ? `久期比最新资产配置滞后${lag}个季度，不能当作当前久期。` : '', !recentStock && fund.category !== 'pure-bond' ? '股票披露与配置日期不齐，不把历史集中度当作当期值。' : '', '持仓与画像来自公开披露，不是每日真实持仓；规模变化包含市场涨跌，不等于资金净流入。'].filter(Boolean);
+  const risks = [index && !isFiniteValue(relative.tracking_error) ? '跟踪指数行情未补齐，超额、跟踪误差和信息比率待计算。' : '', bond && lag ? `久期比最新资产配置滞后${lag}个季度，采用原报告日期展示。` : '', !recentStock && fund.category !== 'pure-bond' ? '股票披露与配置日期不齐，集中度使用各自披露日期。' : '', '持仓与画像来自公开披露，不是每日真实持仓；规模变化包含市场涨跌，不等于资金净流入。'].filter(Boolean);
   const conclusion = `${fund.subtype || fund.category_label || '基金'}；${isFiniteValue(returnValue) ? `近一年${index ? '超额' : ''}收益${pct(returnValue, 1, true)}` : '完整一年收益或基准数据尚不足'}。${s ? `目前${s.current_drawdown < -1e-8 ? `距可得净值历史高点回撤${pct(s.current_drawdown, 1)}` : '处于可得净值历史高点'}。` : '正在核对决策摘要。'}`;
-  return `<div class="research-conclusion"><span>研究概览 · 数据摘要，非投资评级</span><p>${escapeHTML(conclusion)}</p></div><div class="research-freshness" aria-label="各项数据对应日期">${dates.map(([label, date]) => `<span>${label} <b>${escapeHTML(date || '暂无披露')}</b></span>`).join('')}</div><section class="research-decision-metrics">${tiles.join('')}</section><div class="research-overview-grid"><article class="subpanel research-chart"><div class="subpanel-heading"><h3>净值与回撤</h3><span>最近一年可得区间 · 基金自身</span></div>${researchNavPreview(detail)}<p class="method-note">曲线按区间起点归一；完整基准对比见“业绩与风险”。当前回撤按全部可得净值计算（起于${escapeHTML(s?.nav_start || detail?.nav?.[0]?.[0] || '—')}）。</p></article><article class="subpanel research-changes"><h3>最近发生了什么</h3>${signals.map(([title, text, note]) => `<div class="research-signal"><span>${title}</span><strong>${escapeHTML(text)}</strong><small>${escapeHTML(note)}</small></div>`).join('')}${s?.entry_names?.length ? `<p class="method-note">本次新出现的较大持仓：${escapeHTML(s.entry_names.join('、'))}。名单仅比较两个完整披露截面，不推断具体交易日期。</p>` : ''}</article></div><article class="research-risk"><h3>阅读前需要知道</h3><ul>${risks.map(t => `<li>${escapeHTML(t)}</li>`).join('')}</ul><p>同类位置：按内部基金类别、相同净值截止日、满一年净值历史的至少30个当前产品计算；并列取中秩。仅当前存续截面，不是历史回测。历史画像应在新披露后更新，模型识别须先冻结留档、再用新披露验真。</p></article>`;
+  return `<div class="research-conclusion"><span>基金概览</span><p>${escapeHTML(conclusion)}</p></div><div class="research-freshness" aria-label="各项数据对应日期">${dates.map(([label, date]) => `<span>${label} <b>${escapeHTML(date || '暂无披露')}</b></span>`).join('')}</div><section class="research-decision-metrics">${tiles.join('')}</section><div class="research-overview-grid"><article class="subpanel research-chart"><div class="subpanel-heading"><h3>净值与回撤</h3><span>区间起点归一 · 悬停查看日期与回撤</span></div>${researchNavPreview(detail)}<p class="method-note">曲线按区间起点归一；完整基准对比见“业绩与风险”。当前回撤按全部可得净值计算（起于${escapeHTML(s?.nav_start || detail?.nav?.[0]?.[0] || '—')}）。</p></article><article class="subpanel research-changes"><h3>最近发生了什么</h3>${signals.map(([title, text, note]) => `<div class="research-signal"><span>${title}</span><strong>${escapeHTML(text)}</strong><small>${escapeHTML(note)}</small></div>`).join('')}${s?.entry_names?.length ? `<p class="method-note">新增重仓：${escapeHTML(s.entry_names.join('、'))}。比较相邻两次完整披露。</p>` : ''}</article></div><details class="research-risk"><summary>数据日期与计算口径</summary><ul>${risks.map(t => `<li>${escapeHTML(t)}</li>`).join('')}</ul><p>同类位置：按内部基金类别、相同净值截止日、满一年净值历史的至少30个当前产品计算；并列取中秩。仅当前存续截面，不是历史回测。历史画像应在新披露后更新，模型识别须先冻结留档、再用新披露验真。</p></details>`;
 }
 
 function foldResearchHistory() {
@@ -2971,22 +2961,20 @@ function foldResearchHistory() {
 function prepareResearchOverview(fund, detail) {
   document.body.classList.add('decision-detail');
   const hero = page.querySelector('.fund-page-hero');
-  if (hero) hero.innerHTML = `<div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.subtype || fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.fund_company || '')} · 份额已合并</p></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join('、') || '—')}</dd></div><div><dt>资产规模 · ${escapeHTML(fund.asset?.report_date || '暂无披露')}</dt><dd>${money(fund.asset?.net_asset)}</dd></div></dl>`;
+  if (hero) hero.innerHTML = `<div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.subtype || fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.fund_company || '')}</p></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join('、') || '—')}</dd></div><div><dt>资产规模 · ${escapeHTML(fund.asset?.report_date || '暂无披露')}</dt><dd>${money(fund.asset?.net_asset)}</dd></div></dl>`;
   page.querySelector('.fund-page-metrics')?.remove();
   const nav = page.querySelector('.fund-tab-nav');
   nav.querySelectorAll('button').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected', 'false'); });
-  nav.insertAdjacentHTML('afterbegin', `<button class="active" data-tab="overview" role="tab" aria-selected="true">${fund.category === 'pure-bond' ? '市场概览' : '研究概览'}</button>`);
+  nav.insertAdjacentHTML('afterbegin', `<button class="active" data-tab="overview" role="tab" aria-selected="true">研究概览</button>`);
   page.querySelectorAll('[data-panel]').forEach(p => { p.hidden = true; p.classList.remove('active'); });
   page.querySelector('.fund-tab-content').insertAdjacentHTML('afterbegin', panel('overview', renderResearchOverview(fund, detail), true));
+  bindResearchOverview(detail);
   // One navigation keeps every available analysis directly accessible.
   nav.classList.add('all-functions');
   nav.setAttribute('aria-label', '基金分析功能');
-  if (fund.category === 'pure-bond') {
-    void FundMarket.mount(page.querySelector('[data-panel="overview"]'));
-    return;
-  }
   const refreshSummary = () => loadResearchSummary(fund.code).then(() => {
     page.querySelector('[data-panel="overview"]').innerHTML = renderResearchOverview(fund, detail);
+    bindResearchOverview(detail);
   }).catch(error => {
     page.querySelector('[data-summary-error]')?.remove();
     page.querySelector('.research-conclusion')?.insertAdjacentHTML('beforeend', `<div data-summary-error><p class="empty-copy">概览补充信息未能加载：${escapeHTML(error.message)}。净值和其他分析仍可查看。</p><button type="button" class="text-button" data-summary-retry>重新加载概览</button></div>`);
@@ -3578,7 +3566,7 @@ function dailyIndustryChart(view,name) {
 }
 
 function dailyFilterPanel(daily,options={},error='') {
-  const intro='<div class="daily-explorer-head"><div><h2>每日配置估计</h2><p>选择日期看配置，点选行业看变化。以下都是模型估计，不是基金实时公布的持仓。</p></div></div>';
+  const intro='<div class="daily-explorer-head"><div><h2>每日配置估计</h2><p>悬停查看当日配置，点选行业看走势。模型估计 · 占基金净值。</p></div></div>';
   if(!daily) return `<section class="daily-explorer">${intro}<div class="simulation-empty-card daily-explorer-empty" data-model-state="${error?'error':options.pending?'loading':'unavailable'}" role="${error?'alert':'status'}"><p>${error?'每日估计没有加载成功，可以重新试一次。':options.pending?'正在加载每日估计，请稍候…':'这只基金暂时没有每日估计结果。'}</p>${error?`<button type="button" class="text-button" data-model-retry="daily">重新加载每日估计</button><details class="simulation-method"><summary>查看加载失败原因</summary><p>${escapeHTML(error)}</p></details>`:''}</div></section>`;
   let view;
   try{view=dailyFilterViewModel(daily,options);}catch(invalid){return `<section class="daily-explorer">${intro}<div class="simulation-empty-card daily-explorer-empty" data-model-state="invalid" role="alert"><p>日期数据存在冲突，暂时无法展示。</p><p>${escapeHTML(invalid.message)}</p></div></section>`;}
@@ -3589,14 +3577,14 @@ function dailyFilterPanel(daily,options={},error='') {
   const rows=[...daily.names].sort((a,b)=>view.point?view.point.groups[b]-view.point.groups[a]:0),search=String(options.search||''),query=search.trim().toLocaleLowerCase();
   const matching=rows.filter(name=>name.toLocaleLowerCase().includes(query)).length;
   const displayWeight=value=>value>0&&value<.0001?pct(value,4):pct(value,2);
-  const ranking=rows.map(name=>{const value=view.point?.groups[name],hasValue=Number.isFinite(value),selected=view.industry===name;return `<li data-daily-row="${escapeHTML(name)}"${name.toLocaleLowerCase().includes(query)?'':' hidden'}><button type="button" class="daily-allocation-row${selected?' active':''}" data-daily-industry="${escapeHTML(name)}" aria-pressed="${selected}" aria-label="${escapeHTML(name)}，${hasValue?pct(value,4):'没有结果'}，查看走势"><span class="daily-allocation-name"><i style="background:${reconstructionColor(name)}" aria-hidden="true"></i>${escapeHTML(name)}</span><span class="daily-allocation-track" aria-hidden="true">${hasValue?`<i class="daily-allocation-bar" style="width:${Math.max(0,Math.min(100,value*100))}%;background:${reconstructionColor(name)}"></i>`:''}</span><strong class="daily-allocation-value" title="${hasValue?pct(value,4):'没有结果'}" data-daily-value="${hasValue?value:''}">${hasValue?displayWeight(value):'—'}</strong></button></li>`;}).join('');
+  const ranking=rows.map(name=>{const value=view.point?.groups[name],hasValue=Number.isFinite(value),selected=view.industry===name;return `<li data-daily-row="${escapeHTML(name)}"${name.toLocaleLowerCase().includes(query)?'':' hidden'}><button type="button" class="daily-allocation-row${selected?' active':''}" data-daily-industry="${escapeHTML(name)}" aria-pressed="${selected}" aria-label="${escapeHTML(name)}，${hasValue?pct(value,4):'没有结果'}，查看走势"><span class="daily-allocation-name"><i style="background:${reconstructionColor(name)}" aria-hidden="true"></i>${escapeHTML(name)}</span><span class="daily-allocation-track" aria-hidden="true">${hasValue?`<i class="daily-allocation-bar" style="width:${Math.max(0,Math.min(100,value*(r.a_share_nav_weight??0)*100))}%;background:${reconstructionColor(name)}"></i>`:''}</span><strong class="daily-allocation-value" title="${hasValue?pct(value,4):'没有结果'}" data-daily-value="${hasValue?value:''}">${hasValue?displayWeight(value):'—'}</strong></button></li>`;}).join('');
   const value=view.industry&&view.point?view.point.groups[view.industry]:null;
   const unknownWeight=view.point?.groups['未知残余'];
   const unknownNote=Number.isFinite(unknownWeight)&&unknownWeight>0?`<p class="method-note" data-kalman-unknown-note>有 ${displayWeight(unknownWeight)} 的股票仓位暂时不能归到具体行业，单列为“未知残余”，没有摊入已知行业。</p>`:'';
   const dateText=view.point?`正在查看 <strong>${escapeHTML(view.selected)}</strong>${view.point.date!==view.selected?`，对应最近一次结果 <strong>${escapeHTML(view.point.date)}</strong>`:''}`:`<strong>${escapeHTML(view.selected)}</strong> 没有可用估计；“—”不表示仓位为 0`;
   return `<section class="daily-explorer">${intro}<p class="simulation-date-note">最近有结果的日期：<strong>${view.latest}</strong>${daily.end!==view.latest?`；此后暂缺估计，数据检查至 ${escapeHTML(daily.end)}`:''}。</p>
     <div class="daily-explorer-controls"><label>时间范围 <select data-daily-range>${[['1','最近1年'],['3','最近3年'],['5','最近5年'],['all','全部历史']].map(([key,label])=>`<option value="${key}"${view.range===key?' selected':''}>${label}</option>`).join('')}</select></label><label>查看日期 <input type="date" data-daily-date min="${view.start}" max="${view.end}" value="${view.selected}"></label><div class="daily-date-buttons"><button type="button" data-daily-date-step="previous" data-daily-target-date="${view.previous}" aria-label="上一个有估计的日期"${view.previous?'':' disabled'}>上一日</button><button type="button" data-daily-date-step="next" data-daily-target-date="${view.next}" aria-label="下一个有估计的日期"${view.next?'':' disabled'}>下一日</button><button type="button" data-daily-date-step="latest" data-daily-target-date="${view.latest}" data-daily-target-range="${view.latest<view.start?'all':''}">最新</button></div></div>
-    <p class="daily-explorer-date" role="status">${dateText}。</p>${unknownNote}<div class="daily-explorer-layout"><article class="subpanel daily-explorer-chart"><div class="daily-chart-controls"><button type="button" data-daily-industry="" class="text-button${view.industry?'':' active'}" aria-pressed="${!view.industry}">整体配置</button><label>查看行业走势 <select data-daily-industry-select><option value="">整体配置</option>${daily.names.map(name=>`<option value="${escapeHTML(name)}"${name===view.industry?' selected':''}>${escapeHTML(name)}</option>`).join('')}</select></label></div><h3>${view.industry?`${escapeHTML(view.industry)}${Number.isFinite(value)?` · ${displayWeight(value)}`:''}`:'配置随时间的变化'}</h3><p class="simulation-chart-description">${view.industry?'纵轴是该行业或资产占基金净资产的比例。':'色带越厚，占比越大；估计为 20%，相当于每 100 元基金净资产约有 20 元投向这一类。债券在最上层。'}</p><div data-daily-chart>${chart}</div><p class="method-note">点图查看日期，也可用上方日期按钮。灰色或空白处没有结果，前后不会直接连线。</p></article>
+    <p class="daily-explorer-date" role="status">${dateText}。</p>${unknownNote}<div class="daily-explorer-layout"><article class="subpanel daily-explorer-chart"><div class="daily-chart-controls"><button type="button" data-daily-industry="" class="text-button${view.industry?'':' active'}" aria-pressed="${!view.industry}">整体配置</button><label>查看行业走势 <select data-daily-industry-select><option value="">整体配置</option>${daily.names.map(name=>`<option value="${escapeHTML(name)}"${name===view.industry?' selected':''}>${escapeHTML(name)}</option>`).join('')}</select></label></div><h3>${view.industry?`${escapeHTML(view.industry)}${Number.isFinite(value)?` · ${displayWeight(value)}`:''}`:'配置随时间的变化'}</h3><p class="simulation-chart-description">${view.industry?'纵轴是该行业或资产占基金净资产的比例。':'色带表示行业与资产占比，债券在最上层。'}</p><div data-daily-chart>${chart}</div><p class="method-note">移动鼠标或手指查看日期与配置；左右方向键逐日查看。灰色区间为暂无结果。</p></article>
     <article class="subpanel daily-explorer-ranking"><h3>${view.point?`${view.point.date} · 配置明细`:'该日暂无配置明细'}</h3><p class="method-note">按占比从高到低排列，点击一行查看走势，向下滚动可查全部。</p><label class="daily-explorer-search">查找行业或资产 <input type="search" data-daily-search value="${escapeHTML(search)}" placeholder="例如：电子、医药、港股、债券" autocomplete="off"></label><p class="daily-search-count" data-daily-search-count role="status">显示 ${matching} / ${rows.length} 项，可滚动查看全部</p><ul class="daily-allocation-list" aria-label="当日配置，可滚动查看全部行业">${ranking}</ul><p class="empty-copy" data-daily-search-empty${matching?' hidden':''}>没有匹配的行业或资产，可缩短关键词。</p></article></div>
     <details class="simulation-method"><summary>查看估计方法和没有结果的原因</summary><p>使用 Event-P Filter 逐日估计，比例均占基金净资产，没有重新归一到100%。出现“未知残余”时，表示这部分股票仓位暂时无法归到具体行业；它使用市场代理收益，不代表已经识别出新的持仓。港股和债券只估计总体比例，不能还原个股、个券。不同披露阶段分别计算，缺数据的时段不沿用旧值。休市日可对应最近一次有结果的日期。历史数据没有逐日留档，这些结果不等于当时保存的实盘预测。</p><p>${escapeHTML((daily.issues||[]).map(comparisonIssueText).join('；')||'未记录其他异常。')}</p></details></section>`;
 }
@@ -3617,7 +3605,7 @@ function bindDailyFilterExplorer(target,daily,options,onChange) {
   });
   const svg=target.querySelector('[data-daily-chart]')?.querySelector('svg');
   if(!svg||!daily)return;
-  svg.addEventListener('click',event=>{
+  const selectDate=event=>{
     const matrix=svg.getScreenCTM();if(!matrix)return;
     const cursor=svg.createSVGPoint();cursor.x=event.clientX;cursor.y=event.clientY;
     const local=cursor.matrixTransform(matrix.inverse()),width=svg.viewBox.baseVal.width,left=48,right=width-15;
@@ -3625,8 +3613,29 @@ function bindDailyFilterExplorer(target,daily,options,onChange) {
     const view=dailyFilterViewModel(daily,options),stamp=Date.parse(view.start)+(local.x-left)/(right-left)*(Date.parse(view.end)-Date.parse(view.start));
     const day=new Date(Math.round(stamp/86400000)*86400000).toISOString().slice(0,10);
     const date=view.gaps.some(g=>day>=g.start&&day<=g.end)?day:view.visibleDates.reduce((best,d)=>!best||Math.abs(Date.parse(d)-stamp)<Math.abs(Date.parse(best)-stamp)?d:best,'');
-    if(date)onChange({date});
-  });
+    if(date)return date;
+  };
+  let selected=options.date||'';
+  const update=date=>{
+    if(!date||date===selected)return;selected=date;options.date=date;
+    onChange({date},false);
+    const view=dailyFilterViewModel(daily,options),input=target.querySelector('[data-daily-date]');if(input)input.value=date;
+    const label=target.querySelector('.daily-explorer-date');if(label)label.textContent=view.point?`正在查看 ${date} · 对应结果 ${view.point.date}`:`${date} 暂无估计`;
+    const title=target.querySelector('.daily-explorer-ranking h3');if(title)title.textContent=view.point?`${view.point.date} · 配置明细`:'该日暂无配置明细';
+    const list=target.querySelector('.daily-allocation-list');
+    const rows=[...target.querySelectorAll('[data-daily-row]')];
+    rows.forEach(row=>{const name=row.dataset.dailyRow,v=view.point?.groups[name],value=row.querySelector('.daily-allocation-value');let bar=row.querySelector('.daily-allocation-bar');if(value){value.textContent=Number.isFinite(v)?pct(v,2):'—';value.title=Number.isFinite(v)?pct(v,4):'没有结果';value.dataset.dailyValue=Number.isFinite(v)?v:'';}if(!bar&&Number.isFinite(v)){const track=row.querySelector('.daily-allocation-track');if(track){const added=document.createElement('i');added.className='daily-allocation-bar';added.style.background=reconstructionColor(name);track.append(added);bar=added;}}if(bar)bar.style.width=`${Number.isFinite(v)?Math.max(0,Math.min(100,v*100)):0}%`;});
+    rows.sort((a,b)=>(view.point?.groups[b.dataset.dailyRow]??-Infinity)-(view.point?.groups[a.dataset.dailyRow]??-Infinity)).forEach(row=>list?.append(row));
+    let line=svg.querySelector('[data-review-cursor]')||svg.querySelector('line[stroke="#17324d"][stroke-width="1.2"]');if(!line){line=document.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('data-review-cursor','true');line.setAttribute('y1','32');line.setAttribute('y2','280');line.setAttribute('stroke','#174d42');line.setAttribute('stroke-width','1.5');line.setAttribute('pointer-events','none');svg.append(line);}
+    const x=48+(Date.parse(date)-Date.parse(view.start))/Math.max(1,Date.parse(view.end)-Date.parse(view.start))*(svg.viewBox.baseVal.width-63);line.setAttribute('x1',x);line.setAttribute('x2',x);
+    target.querySelectorAll('[data-daily-date-step]').forEach(button=>{const kind=button.dataset.dailyDateStep;if(kind==='previous'||kind==='next'){button.dataset.dailyTargetDate=view[kind];button.disabled=!view[kind];}});
+  };
+  svg.setAttribute('tabindex','0');svg.setAttribute('aria-label','每日估计，移动指针或左右方向键查看日期和配置');
+  svg.addEventListener('pointermove',event=>update(selectDate(event)));
+  svg.addEventListener('pointerdown',event=>update(selectDate(event)));
+  svg.addEventListener('click',event=>update(selectDate(event)));
+  svg.addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const view=dailyFilterViewModel(daily,options);update(event.key==='Home'?view.visibleDates[0]:event.key==='End'?view.latest:event.key==='ArrowLeft'?view.previous:view.next);});
+
 }
 
 function bindCombinedEquitySimulation(target, current=null, historical=null, historicalError='', eventp=null, eventpError='', code=fundCode) {
@@ -3722,7 +3731,7 @@ function equitySimulationPanel(data, index, selectedDate, view, selectedIndustry
   basis=basis==='equity'?'equity':'nav';
   const basisLabel=simulationBasisLabel(basis);
   const peers = Object.entries(index.funds || {}).map(([code, fund]) => `<a href="fund.html?code=${encodeURIComponent(code)}&tab=simulation">${escapeHTML(fund.name)} <small>${escapeHTML(code)}</small></a>`).join('');
-  if (!data || data.status !== 'available') return `<div class="panel-intro"><div><h2>持仓模拟（研究版）</h2><p>目前仅覆盖 ${Object.keys(index.funds || {}).length} 只固定试点基金。</p></div></div><article class="subpanel"><p>${escapeHTML(data?.reason || '本基金暂未纳入试点，不生成推测性持仓。')}</p><p class="method-note">按完整持仓、A股覆盖和行情质量选择，未按模型效果筛选；尚不推广到全部主动权益基金。</p><div class="simulation-pilot-links">${peers}</div></article>`;
+  if (!data || data.status !== 'available') return `<div class="panel-intro"><div><h2>持仓模拟</h2><p>目前仅覆盖 ${Object.keys(index.funds || {}).length} 只固定试点基金。</p></div></div><article class="subpanel"><p>${escapeHTML(data?.reason || '本基金暂未纳入试点，不生成推测性持仓。')}</p><p class="method-note">按完整持仓、A股覆盖和行情质量选择，未按模型效果筛选；尚不推广到全部主动权益基金。</p><div class="simulation-pilot-links">${peers}</div></article>`;
   const rows = simulationDisplayRows(data.rows || [],basis);
   const row = rows.find(r => r.date === selectedDate) || rows.at(-1);
   if (!row) return '<p class="empty-copy">暂无可用模拟日期。</p>';
@@ -3786,11 +3795,11 @@ function bindEquitySimulation(target, data, index) {
 }
 
 const GENERIC_TABS = {
-  "active-equity": [["performance", "业绩表现"], ["profile", "基金画像"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股分析"], ["simulation", "持仓模拟（研究版）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
+  "active-equity": [["performance", "业绩表现"], ["profile", "基金画像"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股分析"], ["simulation", "持仓模拟"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "index-enhanced": [["performance", "业绩表现"], ["industries", "行业分析（相比基准）"], ["holdings", "持股分析（相比基准）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["documents", "公告原文"]],
-  "pure-bond": [["perf", "业绩表现"], ["alloc", "资产配置"], ["bond", "券种结构"], ["corr", "相关性分析"], ["campisi", "Campisi归因"], ["documents", "公告原文"]],
-  "hybrid-bond": [["performance", "业绩表现"], ["evaluation", "五维评价"], ["assets", "资产配置"], ["bonds", "券种结构"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["original", "同事原版与久期研究"], ["documents", "公告原文"]],
-  "convertible-bond": [["performance", "业绩表现"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股与转债分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["original", "同事原版与久期研究"], ["documents", "公告原文"]],
+  "pure-bond": [["perf", "业绩表现"], ["alloc", "资产配置"], ["bond", "券种结构"], ["corr", "相关性分析"], ["campisi", "业绩归因"], ["documents", "公告原文"]],
+  "hybrid-bond": [["performance", "业绩表现"], ["profile", "权益画像"], ["evaluation", "五维评价"], ["assets", "资产配置"], ["bonds", "券种与利率敏感性"], ["convertibles", "转债穿透"], ["ipo", "打新分析"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
+  "convertible-bond": [["performance", "业绩表现"], ["profile", "权益画像"], ["assets", "资产配置"], ["bonds", "券种与利率敏感性"], ["convertibles", "转债穿透"], ["ipo", "打新分析"], ["industries", "行业分析"], ["holdings", "持股与转债分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
 };
 
 function genericPeriodRows(fund) {
@@ -4501,15 +4510,24 @@ function pureBondDurationPairs(kalmanDuration, disclosureHistory) {
   }).filter(Boolean);
 }
 
-function downsamplePureBondDuration(kalmanDuration, maximum = 900) {
-  const dates = kalmanDuration?.dates || [];
-  const values = kalmanDuration?.duration || [];
-  if (dates.length <= maximum) return dates.map((date, index) => ({ report_date: date, duration: Number(values[index]) }));
-  const indexes = new Set([0, dates.length - 1]);
+function downsamplePureBondDuration(kalmanDuration, maximum = 900, startDate = "") {
+  // Display projection only: retain missing values and all original model inputs.
+  const rows = (kalmanDuration?.dates || []).map((date, index) => ({
+    report_date: date,
+    duration: isFiniteValue(kalmanDuration?.duration?.[index]) ? Number(kalmanDuration.duration[index]) : null,
+  })).filter(row => row.report_date >= startDate);
+  if (rows.length <= maximum) return rows;
+  const indexes = new Set([0, rows.length - 1]);
   for (let index = 1; index < maximum - 1; index += 1) {
-    indexes.add(Math.round(index / (maximum - 1) * (dates.length - 1)));
+    indexes.add(Math.round(index / (maximum - 1) * (rows.length - 1)));
   }
-  return [...indexes].sort((left, right) => left - right).map((index) => ({ report_date: dates[index], duration: Number(values[index]) }));
+  // Preserve gap boundaries so downsampling never draws across a missing section.
+  rows.forEach((row, index) => {
+    if (index && (row.duration == null) !== (rows[index - 1].duration == null)) {
+      indexes.add(index - 1); indexes.add(index);
+    }
+  });
+  return [...indexes].sort((a, b) => a - b).map(index => rows[index]);
 }
 
 function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
@@ -4517,7 +4535,7 @@ function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
   const comparisons=kalmanDuration?.core_evaluation?.points||[];
   const byDate=new Map(comparisons.map(r=>[r.report_date,r]));
   const comparable=new Set(comparisons.filter(r=>!r.excluded_reason&&isFiniteValue(r.actual)).map(r=>r.report_date));
-  const model=kalmanDuration?.status==='ok'?downsamplePureBondDuration(kalmanDuration):[];
+  const model=kalmanDuration?.status==='ok'?downsamplePureBondDuration(kalmanDuration,900,'2018-01-01'):[];
   const series=new Map(model.map(r=>[r.report_date,{...r}]));
   const reasons={missing_same_period_signed_sensitivity:'缺少同报告期双向利率敏感性核验',missing_same_period_net_assets:'缺少同报告期净资产核验',invalid_sensitivity_direction:'敏感性方向未通过核验',unverified_disclosure:'披露来源尚未完成核验',no_estimate_before_report:'报告期早于模型估计起点',estimate_too_far:'最近估计日距报告期过远'};
   const rows=history.map(r=>{
@@ -4531,11 +4549,11 @@ function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
   });
   const state=detail?.fund?.duration_disclosure||fund.duration_disclosure||{};
   const missing=state.status==='report_without_numeric_sensitivity'?'已核对报告，本期未给出可计算的数值敏感性，不记为0。':state.status==='invalid_numeric_value'?'本期来源数值异常（超出0—30年检查范围），未用于图表，等待核查。':state.status==='source_value_missing'?'本期利率敏感性久期尚未取得；保留历史值，后续自动补查。':'';
-  const points=[...series.values()].sort((a,b)=>a.report_date.localeCompare(b.report_date));
-  return `<section class="bond-disclosed-history"><div class="subpanel-heading"><div><h3>日频估计与半年报／年报久期</h3><span>日期按报告期末标注 · 单位：年</span></div></div>
+  const points=[...series.values()].filter(r=>r.report_date>='2018-01-01').sort((a,b)=>a.report_date.localeCompare(b.report_date));
+  return `<section class="bond-disclosed-history"><div class="subpanel-heading"><div><h3>日频估计与半年报／年报久期</h3><span>图示自2018年起 · 披露日期按报告期末标注 · 单位：年</span></div></div>
     ${missing?`<p class="method-note">${escapeHTML(state.target_report_date||'')}：${missing}</p>`:''}
-    ${points.length>=2?renderMiniLineChart(points,[{key:'duration',label:'日频估计',color:'#0a7c78',format:'years'},{key:'disclosed',label:'已核验披露对照',color:'#c17729',format:'years',points:true},{key:'historical',label:'其他历史披露',color:'#78848c',format:'years',points:true,hollow:true}],`${fund.name}日频估计与历史披露久期`,true):'<p class="empty-copy">可用久期点不足以绘图；已有披露见下表。</p>'}
-    <p class="method-note">实心点：已核验披露对照；空心点：其他历史披露。鼠标悬停查看日期、数值和来源。</p>
+    ${points.length>=2?renderMiniLineChart(points,[{key:'duration',label:'日频估计',color:'#0a7c78',format:'years'},{key:'disclosed',label:'已核验披露对照',color:'#c17729',format:'years',points:true},{key:'historical',label:'其他历史披露',color:'#98465f',format:'years',points:true}],`${fund.name}日频估计与历史披露久期`,true):'<p class="empty-copy">可用久期点不足以绘图；已有披露见下表。</p>'}
+    <p class="method-note">橙色实心点：已核验披露；紫红色实心点：其他历史披露。悬停查看日期和数值，全部历史披露保留在下表。</p>
     ${rows.length?`<details><summary>全部历史披露（${rows.length}期）</summary>${renderTable(['报告期','披露久期','来源','对照说明'],rows.reverse())}</details>`:'<p class="method-note">暂未取得可用的历史数值披露。</p>'}
   </section>`;
 }
@@ -4784,7 +4802,7 @@ function genericPureBondDeepResearchPanelLegacy(fund, detail, research, campisi,
       ${pureBondResearchJump("performance", "业绩表现", "净值、回撤、滚动风险与期限指数对比")}
       ${pureBondResearchJump("assets", "资产与久期", "杠杆、披露久期、国债收益率和日频Kalman")}
       ${pureBondResearchJump("bonds", "券种与逐券", "券种结构、重仓券、集中度与换手代理")}
-      ${pureBondResearchJump("attribution", "Campisi归因", "五因子收益贡献、暴露与同类百分位")}
+      ${pureBondResearchJump("attribution", "业绩归因", "五因子收益贡献、暴露与同类百分位")}
       ${pureBondResearchJump("correlation", "相关性", "同类基金及财富指数多窗口相关性")}
       ${pureBondResearchJump("documents", "公告原文", "季度、半年及年度报告公开原文")}
     </div>
@@ -5067,7 +5085,7 @@ function genericNavChartPoints(fund, detail) {
       benchmark: Number.isFinite(benchmarkMap.get(date)) ? benchmarkMap.get(date) : null,
     }));
   const firstCommonIndex = rows.findIndex((item) => isFiniteValue(item.benchmark) && Number(item.benchmark) > 0);
-  return firstCommonIndex >= 0 ? rows.slice(firstCommonIndex) : [];
+  return firstCommonIndex >= 0 ? rows.slice(firstCommonIndex) : rows;
 }
 
 function genericPerformancePanel(fund, detail, brinson) {
@@ -5095,14 +5113,14 @@ function genericPerformancePanel(fund, detail, brinson) {
   const benchmarkLatest = (benchmark.series || []).filter(([, value]) => isFiniteValue(value)).at(-1)?.[0] || "—";
   const contractBenchmark = fund.benchmark || "现有目录未记录";
   return `
-    <div class="panel-intro"><div><p class="eyebrow">PERFORMANCE & DRAWDOWN</p><h2>${relative ? "基金表现与超额表现" : "业绩、风险与回撤"}</h2></div><div class="chart-controls" aria-label="净值区间"><button data-generic-nav-range="ytd">今年以来</button><button data-generic-nav-range="12">1年</button><button data-generic-nav-range="36">3年</button><button data-generic-nav-range="60">5年</button>${managerStart ? `<button data-generic-nav-range="manager" data-manager-start="${escapeHTML(managerStart)}">现任经理</button>` : ""}<button data-generic-nav-range="all" class="active">可得历史</button></div></div>
-    <div class="calibration-note"><strong>基准口径</strong><p>基金合同业绩比较基准：${escapeHTML(contractBenchmark)}。<br>图中采用${escapeHTML(genericBenchmarkRole(fund))}：${escapeHTML(benchmark.name)}；用于横向研究与风险比较，不替代合同基准。</p></div>
+    <div class="panel-intro warm-performance-heading"><div><p class="eyebrow">01 / PERFORMANCE</p><h2>业绩表现</h2></div><div class="chart-controls" aria-label="净值区间"><button data-generic-nav-range="ytd">今年以来</button><button data-generic-nav-range="12">近1年</button><button data-generic-nav-range="36">近3年</button><button data-generic-nav-range="60">近5年</button><button data-generic-nav-range="all" class="active">可得历史</button></div></div>
+    ${WarmPerformance.controls(fund, navPoints)}
+    <p id="warm-range-note" class="warm-range-note" aria-live="polite"></p>
     <div class="research-metric-grid metric-six" id="generic-performance-range-metrics" aria-live="polite">${renderPerformanceMetricCards("all", navPoints)}</div>
-    <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>复权净值与回撤</h3><span>基金净值截至 ${escapeHTML(navPoints.at(-1)?.date || "—")} · 研究基准截至 ${escapeHTML(benchmarkLatest)}</span></div></div><div id="generic-nav-chart-output">${chartPoints.length ? renderZoomableNavChart(chartPoints, fund.name, benchmark.name) : '<p class="empty-copy">比较基准序列不足，暂显示下方收益回撤表。</p>'}</div><p class="method-note">两条序列从首个共同有效日分别归一化；若研究基准暂未更新到基金最新净值日，基金曲线仍继续展示，基准线停在自身最新日期。定开、暂停估值或源数据未披露的自然日不伪造数值。</p></article>
-    <div class="performance-table-stack">
-      <article class="subpanel performance-table-panel"><div class="subpanel-heading"><div><h3>分期限风险收益</h3><span>累计收益、波动、回撤与风险调整指标</span></div></div>${horizonRows.length ? renderTable(["区间", "累计收益", "年化收益", "年化波动", "最大回撤", "Sharpe", "Calmar"], horizonRows) : '<p class="empty-copy">净值历史不足，暂无法计算风险收益指标。</p>'}</article>
-      <article class="subpanel performance-table-panel"><div class="subpanel-heading"><div><h3>全部自然年度风险收益</h3><span>按自然年度统计，最新年度为年初至今</span></div></div>${calendarRows.length ? renderTable(["年度", "年度收益", "年化收益", "年化波动", "最大回撤", "Sharpe", "Calmar"], calendarRows) : '<p class="empty-copy">年度净值历史不足。</p>'}</article>
-    </div>
+    <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>复权净值与回撤</h3><span>基金净值截至 ${escapeHTML(navPoints.at(-1)?.date || "—")} · 研究基准截至 ${escapeHTML(benchmarkLatest)}</span></div></div><div id="generic-nav-chart-output">${chartPoints.length ? renderZoomableNavChart(chartPoints, fund.name, benchmark.name) : '<p class="empty-copy">比较基准序列不足，暂显示下方收益回撤表。</p>'}</div><details class="warm-method"><summary>基准与图表口径</summary><p>合同基准：${escapeHTML(contractBenchmark)}。图中比较：${escapeHTML(benchmark.name)}，从区间内首个共同有效日归一化；基准线截至自身最新日期。右轴显示所选区间的基金回撤。</p></details></article>
+    ${WarmPerformance.summary(fund, navPoints, calendarRows)}
+    <article class="subpanel performance-table-panel"><div class="subpanel-heading"><div><p class="eyebrow">04 / PERIOD RETURNS</p><h3>阶段表现</h3></div><span>累计收益 · 波动 · 回撤</span></div>${horizonRows.length ? renderTable(["阶段", "累计收益", "年化收益", "年化波动", "最大回撤", "Sharpe", "Calmar"], horizonRows) : '<p class="empty-copy">净值历史不足。</p>'}</article>
+    ${WarmPerformance.tenureTable(fund, navPoints)}
     <p class="method-note">Sharpe按无风险利率0计算；Calmar＝年化收益/最大回撤绝对值。全量详情使用日频有效净值估算波动和风险调整指标，频率按实际观察数年化。</p>
     <article class="subpanel"><div class="subpanel-heading"><div><h3>月度收益、年度回撤与修复</h3><span>红色为上涨、绿色为下跌；当年合计按已有月份复合</span></div></div>${renderMonthlyReturnHeatmap(monthlyReturnsFromNav(navPoints), navPoints)}</article>
     ${activeMetrics ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>超额与风险调整指标</h3><span>近五年月度收益 · 统一以中证800为横向研究代理</span></div></div><section class="research-metric-grid metric-six">${metric("年化超额", pct(activeMetrics.annualizedExcess, 1, true))}${metric("跟踪误差", pct(activeMetrics.trackingError, 1))}${metric("信息比率", num(activeMetrics.informationRatio, 2))}${metric("月度超额胜率", pct(activeMetrics.winRate, 1))}${metric("上涨捕获", pct(activeMetrics.upCapture, 1))}${metric("下跌捕获", pct(activeMetrics.downCapture, 1))}${metric("年化波动率", pct(activeMetrics.volatility, 1))}${metric("下行波动率", pct(activeMetrics.downside, 1))}${metric("Sharpe", num(activeMetrics.sharpe, 2))}${metric("Sortino", num(activeMetrics.sortino, 2))}</section>${renderTable(["情景", "样本", "基金月均", "基准月均", "超额胜率"], activeMetrics.scenarios)}</article><p class="method-note">横向研究基准不替代基金合同业绩比较基准；上涨/下跌捕获以基准正负收益月份的平均收益比计算。</p>` : ""}
@@ -5328,7 +5346,7 @@ function genericBondPanel(fund, bondHistory, detail) {
     item.underlying_volatility_12m === null ? "—" : `${num(item.underlying_volatility_12m, 1)}%`,
   ]);
   const convertibleWeighted = (key) => {
-    const values = convertible.map((item) => [Number(item.weight), Number(item[key])]).filter(([weight, value]) => weight > 0 && Number.isFinite(value));
+    const values = convertible.filter(item => isFiniteValue(item.weight) && isFiniteValue(item[key])).map(item => [item.weight, item[key]]).filter(([weight]) => weight > 0);
     const weight = values.reduce((sum, item) => sum + item[0], 0);
     return weight > 0 ? values.reduce((sum, item) => sum + item[0] * item[1], 0) / weight : null;
   };
@@ -5666,7 +5684,7 @@ function genericCorrelationSide(fund, data, key, type) {
   const windowData = data?.windows?.[key] || {};
   const source = windowData[type] || (key === "5y" ? data?.[type] : []) || [];
   if (type === "peers") {
-    const rows = source.map((item) => {
+    const rows = source.filter(item => FundLifecycle.currentCompareEligible(item.code)).map((item) => {
       return [
         escapeHTML(item.code),
         `<a href="fund.html?code=${encodeURIComponent(item.code)}"><strong>${escapeHTML(item.name)}</strong></a>`,
@@ -5738,7 +5756,7 @@ function genericCorrelationPanel(fund, errors = {}) {
       <div class="calibration-note"><strong>用于替换研究</strong><p>同类基金表先回答“净值行为最像谁”，指数表回答“更接近哪类市场风格”。真正用于经理更换或风格漂移后的替换，还应叠加行业集中度、历史行业稳定性、波动回撤和经理任期过滤；仅凭相关系数不直接给出替代结论。</p></div>
       <p class="method-note">相关性描述历史共同波动，不代表持仓相似度、因果关系或未来表现。短窗口至少12/35/70个共同交易日，长期窗口使用月收益；行业相关性采用Choice东财一级行业价格指数，持仓行业分析仍采用中信行业分类，两套分类不可直接逐项等同。</p>`;
   }
-  const peerRows = (data.peers || []).map((item) => [
+  const peerRows = (data.peers || []).filter(item => FundLifecycle.currentCompareEligible(item.code)).map((item) => [
     `<a href="fund.html?code=${encodeURIComponent(item.code)}"><strong>${escapeHTML(item.name)}</strong></a><small>${escapeHTML(item.code)}</small>`,
     num(item.correlation, 3),
   ]);
@@ -5909,7 +5927,7 @@ function genericMultiAssetAttributionPanel(data) {
       ["股票选择收益", '<span class="status-pill entered">已实现</span>', "完整持仓区间可计算Brinson-Fachler归因"],
       ["转债选择收益", '<span class="status-pill added">部分实现</span>', "指数代理；逐券行情覆盖不足时不强算"],
       ["纯债选择收益", '<span class="status-pill entered">已实现</span>', "官方类属仓位×对应债券财富指数"],
-      ["打新收益", '<span class="status-pill reduced">未实现</span>', "本地无网下配售明细，不并入选券能力"],
+      ["打新收益", '<span class="status-pill reduced">未单独剥离</span>', "逐笔覆盖与价差口径见打新分析"],
       ["隐形交易与残差", '<span class="status-pill unchanged">轧差项</span>', "不可直接解释为基金经理交易能力"],
     ])}</article>
     <div class="toolbar"><label>披露区间<select id="multi-asset-attribution-period">${data.periods.slice().reverse().map((item) => `<option value="${escapeHTML(item.start)}"${item.start === latest.start ? " selected" : ""}>${escapeHTML(item.start)} → ${escapeHTML(item.end)}</option>`).join("")}</select></label></div>
@@ -6125,7 +6143,7 @@ function genericTabLoadingPanel(label) {
 function bindGenericPerformancePanel(fund, detail) {
   const chartPoints = genericNavChartPoints(fund, detail);
   const benchmark = genericBenchmark(fund, detail);
-  bindGenericPerformanceChart(chartPoints, fund.name, benchmark.name, genericFundNavPoints(detail), ["active-equity", "index-enhanced"].includes(fund.category));
+  WarmPerformance.bind(chartPoints, fund, benchmark.name, genericFundNavPoints(detail));
   if (["pure-bond", "hybrid-bond"].includes(fund.category)) bindPureBondIndexComparison(fund, detail);
 }
 
@@ -6176,6 +6194,7 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (id === "performance") {
+      try { await WarmPerformance.load(fund.code); } catch(error) { fund.warm_context_error=error.message; }
       target.innerHTML = genericPerformancePanel(fund, detail, null);
       bindGenericPerformancePanel(fund, detail);
       if (!detail?.benchmark?.length) void loadGenericPerformanceBenchmark(fund, detail);
@@ -6186,6 +6205,13 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (id === "profile") {
+      if (BondCBFusion.isEligible(fund)) {
+        const equity = await BondEquityFusion.load(fund);
+        target.innerHTML = BondEquityFusion.profilePanel(equity);
+        BondEquityFusion.bind(target, equity);
+        bindMiniLineCharts();
+        return;
+      }
       await loadProfileDetails(fund.code);
       target.innerHTML = renderActiveEquityProfilePanel(fund);
       return;
@@ -6213,7 +6239,8 @@ function createGenericTabLoader(fund, detail) {
         ["active-equity", "hybrid-bond"].includes(fund.category) ? holdings() : Promise.resolve(null),
         fund.category === "pure-bond" ? pureBondDuration() : Promise.resolve(null),
       ]);
-      target.innerHTML = genericAssetPanel(fund, detail, holdingHistory, kalmanDuration);
+      const equity = await BondEquityFusion.load(fund);
+      target.innerHTML = BondEquityFusion.allocationPanel(equity) + genericAssetPanel(fund, detail, holdingHistory, kalmanDuration);
       const assetHistory = (detail?.asset_history || []).map((item) => ({ report_date: item.date, stock_to_nav: item.stock, bond_to_nav: item.bond, cash_to_nav: item.cash }));
       if (assetHistory.length) bindAssetAllocationChart(assetHistory);
       bindPureBondTripleAxisCharts();
@@ -6221,9 +6248,36 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (id === "bonds") {
-      const [, history] = await Promise.all([bondAssets(), bondHistory()]);
-      target.innerHTML = genericBondPanel(fund, history, detail);
+      const [, history, fusion] = await Promise.all([bondAssets(), bondHistory(), BondCBFusion.load(fund)]);
+      target.innerHTML = BondCBFusion.riskPanel(fund, detail, fusion) + genericBondPanel(fund, history, detail);
       bindGenericBondHistory(history, fund.category === "pure-bond");
+      bindMiniLineCharts();
+      return;
+    }
+    if (id === "convertibles" || id === "ipo") {
+      const [fusion, equity] = await Promise.all([BondCBFusion.load(fund), id === "convertibles" ? BondEquityFusion.load(fund) : Promise.resolve(null)]);
+      const original = id === "convertibles" ? BondCBFusion.convertiblePanel(fund, fusion) : BondCBFusion.ipoPanel(fund, fusion);
+      target.innerHTML = equity ? BondEquityFusion.convertibleReportPanel(equity) + `<details class="fusion-section fusion-archive"><summary>逐券估值与历史资料（各自日期）</summary>${original}</details>` : original;
+      BondCBFusion.bind(target, fusion);
+      BondEquityFusion.bind(target, equity);
+      return;
+    }
+    if (["industries", "holdings", "rebalancing"].includes(id) && BondEquityFusion.has(fund.code)) {
+      const [equity, originalHistory] = await Promise.all([BondEquityFusion.load(fund), holdings()]);
+      const holdingHistory = BondEquityFusion.holdingHistory(equity, originalHistory);
+      if (id === "industries") {
+        target.innerHTML = BondEquityFusion.disclosureIntro(equity) + genericIndustryPanel(fund, holdingHistory);
+        bindIndustryAnalysis({industry_history:holdingHistory});
+      } else if (id === "holdings") {
+        target.innerHTML = BondEquityFusion.holdingsPanel(equity, holdingHistory);
+        bindHoldingAnalysis({holding_analysis_history:holdingHistory});
+      } else {
+        await commonBenchmarks();
+        const multiIndexAnalysis = genericMultiIndexAnalysis(fund, detail);
+        target.innerHTML = BondEquityFusion.changesPanel(equity) + `<details class="fusion-section fusion-archive"><summary>季度前十大与市场走势</summary>${genericRebalancingPanel(fund, detail, originalHistory, multiIndexAnalysis)}</details>`;
+        if (multiIndexAnalysis) bindMultiIndexChart(multiIndexAnalysis, fund.name);
+      }
+      BondEquityFusion.bind(target,equity);
       bindMiniLineCharts();
       return;
     }
@@ -6246,12 +6300,12 @@ function createGenericTabLoader(fund, detail) {
       const [holdingHistory, heavyStockTrends, history] = await Promise.all([
         equityCategory ? holdings() : Promise.resolve(null),
         fund.category === "active-equity" ? heavyStock() : Promise.resolve(null),
-        fund.category === "convertible-bond" ? Promise.all([bondAssets(), bondHistory()]).then(values => values[1]) : Promise.resolve(null),
+        Promise.resolve(null),
         fund.category === "index-enhanced" ? indexRelativeAssets() : Promise.resolve(),
       ]);
       if (!holdingHistory?.quarterly?.length && !holdingHistory?.full?.length) await loadDashboardAsset("stock_classification.js");
       target.innerHTML = genericHoldingsPanel(fund, holdingHistory, heavyStockTrends)
-        + (fund.category === "convertible-bond" ? genericBondPanel(fund, history, detail) : "");
+        ;
       if (holdingHistory?.quarterly?.length || holdingHistory?.full?.length) {
         bindHoldingAnalysis({ holding_analysis_history: holdingHistory });
       }
@@ -6286,11 +6340,12 @@ function createGenericTabLoader(fund, detail) {
         target.innerHTML = genericCampisiPanel(fund, data);
         bindGenericCampisi(data);
       } else {
-        const [brinsonData, multiAssetData] = await Promise.all([
+        const [brinsonData, multiAssetData, fusion] = await Promise.all([
           fund.category === "active-equity" ? brinson() : Promise.resolve(null),
           ["hybrid-bond", "convertible-bond"].includes(fund.category) ? multiAsset() : Promise.resolve(null),
+          ["hybrid-bond", "convertible-bond"].includes(fund.category) ? BondCBFusion.load(fund) : Promise.resolve(null),
         ]);
-        target.innerHTML = genericAttributionPanel(fund, brinsonData, multiAssetData);
+        target.innerHTML = genericAttributionPanel(fund, brinsonData, multiAssetData) + (fusion ? BondCBFusion.attributionAudit(multiAssetData, fusion) : "");
         bindGenericBrinson(brinsonData);
         bindGenericMultiAssetAttribution(multiAssetData);
       }
@@ -6490,7 +6545,7 @@ function renderPureBondReferenceFund(fund, detail, currentDuration) {
   const overviewMetrics = `${metric("近1年收益", pct(fundPerformanceValue(fund, "1y", "returns"), 1, true))}${metric("近3年收益", pct(fundPerformanceValue(fund, "3y", "returns"), 1, true))}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 1))}${metric("最新杠杆", isFiniteValue(fund.asset?.leverage) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—")}`;
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
-    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span><span class="tag">份额已合并</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
+    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
     ${detail?.pure_bond_duration_error ? `<p class="simulation-warning" role="status">最新日频久期未能加载，其他数据仍可查看。${escapeHTML(detail.pure_bond_duration_error)} 刷新页面可重试。</p>` : ""}
     <section class="fund-page-metrics">${overviewMetrics}</section>
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${tabs.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${escapeHTML(label)}</button>`).join("")}</nav>
@@ -6585,6 +6640,7 @@ function createPureBondTabLoader(fund, detail) {
       else if (id === "documents") target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
       else {
         const reference = await bundle();
+        if (id === 'perf') { try { await WarmPerformance.load(fund.code); } catch(error) { fund.warm_context_error=error.message; } }
         if (!target.isConnected) return;
         const render = {perf:window.__PB.renderPerf, alloc:window.__PB.renderAlloc, bond:window.__PB.renderBondStruct, corr:window.__PB.renderCorr, campisi:window.__PB.renderCampisi}[id];
         if (!render) return;
@@ -6686,7 +6742,7 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
   const navSource = "基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充";
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
-    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span><span class="tag">份额已合并</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
+    <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(fund.name)}</h1><p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>最新规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
     ${detail?.pure_bond_reference_error ? `<p class="simulation-warning" role="status">纯债详细分析数据加载失败，已显示通用研究报告。${escapeHTML(detail.pure_bond_reference_error)} <button type="button" class="button" data-pure-bond-retry>重新加载完整分析</button></p>` : ""}
     ${detail?.pure_bond_duration_error ? `<p class="simulation-warning" role="status">最新日频久期未能加载，其他数据仍可查看。${escapeHTML(detail.pure_bond_duration_error)} 刷新页面可重试。</p>` : ""}
     <section class="fund-page-metrics">${overviewMetrics}</section>
@@ -6976,7 +7032,7 @@ function loadGenericDocuments(code) {
 function loadGenericCampisi(code) {
   const read = () => { const value = window.FUND_CAMPISI?.[code]; return value || null; };
   if (window.FUND_CAMPISI?.[code]) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} Campisi归因`, read);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 业绩归因`, read);
 }
 
 function normalizeGenericBrinson(raw) {
@@ -7016,15 +7072,36 @@ function showError(message) {
   page.querySelector("[data-page-retry]")?.addEventListener("click", () => window.location.reload());
 }
 
+async function ensureFundPresentationHelpers() {
+  if (!window.ReviewCore?.matches || !window.ReviewCore?.scale) {
+    await loadDataScript('review-core.js', '图表与检索工具', () => window.ReviewCore?.matches && window.ReviewCore?.scale ? window.ReviewCore : null);
+  }
+  if (!window.FundResearch?.range) {
+    await loadDataScript('research-core.js', '指标工具', () => window.FundResearch?.range ? window.FundResearch : null);
+  }
+}
+
+async function ensureFundLifecycleData() {
+  const valid = value => value?.schema_version === 1 && value.records && value.aliases;
+  if (window.FUND_LIFECYCLE_DATA) {
+    if (!valid(window.FUND_LIFECYCLE_DATA)) throw new Error("基金状态资料格式不正确，请刷新重试。");
+    return window.FUND_LIFECYCLE_DATA;
+  }
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_lifecycle_overlay.js?v=${DASHBOARD_DATA_VERSION}`, "基金状态资料", () => {
+    if (!valid(window.FUND_LIFECYCLE_DATA)) throw new Error("基金状态资料未能生成有效内容，请重试。");
+    return window.FUND_LIFECYCLE_DATA;
+  });
+}
+
 function startInitialFundRequests(code) {
   // Start only the requested view and selected pair, never a whole peer list.
   const detail = loadGenericDetail(code);
   const optional = [loadResearchSummary(code)];
   const tab = query.get('tab');
   const peer = query.get('compare');
-  const paired = tab === 'correlation' && /^\d{6}\.(?:OF|SH|SZ)$/.test(peer || '') && peer !== code;
+  const paired = FundLifecycle.currentCompareEligible(code) && FundLifecycle.currentCompareEligible(peer) && tab === 'correlation' && /^\d{6}\.(?:OF|SH|SZ)$/.test(peer || '') && peer !== code;
   if (tab === 'correlation') optional.push(loadCorrelationMetrics(code));
-  if (tab === 'profile' || paired) optional.push(loadProfileDetails(code));
+  if ((tab === 'profile' && !window.BOND_CB_FUSION_INDEX?.equity_shards?.includes(code)) || paired) optional.push(loadProfileDetails(code));
   if (paired) optional.push(loadGenericDetail(peer), loadProfileDetails(peer));
   // Optional failures remain retryable in their own UI and cannot reject NAV.
   for (const request of optional) void request.catch(() => {});
@@ -7050,8 +7127,11 @@ if (!fundId && !fundCode) {
         normalizedCode = String(fallbackFund?.code || "").toUpperCase();
       }
       if (!normalizedCode) throw new Error("没有找到该基金的研究数据");
+      await ensureFundPresentationHelpers();
+      await ensureFundLifecycleData();
+      normalizedCode = FundLifecycle.canonicalCode(normalizedCode);
       // All products, including former deep samples, use the same current lazy data sources.
-      const genericDetail = await startInitialFundRequests(normalizedCode);
+      const genericDetail = BondCBFusion.adaptDetail(await startInitialFundRequests(normalizedCode));
       let catalogFund = genericDetail?.fund || fallbackFund;
       if (!catalogFund) {
         catalogData = catalogData || await loadCatalogData();
@@ -7062,6 +7142,7 @@ if (!fundId && !fundCode) {
       if (!catalogFund) throw new Error("没有找到该基金的研究数据");
       if (!genericDetail) throw new Error("该基金的净值详情尚未生成");
       renderGenericFund(catalogFund, genericDetail);
+      page.insertAdjacentHTML("afterbegin", FundLifecycle.notice(catalogFund, fundCode));
       bindHistoricalControls();
     })
     .catch((error) => showError(error.message));

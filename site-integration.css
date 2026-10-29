@@ -1,0 +1,35 @@
+/* Visual record (2): retain all formal categories, add compact desktop controls. */
+body.workbench.warm-workbench :is(h1,.workspace-intro h1){font-size:34px;font-weight:600}
+body.workbench.warm-workbench .eyebrow{font-size:13px}
+body.workbench.warm-workbench :is(.fund-list-table,.research-table,.profile-pair-table,.bc-complete table) th{font-size:14px;font-weight:600;padding-top:12px;padding-bottom:12px;color:#302e29;background:#eee9df;white-space:normal}
+body.workbench.warm-workbench :is(.fund-list-table,.research-table,.profile-pair-table) th :is(button,select){font-size:12px}
+body.workbench.warm-workbench :is(.value-positive,.performance-positive){color:#b01625}
+body.workbench.warm-workbench :is(.value-negative,.performance-negative){color:#16854a}
+body.workbench.warm-workbench .value-zero{color:#302e29}
+body.workbench.warm-workbench :is(.fund-list-table strong,.return-main,.performance-metric-value){font-variant-numeric:tabular-nums}
+body.workbench.warm-workbench #clear-decision-filters{background:#f3e7de;color:#713d2e;border:1px solid #c7a58c}
+body.workbench.warm-workbench .research-sidebar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.header-fund-search{display:flex;align-items:center;flex:0 1 250px;min-width:160px;margin:0;position:relative}
+body.workbench.warm-workbench .header-fund-search input{width:100%;height:31px;padding:5px 28px 5px 9px;font-size:12px;background:#fcfbf9;border:1px solid #b9afa4}
+.header-fund-search button{position:absolute;right:5px;top:4px;width:23px;height:23px;border:0;background:transparent;color:#625b55;font-size:18px;line-height:20px}
+.shared-search-suggestions{border:1px solid #b9afa4;border-radius:3px;background:#fffdf8;box-shadow:0 8px 22px #302e2926;margin:0}
+.shared-search-suggestions[hidden]{display:none}
+body.workbench.warm-workbench .overview-return-button{background:#e9f1fc;color:#17569a;border:1px solid #95b5dc;border-radius:3px;padding:6px 10px;font-size:12px;white-space:nowrap}
+.overview-return-button[hidden]{display:none!important}
+body.workbench.warm-workbench .locate-fund-category{display:block;margin-top:7px;font-size:11px;color:#17569a;font-weight:500}
+body.workbench.warm-workbench .located-fund-row{outline:2px solid #648fc7;outline-offset:-2px;background:#edf4fd!important}
+body.workbench.warm-workbench .all-fund-core-cell{width:320px;min-width:320px;max-width:320px}
+body.workbench.warm-workbench .all-fund-core-grid{display:block}
+body.workbench.warm-workbench .all-fund-core-grid>span{display:grid;grid-template-columns:100px minmax(0,1fr);gap:3px 7px;padding:4px 0;background:transparent;border:0}
+body.workbench.warm-workbench .all-fund-core-grid>span em{grid-column:2;font-style:normal;font-size:11px;font-weight:400}
+body.workbench.warm-workbench .all-fund-core-grid>.core-metric{display:inline-grid;vertical-align:top;min-width:125px;margin:0 8px 6px 0;background:transparent}
+body.workbench.warm-workbench.desktop-detail :is(.fund-tab-nav,.quick-metrics,.research-metric-grid,.subpanel){padding-left:20px;padding-right:20px}
+.profile-comparison-diagnostics{margin:12px 0;border-top:1px solid #ded9ce;padding-top:8px;font-size:12px;color:#625b55}
+.profile-source-strip{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;padding:10px 0;border-top:1px solid #ded9ce;border-bottom:1px solid #ded9ce;font-size:12px}
+.profile-source-strip strong{color:#302e29}
+@media(max-width:1100px){.header-fund-search{flex-basis:185px}body.workbench.warm-workbench .research-sidebar{gap:6px}}
+@media(max-width:760px){.header-fund-search{display:none}body.workbench.warm-workbench .research-sidebar{display:block}body.workbench.warm-workbench h1{font-size:27px}.overview-return-button{margin-top:5px}}
+
+body.workbench.warm-workbench .research-sidebar>.header-fund-search{flex:0 0 250px;max-width:250px}
+@media(max-width:1100px){body.workbench.warm-workbench .research-sidebar>.header-fund-search{flex-basis:185px;max-width:185px}}
+@media(max-width:760px){body.workbench.warm-workbench .research-sidebar>.header-fund-search{display:none!important}}

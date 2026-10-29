@@ -1,0 +1,11 @@
+.lifecycle-note{margin:8px 0 16px;color:#526773;font-size:12px}
+.lifecycle-note summary{cursor:pointer}
+.lifecycle-note p{margin:5px 0}
+.lifecycle-notice{border-left:3px solid #97614f;background:#f5eee5;padding:12px 16px;margin:12px 0 18px;font-size:13px;line-height:1.6;color:#4c4540}
+.lifecycle-notice p{margin:4px 0}
+.lifecycle-notice a{color:#743e34;text-decoration:underline;text-underline-offset:3px}
+.lifecycle-badge{display:inline-block;margin:4px 0;padding:2px 6px;background:#f5e9dc;color:#76472c;border-radius:3px;font-size:11px}
+.lifecycle-pool-control{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;margin:8px 0}
+.lifecycle-pool-control select{font:inherit;padding:6px 9px;color:#344e60;background:#fff;border:1px solid #c8bfb1}
+.lifecycle-pool-control small{color:#61717b}
+.lifecycle-current-block{padding:10px 0;color:#79513e;font-size:13px}
