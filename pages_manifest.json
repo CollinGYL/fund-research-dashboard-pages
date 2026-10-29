@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-29T11:10:01+08:00",
+  "generatedAt": "2026-10-29T11:44:50+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -21,12 +21,12 @@
       "sha256": "b28f2748bae80bd3d99f1987acb9ffe4127d9eb3a4f11428ce75a4b1285d8da9"
     },
     "bond-complete.js": {
-      "size": 19029,
-      "sha256": "8c00170af0658be24f157865abad629044d60c4fe67a11149cd5c2f9fd8848d7"
+      "size": 19131,
+      "sha256": "4fa8593dbaeffdec575a9047dc814a9aed9cea2857638a2714719a754db1c76a"
     },
     "bond-equity-fusion.js": {
-      "size": 20222,
-      "sha256": "1c9db28e374dd78c4f9474a378bcd9e658ae835245d89fb02bedd35385003634"
+      "size": 22387,
+      "sha256": "7ced84419cfc5ddf912aef4562530bfdb9716df21b569b804a2fb45d58a8bba4"
     },
     "bond-lab-factors.html": {
       "size": 44263,
@@ -53,8 +53,8 @@
       "sha256": "1988206a24e71f6b1b065a8d2d38471fa0ea9dc277d85a46a990b48e26910d2b"
     },
     "bond-market-fusion.js": {
-      "size": 5805,
-      "sha256": "532821f5eed9307825aba2efdfb1a02a9dc046e380ef7bfa1e057a3630b683fa"
+      "size": 5911,
+      "sha256": "4b7b7478dc1e57fd2f2766f3227d02ef246c7163c77c41ec34d493458bae9b65"
     },
     "bond-methodology.html": {
       "size": 39804,
@@ -66,7 +66,7 @@
     },
     "bond-original-single.html": {
       "size": 729080,
-      "sha256": "2329132f43ab2934fa9c8d8fa060619ea8e29934fbbea6628fdde7ed60bbfe60"
+      "sha256": "5a61cd8e9ff944d4ae43e1f25e49337be0ee2b04cf4a7ffa1c411a128a11837e"
     },
     "bond-research.html": {
       "size": 6193,
@@ -118,11 +118,11 @@
     },
     "fund.html": {
       "size": 5096,
-      "sha256": "7ebed0dbaf05a58c984655b1ae0c21e07471b6533efbf55d2725d9b1ad7dc64c"
+      "sha256": "3f378a22e2099d893002f56661ca02335b3d4460d09975520e20b6994f63a528"
     },
     "fund.js": {
-      "size": 605120,
-      "sha256": "3568cde2b9092578f560c6f2240cd0a1703c44ab836f704e858939d8ff2337df"
+      "size": 605250,
+      "sha256": "f8413bfade7f709e4aefbd4ddae725f0d69fc5ae7d60d8d90b191511578e1b44"
     },
     "index.html": {
       "size": 14701,
@@ -181,8 +181,8 @@
       "sha256": "fb308c4e90c397de37a9b6e051f4a28642b4090212e470b03c6cd580dee42af4"
     },
     "warm-performance.js": {
-      "size": 10806,
-      "sha256": "69103e6a4c72ad2edf27539d18f263e7ec979e4145b6a2418483d93c5e4672a6"
+      "size": 11965,
+      "sha256": "6bc95114b8a1277ec9a35ac5df0c68fdc3718ffa36e67ea535e198a2bb1b7898"
     },
     "warm-ui-repair.css": {
       "size": 9711,

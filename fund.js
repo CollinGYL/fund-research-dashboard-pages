@@ -1230,6 +1230,7 @@ function miniLineValue(value, format = "percent") {
   if (!isFiniteValue(value)) return "—";
   if (format === "number") return num(value, 2);
   if (format === "years") return `${num(value, 2)}年`;
+  if (format === "multiple") return `${num(value, 2)}倍`;
   if (format === "percent-point") return `${num(value, 2)}%`;
   return pct(value, 2);
 }
@@ -5023,7 +5024,7 @@ function pureBondReferenceReportPanel(fund, detail, research, campisi, kalmanDur
   cards.push(pureBondReferenceCard("⑥", "vs 中债综合全价研究基准", "日频", contract.length > 1 ? `${renderMiniLineChart(contract, [{ key: "fund_level", label: fund.name, color: "#c20000", width: 3 }, { key: "index_level", label: "中债综合全价(总值)指数", color: "#0a6fb0", width: 2.5 }], `${fund.name}与中债综合全价研究基准对照`)}<div class="pb-benchmark-warning"><strong>口径提醒</strong>这里统一使用中债综合全价作为研究对照，具体合同基准请查基金公告。全价指数不含票息再投资；基金复权净值包含分红再投资。长期超额会被这一口径差异机械放大，研究对照应同时查看财富指数。</div>` : '<p class="empty-copy">中债综合全价研究基准共同数据不足。</p>', "基金复权净值；中债综合全价(总值)指数 CBA00203", { wide: true }));
 
   cards.push(pureBondReferenceCard("⑦", "风格漂移 · 券种占比逐季演变", "季报/半年报", assetHistory.length > 1 ? renderMiniLineChart(assetHistory, [{ key: "financial", label: "金融债", color: "#0a6fb0", width: 2.8 }, { key: "corporate", label: "企业债", color: "#c20000", width: 2.4 }, { key: "government", label: "政府债", color: "#122844", width: 2.4 }, { key: "cash", label: "现金", color: "#999", width: 2 }], `${fund.name}券种占比演变`) : '<p class="empty-copy">券种历史不足。</p>', "基金定期报告资产配置；占净值比例", { wide: true }));
-  cards.push(pureBondReferenceCard("⑧", "杠杆演变", "季报/半年报", assetHistory.length > 1 ? `${renderMiniLineChart(assetHistory, [{ key: "leverage", label: "总资产/净资产", color: "#c20000", width: 3, format: "number" }], `${fund.name}杠杆演变`)}<p class="method-note">开放式基金通常受140%总资产/净资产上限约束，定期开放或封闭式产品口径可能不同；异常值需回查报告。</p>` : '<p class="empty-copy">杠杆历史不足。</p>', "定期报告总资产与净资产；Choice组合杠杆增量", { wide: true }));
+  cards.push(pureBondReferenceCard("⑧", "杠杆演变", "季报/半年报", assetHistory.length > 1 ? `${renderMiniLineChart(assetHistory, [{ key: "leverage", label: "总资产/净资产", color: "#c20000", width: 3, format: "multiple" }], `${fund.name}杠杆演变`)}<p class="method-note">开放式基金通常受140%总资产/净资产上限约束，定期开放或封闭式产品口径可能不同；异常值需回查报告。</p>` : '<p class="empty-copy">杠杆历史不足。</p>', "定期报告总资产与净资产；Choice组合杠杆增量", { wide: true }));
   cards.push(pureBondReferenceCard("⑨", "持仓结构 vs 同类", "最新截面", `${pureBondPeerPositionRow("披露久期", currentPeer.duration, (value) => `${num(value, 2)}年`, "仅使用定期报告反推久期")}${pureBondPeerPositionRow("杠杆", currentPeer.leverage, (value) => `${num(value, 2)}x`, "总资产/净资产")}${pureBondPeerPositionRow("金融债", currentPeer.financial_bond, (value) => pct(value, 1), "占基金净值")}${pureBondPeerPositionRow("企业债", currentPeer.corporate_bond, (value) => pct(value, 1), "占基金净值")}`, "同一长/短期纯债子类当前截面；底层基金去重"));
   cards.push(pureBondReferenceCard("⑩", "逐券持仓明细", "季报", latestBond ? genericBondHistoryTable(latestBond, false) : '<p class="empty-copy">暂无重仓债券披露。</p>', "基金定期报告重仓债券；债券特征为Choice最新快照", { wide: true }));
 
@@ -5218,9 +5219,9 @@ function genericAssetPanel(fund, detail, holdingHistory, kalmanDuration = null) 
     ${fund.category === "pure-bond" ? genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) : ""}
     ${fund.category === "hybrid-bond" ? `<div class="research-grid two-column-grid hybrid-bond-asset-trends">
       <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>持股重仓集中度</h3><span>季度前十大合计占净值</span></div></div>${quarterlyConcentration.length ? renderMiniLineChart(quarterlyConcentration, [{ key: "top10_concentration", label: "前十大集中度", color: "#0b7774", width: 3 }], "季度前十大持股集中度") : '<p class="empty-copy">暂无季度股票持仓历史。</p>'}</article>
-      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>杠杆演变</h3><span>总资产 / 净资产</span></div></div>${leverageHistory.length ? renderMiniLineChart(leverageHistory, [{ key: "leverage", label: "杠杆率", color: "#17324d", width: 3 }], "基金杠杆率历史") : '<p class="empty-copy">暂无杠杆历史。</p>'}</article>
+      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>杠杆演变</h3><span>总资产 / 净资产</span></div></div>${leverageHistory.length ? renderMiniLineChart(leverageHistory, [{ key: "leverage", label: "杠杆率", color: "#17324d", width: 3, format: "multiple" }], "基金杠杆率历史") : '<p class="empty-copy">暂无杠杆历史。</p>'}</article>
       <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>股票仓位演变</h3><span>占基金净值</span></div></div>${history.length ? renderMiniLineChart(history, [{ key: "stock_to_nav", label: "股票仓位", color: "#c5913d", width: 3 }], "股票仓位历史") : '<p class="empty-copy">暂无股票仓位历史。</p>'}</article>
-      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>久期时间序列</h3><span>利率敏感性披露反推</span></div></div>${durationHistory.length ? renderMiniLineChart(durationHistory, [{ key: "duration", label: "修正久期", color: "#6f7790", width: 3 }], "组合修正久期历史") : '<p class="empty-copy">暂无久期历史。</p>'}</article>
+      <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>久期时间序列</h3><span>利率敏感性披露反推</span></div></div>${durationHistory.length ? renderMiniLineChart(durationHistory, [{ key: "duration", label: "修正久期", color: "#6f7790", width: 3, format: "years" }], "组合修正久期历史") : '<p class="empty-copy">暂无久期历史。</p>'}</article>
     </div>` : ""}
     ${active && holdingHistory ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>持股重仓集中度</h3><span>季度前十大与半年报/年报完整持仓分别计算</span></div></div><section class="research-metric-grid metric-four">${metric("最新季度前十大", pct(latestQuarterly.top10, 1))}${metric("完整持仓前十大", pct(latestFull.top10, 1))}${metric("完整持仓前二十", pct(latestFull.top20, 1))}${metric("前二十以外长尾", pct(Math.max(0, latestFull.total - latestFull.top20), 1))}</section><p class="method-note">季度前十大用于高频跟踪；完整持仓只使用半年报/年报全部披露股票，两者不拼接。</p></article><article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>季度前十大集中度趋势</h3><span>占基金净值</span></div></div>${quarterlyConcentration.length ? renderMiniLineChart(quarterlyConcentration, [{ key: "top10_concentration", label: "前十大集中度", color: "#0b7774", width: 3 }], "季度前十大持仓集中度变化") : '<p class="empty-copy">暂无持仓集中度历史。</p>'}</article>` : ""}
     <article class="subpanel"><div class="subpanel-heading"><div><h3>最新资产分布</h3><span>按净资产比例；超过100%可能来自杠杆</span></div></div>${renderBarList(allocation)}</article>
@@ -6206,7 +6207,7 @@ function createGenericTabLoader(fund, detail) {
     }
     if (id === "profile") {
       if (BondCBFusion.isEligible(fund)) {
-        const equity = await BondEquityFusion.load(fund);
+        const equity = await BondEquityFusion.load(fund, detail);
         target.innerHTML = BondEquityFusion.profilePanel(equity);
         BondEquityFusion.bind(target, equity);
         bindMiniLineCharts();
@@ -6239,7 +6240,7 @@ function createGenericTabLoader(fund, detail) {
         ["active-equity", "hybrid-bond"].includes(fund.category) ? holdings() : Promise.resolve(null),
         fund.category === "pure-bond" ? pureBondDuration() : Promise.resolve(null),
       ]);
-      const equity = await BondEquityFusion.load(fund);
+      const equity = await BondEquityFusion.load(fund, detail);
       target.innerHTML = BondEquityFusion.allocationPanel(equity) + genericAssetPanel(fund, detail, holdingHistory, kalmanDuration);
       const assetHistory = (detail?.asset_history || []).map((item) => ({ report_date: item.date, stock_to_nav: item.stock, bond_to_nav: item.bond, cash_to_nav: item.cash }));
       if (assetHistory.length) bindAssetAllocationChart(assetHistory);
@@ -6255,7 +6256,7 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (id === "convertibles" || id === "ipo") {
-      const [fusion, equity] = await Promise.all([BondCBFusion.load(fund), id === "convertibles" ? BondEquityFusion.load(fund) : Promise.resolve(null)]);
+      const [fusion, equity] = await Promise.all([BondCBFusion.load(fund), id === "convertibles" ? BondEquityFusion.load(fund, detail) : Promise.resolve(null)]);
       const original = id === "convertibles" ? BondCBFusion.convertiblePanel(fund, fusion) : BondCBFusion.ipoPanel(fund, fusion);
       target.innerHTML = equity ? BondEquityFusion.convertibleReportPanel(equity) + `<details class="fusion-section fusion-archive"><summary>逐券估值与历史资料（各自日期）</summary>${original}</details>` : original;
       BondCBFusion.bind(target, fusion);
@@ -6263,7 +6264,7 @@ function createGenericTabLoader(fund, detail) {
       return;
     }
     if (["industries", "holdings", "rebalancing"].includes(id) && BondEquityFusion.has(fund.code)) {
-      const [equity, originalHistory] = await Promise.all([BondEquityFusion.load(fund), holdings()]);
+      const [equity, originalHistory] = await Promise.all([BondEquityFusion.load(fund, detail), holdings()]);
       const holdingHistory = BondEquityFusion.holdingHistory(equity, originalHistory);
       if (id === "industries") {
         target.innerHTML = BondEquityFusion.disclosureIntro(equity) + genericIndustryPanel(fund, holdingHistory);

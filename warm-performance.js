@@ -3,9 +3,30 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const finite = value => typeof value === 'number' && Number.isFinite(value);
   const pct = value => finite(value) ? `${value >= 0 ? '+' : ''}${(value * 100).toFixed(2)}%` : '—';
-  const promises = new Map();
+  const promises = new Map(), contextPromises = new Map();
+  function loadContext(code) {
+    const read=()=>{
+      const value=window.WARM_PERFORMANCE_CONTEXT?.[code];
+      if(value?.code!==code||!Array.isArray(value.managers))throw Error('基金任职资料缺失或格式不正确');
+      return value;
+    };
+    if(window.WARM_PERFORMANCE_CONTEXT?.[code])return Promise.resolve(read());
+    const prefix=code.slice(0,3),loaded=window.WARM_PERFORMANCE_CONTEXT_SHARDS?.[prefix];
+    const use=shard=>{window.WARM_PERFORMANCE_CONTEXT=window.WARM_PERFORMANCE_CONTEXT||{};window.WARM_PERFORMANCE_CONTEXT[code]=shard?.[code];return read();};
+    if(loaded)return Promise.resolve(use(loaded));
+    if(!contextPromises.has(code))contextPromises.set(code,loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/performance_context/${encodeURIComponent(prefix)}.js?v=${DASHBOARD_DATA_VERSION}`,'基金经理任职资料',()=>window.WARM_PERFORMANCE_CONTEXT_SHARDS?.[prefix]||null).then(use).catch(e=>{contextPromises.delete(code);throw e;}));
+    return contextPromises.get(code);
+  }
   function load(code) {
-    if (!promises.has(code)) promises.set(code, Promise.all([FundLifecycle.loadRanks(), loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/performance_context/${encodeURIComponent(code)}.js`, '任期与同类排名', () => window.WARM_PERFORMANCE_CONTEXT?.[code] || null)]).then(([, value]) => value).catch(error => { promises.delete(code); throw error; }));
+    if (!promises.has(code)) {
+      let rankError=null;
+      const task=Promise.all([FundLifecycle.loadRanks().catch(e=>{rankError=e.message;}),loadContext(code)]).then(([,value])=>{
+        value.rank_error=rankError;
+        if(rankError)promises.delete(code);
+        return value;
+      }).catch(error=>{promises.delete(code);throw error;});
+      promises.set(code,task);
+    }
     return promises.get(code);
   }
   function context(fund) { return window.WARM_PERFORMANCE_CONTEXT?.[fund.code] || {}; }
@@ -62,7 +83,7 @@
     const c=context(fund),last=nav.at(-1)?.date;
     if (!FundLifecycle.currentEligible(fund)) return '<p class="empty-copy">该组合已退出当前基金池，保留历史净值与年度表现。</p>';
     const rs=FundLifecycle.ranks(fund).filter(r=>r.end===last);
-    if (!rs.length) return `<p class="empty-copy">${fund.warm_context_error?'任期与排名资料加载失败，可刷新重试。':last!==FundLifecycle.data().as_of?'当前排名统一截至 '+FundLifecycle.data().as_of+'，本基金净值末日为 '+last+'。':'同截止日、覆盖完整窗口的同类样本不足。'}</p>`;
+    if (!rs.length) return `<p class="empty-copy">${c.rank_error?'同类排名暂未加载，可重新打开本页重试。':fund.warm_context_error?'任期与排名资料加载失败，可刷新重试。':last!==FundLifecycle.data().as_of?'当前排名统一截至 '+FundLifecycle.data().as_of+'，本基金净值末日为 '+last+'。':'同截止日、覆盖完整窗口的同类样本不足。'}</p>`;
     return `<div class="warm-rank-subtitle">${esc(c.cohort)} · 截至 ${esc(last)}</div><div class="research-table-wrap"><table class="research-table warm-rank-table"><thead><tr><th>阶段</th><th>收益</th><th>同类排名</th><th>超过同类</th></tr></thead><tbody>${rs.map(r=>`<tr><td title="${r.start} — ${r.end}">${esc(r.label)}</td><td class="${r.return>=0?'value-positive':'value-negative'}">${pct(r.return)}</td><td><b>${r.rank}</b><span> / ${r.n}</span></td><td><div class="warm-rank-bar"><i style="width:${Math.max(0,Math.min(100,r.beaten*100))}%"></i><span>${(r.beaten*100).toFixed(2)}%</span></div></td></tr>`).join('')}</tbody></table></div><details class="warm-method"><summary>完整排名数据</summary>${renderTable(['阶段','统计区间','同类中位收益','排名分档'],rs.map(r=>[esc(r.label),r.start+' — '+r.end,pct(r.median),r.rank/r.n<=.25?'前25%':r.rank/r.n<=.5?'25%—50%':r.rank/r.n<=.75?'50%—75%':'后25%']))}</details><details class="warm-method"><summary>排名口径</summary><p>按当前分类、同一净值截止日比较目录已有区间收益；主动权益细分股票型/混合型，指数增强按跟踪指数，一级/二级债基分别比较。份额按产品去重，成立不足区间不参与；收益相同并列。超过同类为收益严格低于本基金的其他产品比例。每个窗口核对实际净值起点、末日与交易日覆盖；只使用通过核对的目录指标。当前分类与当前基金池用于历史窗口比较。</p></details>`;
   }
   function summary(fund,nav,calendarRows) {
@@ -93,5 +114,5 @@
     select?.addEventListener('change',()=>{if(select.value==='')return;const r=rs[Number(select.value)];if(!r)return;buttons.forEach(b=>b.classList.remove('active'));draw(nav.filter(p=>p.date>=r.s && p.date<=r.e),r.label);});
     draw(nav,'可得历史');
   }
-  window.WarmPerformance={load,context,segments,ranges,controls,annual,annualChart,peer,summary,tenureTable,bind};
+  window.WarmPerformance={load,loadContext,context,segments,ranges,controls,annual,annualChart,peer,summary,tenureTable,bind};
 })();

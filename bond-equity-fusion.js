@@ -13,9 +13,10 @@
  const empty=text=>`<p class="empty-copy">${esc(text)}</p>`;
  const has=code=>(root.BOND_CB_FUSION_INDEX?.equity_shards||[]).includes(code);
  const cache=new Map();
- function load(fund){
+ function load(fund,detail){
   if(!has(fund?.code))return Promise.resolve(null);
-  if(cache.has(fund.code))return cache.get(fund.code);
+  const present=task=>task.then(p=>currentView(p,detail,fund.code));
+  if(cache.has(fund.code))return present(cache.get(fund.code));
   const task=(async()=>{
    if(!root.BOND_EQUITY_FUSION?.[fund.code]){
     const signature=root.BOND_CB_FUSION_INDEX.asset_overrides[fund.code].source_payload_sha256.slice(0,16);
@@ -24,7 +25,31 @@
    const p=root.BOND_EQUITY_FUSION?.[fund.code];
    if(p?.code!==fund.code||p.schema_version!=='bond_cb_equity.v1'||!p.direct_equity||!p.allocation){if(root.BOND_EQUITY_FUSION)delete root.BOND_EQUITY_FUSION[fund.code];throw new Error('权益披露画像格式或基金代码不匹配');}
    return p;
-  })().catch(error=>{cache.delete(fund.code);throw error;});cache.set(fund.code,task);return task;
+  })().catch(error=>{cache.delete(fund.code);throw error;});cache.set(fund.code,task);return present(task);
+ }
+ async function currentView(p,detail,code=p?.code){
+  let error=null;
+  if(detail?.nav?.length&&root.WarmPerformance?.loadContext){
+   try{await root.WarmPerformance.loadContext(code);}catch(e){error=e.message;}
+  }
+  const value=withCurrentNav(p,detail,root.WARM_PERFORMANCE_CONTEXT?.[code]);
+  return error?{...value,manager_context_error:error}:value;
+ }
+ function withCurrentNav(p,detail,context){
+  const nav=(detail?.nav||[]).filter(x=>Array.isArray(x)&&/^\d{4}-\d{2}-\d{2}$/.test(x[0])&&finite(x[1])&&x[1]>0).map(x=>({date:x[0],fund:x[1]})).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!nav.length)return p;
+  const last=nav.at(-1).date;
+  const stats=(start,end)=>{
+   const points=nav.filter(x=>x.date>=start&&x.date<=end),value=performanceStats(points);
+   return value?{status:'available',requested_start:start,requested_end:end,start_anchor:points[0].date,end_anchor:points.at(-1).date,observations:points.length,return:value.cumulative,max_drawdown:value.maxDrawdown}:{status:'insufficient_nav',requested_start:start,requested_end:end};
+  };
+  const source=context?.managers?.length?context.managers.map(m=>({name:m.name,tenure_start:m.start,tenure_end:m.end,escrow_name:m.escrow,escrow_start:m.escrow_start,escrow_end:m.escrow_end})):p.manager_history||[];
+  const managers=source.map(m=>{
+   const end=m.tenure_end&&m.tenure_end<last?m.tenure_end:last,lookback=days=>new Date(Date.parse(end+'T00:00:00Z')-days*86400000).toISOString().slice(0,10);
+   const windows=Object.fromEntries([['1y',365],['3y',1095]].map(([key,days])=>[key,stats(m.tenure_start>lookback(days)?m.tenure_start:lookback(days),end)]));
+   return {...m,status:m.tenure_start<=last&&(!m.tenure_end||m.tenure_end>=last)?'current':'historical',tenure_performance:stats(m.tenure_start,end),trailing_windows_within_tenure:windows};
+  });
+  return {...p,nav_end_date:last,manager_history:managers,manager_nav_source:'current_fund_detail'};
  }
  const history=p=>p?.direct_equity_history?.length?p.direct_equity_history:[p?.direct_equity].filter(Boolean);
  const selected=(p,date)=>history(p).find(s=>s.report_date===date)||p.direct_equity;
@@ -74,7 +99,7 @@
  function managerPanel(p){
   const cell=w=>w?.status==='available'?`${percent(w.return)}<small>回撤 ${percent(w.max_drawdown)} · ${esc(w.start_anchor)} 至 ${esc(w.end_anchor)}</small>`:'未覆盖';
   const rows=(p.manager_history||[]).map(m=>[esc(m.name)+(m.status==='current'?'<small>现任</small>':'<small>历史任职</small>'),`${esc(m.tenure_start)}<small>至 ${esc(m.tenure_end||'今')}</small>`,cell(m.tenure_performance),cell(m.trailing_windows_within_tenure?.['1y']),cell(m.trailing_windows_within_tenure?.['3y']),esc(m.escrow_name||'—')+(m.escrow_start?`<small>${esc(m.escrow_start)} 至 ${esc(m.escrow_end||'今')}</small>`:'')]);
-  return section('经理任期与任内窗口',`净值截止 ${p.nav_end_date}`,`<details><summary>查看历任经理、代管及任内1年／3年表现</summary>${table(['经理','任期','任期表现','任内近1年','任内近3年','代管记录'],rows)}<p class="method-note">共管任期可能重叠，表现属于该基金份额；窗口起点从任职日或之后首个有效净值起算。任职历史原始公告时点尚未逐条核验。</p></details>`);
+  return (p.manager_context_error?empty('任职资料刷新失败，暂沿用已存任职记录：'+p.manager_context_error):'')+section('经理任期与任内窗口',`净值截止 ${p.nav_end_date}`,`<details><summary>查看历任经理、代管及任内1年／3年表现</summary>${table(['经理','任期','任期表现','任内近1年','任内近3年','代管记录'],rows)}<p class="method-note">共管任期可能重叠，表现属于该基金份额；窗口起点从任职日或之后首个有效净值起算。任职历史原始公告时点尚未逐条核验。</p></details>`);
  }
  function profilePanel(p){
   if(!p)return section('权益画像','直接股票披露',empty('该基金的权益画像适配尚未覆盖；行业分析和持股分析仍保留原有披露功能。'));
@@ -131,6 +156,6 @@
   host.querySelector('[data-equity-changes-date]')?.addEventListener('change',e=>{host.querySelector('[data-equity-changes-output]').innerHTML=changesSnapshot(p,selected(p,e.target.value));});
   host.querySelector('[data-equity-cb-level]')?.addEventListener('change',e=>{host.querySelector('[data-equity-cb-output]').innerHTML=cbIndustry(p,e.target.value);});
  }
- root.BondEquityFusion={finite,weightLabel,stockQuantity,has,load,snapshotCaption,allocationPanel,profilePanel,profileSnapshot,styleMetrics,historyChart,managerPanel,holdingHistory,disclosureIntro,holdingsPanel,changesPanel,changesSnapshot,convertibleReportPanel,cbIndustry,bind};
+ root.BondEquityFusion={withCurrentNav,currentView,finite,weightLabel,stockQuantity,has,load,snapshotCaption,allocationPanel,profilePanel,profileSnapshot,styleMetrics,historyChart,managerPanel,holdingHistory,disclosureIntro,holdingsPanel,changesPanel,changesSnapshot,convertibleReportPanel,cbIndustry,bind};
  if(typeof module!=='undefined')module.exports=root.BondEquityFusion;
 })(typeof window!=='undefined'?window:globalThis);

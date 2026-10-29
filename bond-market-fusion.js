@@ -9,9 +9,10 @@
  const finite=x=>typeof x==='number'&&Number.isFinite(x),pct=x=>finite(x)?(100*x).toFixed(2)+'%':'—';
  const section=(t,b)=>`<article class="subpanel fusion-section"><h3>${esc(t)}</h3>${b}</article>`;
  const table=(h,r)=>renderTable(h,r,'fusion-table-wrap',12);
- async function load(fund){
-  if(!index.payload_hashes[fund?.code])return base.load(fund);
-  if(cache.has(fund.code))return cache.get(fund.code);
+ async function load(fund,detail){
+  if(!index.payload_hashes[fund?.code])return base.load(fund,detail);
+  const present=task=>task.then(p=>base.currentView(p,detail,fund.code));
+  if(cache.has(fund.code))return present(cache.get(fund.code));
   const hash=index.payload_hashes[fund.code];
   const task=(async()=>{
    if(root.BOND_EQUITY_FUSION?.[fund.code]?.source_payload_sha256!==hash){
@@ -21,7 +22,7 @@
    const p=root.BOND_EQUITY_FUSION?.[fund.code];
    if(p?.code!==fund.code||p.schema_version!=='bond_cb_equity.v1'||p.source_payload_sha256!==hash||!p.direct_equity||!p.allocation)throw new Error('全市场画像内容版本或结构不匹配');
    return p;
-  })().catch(e=>{cache.delete(fund.code);throw e;});cache.set(fund.code,task);return task;
+  })().catch(e=>{cache.delete(fund.code);throw e;});cache.set(fund.code,task);return present(task);
  }
  function scope(p){return isMarket(p)?`<p class="method-note">全市场披露方法 · 净值截至 ${esc(p.nav_end_date||'待补')}。结构化缓存与原报告逐项核验状态分开；空缺不表示零持仓。<a href="bond-methodology.html" target="_blank">统一方法论与实现状态</a></p>`:'';}
  function cleanSource(html,p){return isMarket(p)?html.replace(' 中期报告',' 结构化披露记录').replace('最新完整披露：','所选完整报告期：'):html;}
