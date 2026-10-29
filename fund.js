@@ -16,6 +16,7 @@ const genericDetailPromises = new Map();
 const dashboardAssetPromises = new Map();
 const dataScriptPromises = new Map();
 const profileDetailPromises = new Map();
+const profilePairSelections = new Map();
 const equityModelAssetPromises = new Map();
 // Change this only when the data protocol changes, not at midnight.
 // Unchanged files reuse HTTP cache; expired entries revalidate with OSS ETags.
@@ -219,7 +220,7 @@ function isFiniteValue(value) {
 function activeProfileStatusLabel(status) {
   if (status === "mature_3plus") return "成熟画像";
   if (status === "usable_2") return "可用画像";
-  return "冷启动";
+  return "披露样本待积累";
 }
 
 function activeProfilePercentileRow(label, group, percentile, value, note) {
@@ -241,7 +242,8 @@ function renderActiveEquityProfilePanel(fund) {
   const payload = window.FUND_ACTIVE_EQUITY_PROFILES;
   const profile = payload?.funds?.[fund.code];
   if (!profile || profile.status === "cold_start") {
-    return `<div class="panel-intro"><div><p class="eyebrow">POINT-IN-TIME PROFILE</p><h2>基金画像·冷启动</h2></div><p>当前管理结构尚未积累至少2个合格的完整持仓转移区间，不继承上一管理结构的成熟画像。</p></div><article class="subpanel"><div class="research-metric-grid metric-three">${metric("当前管理结构", escapeHTML((profile?.manager_names || fund.manager || []).join("、") || "—"))}${metric("完整披露", `${profile?.full_disclosure_count || 0}期`)}${metric("合格转移", `${profile?.completed_transition_count || 0}个`)}</div><p class="method-note">冷启动只表示当前管理结构样本不足，不是对基金质量的评价。</p></article>`;
+    const availability=FundResearch.profileAvailability(profile);
+    return `<div class="panel-intro"><div><p class="eyebrow">CURRENT MANAGER PROFILE</p><h2>基金画像 · ${escapeHTML(availability.label)}</h2></div><p>${escapeHTML(availability.reason)}</p></div><article class="subpanel"><div class="research-metric-grid metric-three">${metric("当前基金经理组合", escapeHTML((profile?.manager_names || fund.manager || []).join("、") || "—"))}${metric("完整披露", profile ? `${profile.full_disclosure_count || 0}期` : "资料待补")}${metric("合格转移", profile ? `${profile.completed_transition_count || 0}个` : "资料待补")}</div><p class="method-note">半年报、年报公布完整持仓后更新；基金经理组合变化后，从新组合重新积累披露区间。</p></article>`;
   }
   const values = profile.values || {};
   const percentiles = profile.percentiles || {};
@@ -249,7 +251,7 @@ function renderActiveEquityProfilePanel(fund) {
   const industries = profile.preferred_industries?.level1 || [];
   const status = activeProfileStatusLabel(profile.status);
   const formatRaw = (value) => value !== null && value !== undefined && isFiniteValue(value) ? pct(Number(value), 1) : "—";
-  return `<div class="panel-intro"><div><p class="eyebrow">POINT-IN-TIME PROFILE</p><h2>当前管理结构画像</h2></div><p>只使用当时已公开的半年报/年报完整持仓，对当前管理结构单独累积；经理加入或离任后重新冷启动。</p></div>
+  return `<div class="panel-intro"><div><p class="eyebrow">POINT-IN-TIME PROFILE</p><h2>当前管理结构画像</h2></div><p>只使用当时已公开的半年报/年报完整持仓，对当前管理结构单独累积；经理加入或离任后，按新组合重新积累披露区间。</p></div>
     <div class="active-profile-summary">
       <article class="subpanel"><div class="subpanel-heading"><div><h3>行为分位</h3><span>主动权益当前可用画像横截面</span></div></div>
         ${activeProfilePercentileRow("调仓活跃度", groups.turnover_activity, percentiles.turnover_activity, formatRaw(values.turnover_activity), "最近完成区间相对价格自然漂移的持仓half-L1；是调仓代理，不是官方换手率。")}
@@ -429,9 +431,46 @@ function profilePairMetricValue(key, value) {
   return pct(value,1);
 }
 
+function profilePairIndustryStatus(w) {
+  const entries=Object.entries(w?.industry || {}), total=entries.reduce((sum,[,v])=>sum+(Number.isFinite(v)?v:0),0);
+  if (!entries.length) return {valid:false,reason:'行业权重暂无数据',total};
+  if (entries.some(([,v])=>!Number.isFinite(v)||v<0)) return {valid:false,reason:'行业权重存在缺项或无效值',total};
+  if (Math.abs(total-1)>=.001) return {valid:false,reason:`行业权重不完整，合计${(total*100).toFixed(1)}%`,total};
+  return {valid:true,reason:'',total};
+}
+
+function profilePairChartLegend(names) {
+  return `<div class="pair-visual-legend">${names.map((name,i)=>`<span><i class="pair-visual-color pair-visual-${i}" aria-hidden="true"></i>${escapeHTML(name)}</span>`).join('')}</div>`;
+}
+
+function profilePairChartLine(value, text, side, title, missing='暂无数据') {
+  return `<div class="pair-visual-line" title="${escapeHTML(title)}"><span class="pair-visual-track" aria-hidden="true">${value===null?'':`<i class="pair-visual-fill pair-visual-${side}" style="width:${Math.max(0,Math.min(100,value*100)).toFixed(3)}%"></i>`}</span><span class="pair-visual-value${value===null?' is-missing':''}">${value===null?escapeHTML(missing):text}</span></div>`;
+}
+
+function renderPairPercentileChart(a, key, names, specs) {
+  const windows=[a.lw,a.rw], label=a.lw?.label || a.rw?.label || key;
+  const ranked=(w,k)=>{const m=w?.metrics?.[k],p=m?.percentile;return a.sameBasis&&Number.isFinite(p)&&p>=0&&p<=1&&m.comparison_count>=30?p:null;};
+  const missing=(w,k)=>!w?.dates?.length?'窗口无画像':!a.sameBasis?'基准不可比':!w.metrics?.[k]?'指标缺失':!Number.isFinite(w.metrics[k].comparison_count)?'样本数缺失':w.metrics[k].comparison_count<30?'样本不足30':w.metrics[k].n===0?'窗口无有效观测':!Number.isFinite(w.metrics[k].percentile)?'暂无分位':'分位无效';
+  const rows=specs.map(([k,title])=>`<div class="pair-visual-row" data-profile-dimension="${k}"><strong>${escapeHTML(title)}</strong><div class="pair-visual-series">${windows.map((w,i)=>{const value=ranked(w,k),n=w?.metrics?.[k]?.comparison_count;return profilePairChartLine(value,value===null?'':`P${Math.round(value*100)} <small>n=${escapeHTML(Number.isFinite(n)?n:'—')}</small>`,i,`${names[i]} · ${title} · ${value===null?missing(w,k):'分位P'+Math.round(value*100)+'；样本'+n+'只'}`,missing(w,k));}).join('')}</div></div>`).join('');
+  const basisNote=a.sameBasis?'同类分位 0—100，灰线为50分位。':(a.reasons.find(x=>/日期|市场组|截止日|样本数量|画像档案|完整披露|有效披露/.test(x)) || '当前窗口暂无可比分位。');
+  return `<figure class="pair-visual-card" data-profile-chart="seven-dimensions"><figcaption><h4>七维画像分位对照</h4><p>${escapeHTML(label)} · ${escapeHTML(basisNote)}</p></figcaption>${profilePairChartLegend(names)}<div class="pair-visual-axis" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div><div class="pair-visual-rows">${rows}</div></figure>`;
+}
+
+function renderPairIndustryChart(a, key, names) {
+  const windows=[a.lw,a.rw], states=windows.map(profilePairIndustryStatus), label=a.lw?.label || a.rw?.label || key;
+  const weight=(side,k)=>states[side].valid?(windows[side].industry[k]||0):null;
+  const all=[...new Set(windows.flatMap((w,i)=>states[i].valid?Object.keys(w.industry):[]))].sort((x,y)=>Math.max(weight(0,y)||0,weight(1,y)||0)-Math.max(weight(0,x)||0,weight(1,x)||0));
+  const top=all.slice(0,10), selected=new Set(top);
+  const rows=top.map(k=>({name:k,values:[weight(0,k),weight(1,k)]}));
+  if(all.length>10)rows.push({name:'其他行业',values:windows.map((w,i)=>states[i].valid?Object.entries(w.industry).reduce((sum,[k,v])=>sum+(selected.has(k)?0:v),0):null)});
+  const lines=rows.map(row=>`<div class="pair-visual-row" data-profile-industry="${escapeHTML(row.name)}"><strong>${escapeHTML(row.name)}</strong><div class="pair-visual-series">${row.values.map((value,i)=>profilePairChartLine(value,value===null?'':`${(value*100).toFixed(1)}%`,i,`${names[i]} · ${row.name} · ${value===null?states[i].reason:(value*100).toFixed(2)+'%（A股内部权重）'}`,states[i].reason)).join('')}</div></div>`).join('');
+  const absent=states.flatMap((state,i)=>state.valid?[]:[`<p class="pair-visual-note">${escapeHTML(names[i])}：${escapeHTML(state.reason)}</p>`]).join('');
+  return `<figure class="pair-visual-card pair-visual-industry" data-profile-chart="industry-weights" data-weight-basis="within-a-shares"><figcaption><h4>行业权重对照</h4><p>${escapeHTML(label)} · ${all.length>10?'前10项及其他行业':'主要行业'} · 占各自A股持仓</p></figcaption>${profilePairChartLegend(names)}${absent}${rows.length?`<div class="pair-visual-axis" aria-hidden="true"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div><div class="pair-visual-rows">${lines}</div>`:'<p class="empty-copy">当前窗口没有完整的A股行业权重。</p>'}<p class="pair-visual-note">分母为各自窗口的已披露A股持仓，行业权重在A股内部归一。</p></figure>`;
+}
+
 function renderPairProfileComparison(left, right, key, base, peer, errors = {}) {
   const a=profilePairAnalysis(left,right,key);
-  const names=[base.name,peer.name];
+  const names=[base,peer].map(f=>typeof FundResearch!=='undefined'?(FundResearch.portfolioName?.(f)||f.name):f.name);
   const errorReasons=Object.entries(errors).filter(([,e])=>e).map(([side,e])=>`${side==='left'?base.name:peer.name}：${e.message}`);
   const reasons=errorReasons.length ? [...errorReasons,...a.reasons.filter(x=>!x.includes('暂无可用画像档案'))] : a.reasons;
   const ready=Number.isFinite(a.distance) && !reasons.length;
@@ -439,19 +478,19 @@ function renderPairProfileComparison(left, right, key, base, peer, errors = {}) 
   const rank=existing ? 1+(a.lw.peers||[]).filter(x=>x.distance<existing.distance).length : null;
   const rankText=rank ? `已保存画像候选第${rank}名` : '按选中两只基金的已有画像即时对比；未入前5不代表没有画像';
   const summary=ready ? `<div class="profile-pair-distance"><div><span>画像差异</span><strong>${a.distance.toFixed(3)}<small>越低越接近</small></strong></div><p>${escapeHTML(rankText)}<br>行业 ${a.industry.toFixed(3)} · 股票风格 ${a.style.toFixed(3)} · 投资行为 ${a.behavior===null?'未使用':a.behavior.toFixed(3)}</p></div>` : `<div class="profile-pair-distance profile-pair-unavailable"><div><span>画像差异</span><strong>暂不可合并</strong></div><ul>${reasons.map(x=>`<li>${escapeHTML(x)}</li>`).join('')}</ul></div>`;
-  const coverage=(r,w)=>!r?'档案未加载':!w?.dates?.length?'窗口无有效披露':`${w.first_date} 至 ${w.last_date} · ${w.dates.length}期 · ${w.market_group}`;
+  const coverage=(r,w)=>!r?'档案未加载':!w?.dates?.length?'窗口无有效披露':`${w.label || key} · ${w.first_date} 至 ${w.last_date} · ${w.dates.length}期 · ${w.market_group} · 截止${w.as_of || r.as_of || '—'}`;
   const specs=[['market_cap','股票市值'],['pb','估值 PB'],['roe','盈利 ROE'],['activity','调仓活跃度'],['concentration','持仓集中度'],['persistence','持股延续率'],['industry_stability','行业稳定性']];
   const cell=(w,k)=>{
     const m=w?.metrics?.[k],p=m?.percentile;
     const valid=a.sameBasis && Number.isFinite(p) && p>=0 && p<=1 && m.comparison_count>=30;
-    return `<strong>${profilePairMetricValue(k,m?.value)}</strong>${valid?`<small>窗口分位 P${Math.round(p*100)}</small><span class="pair-profile-bar"><i style="width:${(p*100).toFixed(1)}%"></i></span>`:'<small>可比分位不足或基准不同</small>'}`;
+    return `<strong>${profilePairMetricValue(k,m?.value)}</strong>${valid?`<small>窗口分位 P${Math.round(p*100)} · n=${m.comparison_count}</small><span class="pair-profile-bar"><i style="width:${(p*100).toFixed(1)}%"></i></span>`:'<small>可比分位不足或基准不同</small>'}`;
   };
   const table=`<div class="table-scroll"><table class="profile-pair-table"><thead><tr><th>窗口平均特征</th>${names.map(n=>`<th>${escapeHTML(n)}</th>`).join('')}</tr></thead><tbody>${specs.map(([k,label])=>`<tr><th>${label}</th><td>${cell(a.lw,k)}</td><td>${cell(a.rw,k)}</td></tr>`).join('')}</tbody></table></div>`;
   const industries=[...new Set([...Object.keys(a.lw?.industry||{}),...Object.keys(a.rw?.industry||{})])].sort((x,y)=>Math.max(a.lw?.industry?.[y]||0,a.rw?.industry?.[y]||0)-Math.max(a.lw?.industry?.[x]||0,a.rw?.industry?.[x]||0)).slice(0,10);
   const industryCell=(w,k)=>w?.industry && Object.keys(w.industry).length ? pct(w.industry[k] || 0,1) : '暂无';
-  const industryTable=industries.length?`<details class="profile-pair-method"><summary>展开主要行业配置对照（两者最高权重前10项）</summary>${renderTable(['行业',...names.map(escapeHTML)],industries.map(k=>[escapeHTML(k),industryCell(a.lw,k),industryCell(a.rw,k)]))}</details>`:'';
+  const industryTable=industries.length?`<details class="profile-pair-method"><summary>查看主要行业权重数据（A股内部归一）</summary>${renderTable(['行业',...names.map(n=>escapeHTML(n)+' · 占A股持仓')],industries.map(k=>[escapeHTML(k),industryCell(a.lw,k),industryCell(a.rw,k)]))}</details>`:'';
   const retry=errorReasons.length?`<button type="button" class="profile-pair-button" data-peer-compare="${escapeHTML(peer.code)}">重新读取画像</button>`:'';
-  return `<section class="pair-profile-comparison" aria-label="两只基金画像对照">${summary}${a.notes.map(x=>`<p class="profile-pair-note">${escapeHTML(x)}</p>`).join('')}${retry}<div class="pair-profile-coverage"><p><strong>${escapeHTML(base.name)}</strong>：${escapeHTML(coverage(left,a.lw))}</p><p><strong>${escapeHTML(peer.name)}</strong>：${escapeHTML(coverage(right,a.rw))}</p></div>${a.lw||a.rw?table+industryTable:''}<p class="method-note">画像使用所选披露窗口的平均特征；净值使用下方所选日频窗口。分位越高只表示特征更突出，不是好坏评分。披露覆盖或A/H组不同则保留各自实际值，不计算总距离。</p></section>`;
+  return `<section class="pair-profile-comparison" aria-label="两只基金画像对照"><div class="pair-profile-coverage"><p><strong>${escapeHTML(names[0])} · ${escapeHTML(base.code)}</strong>：${escapeHTML(coverage(left,a.lw))}</p><p><strong>${escapeHTML(names[1])} · ${escapeHTML(peer.code)}</strong>：${escapeHTML(coverage(right,a.rw))}</p></div>${a.lw||a.rw?`<div class="pair-profile-visuals">${renderPairPercentileChart(a,key,names,specs)}${renderPairIndustryChart(a,key,names)}</div>`:''}${summary}${a.notes.map(x=>`<p class="profile-pair-note">${escapeHTML(x)}</p>`).join('')}${retry}${a.lw||a.rw?`<details class="profile-pair-method"><summary>查看七维原值、分位及样本数</summary>${table}</details>`+industryTable:''}<p class="method-note">画像使用所选披露窗口的平均特征；净值使用下方所选日频窗口。分位越高只表示特征更突出，不是好坏评分。披露覆盖或A/H组不同则保留各自实际值，不计算总距离。</p></section>`;
 }
 
 function renderProfilePairResult(r, peer, result) {
@@ -476,8 +515,13 @@ async function updateProfilePair(fund, requestedCode, requestedWindow) {
   const r = window.FUND_PROFILE_DETAILS?.[fund.code] || fund;
   const candidates = profilePairCandidates(r), params = new URLSearchParams(location.search);
   const code = requestedCode || params.get('compare');
-  const peer = candidates.find(x=>x.code===code) || candidates[0];
+  const selectedPeer = code && code !== fund.code && /^\d{6}\.(?:OF|SH|SZ)$/.test(code)
+    ? (window.FUND_DASHBOARD_CATALOG?.funds || []).find(x=>x.code===code && x.category==='active-equity') || window.FUND_PROFILE_DETAILS?.[code]
+      || (profilePairSelections.get(fund.code)?.code===code ? profilePairSelections.get(fund.code) : null)
+    : null;
+  const peer = candidates.find(x=>x.code===code) || selectedPeer || candidates[0];
   if (!peer) return;
+  profilePairSelections.set(fund.code,{code:peer.code,name:peer.name});
   const select = shell.querySelector('[data-pair-window]');
   const range = requestedWindow || params.get('compareWindow') || selectedProfileWindow(r);
   select.value = ['1m','3m','6m','ytd','1y','3y','5y','all'].includes(range) ? range : '3y';
@@ -551,7 +595,7 @@ function renderDisclosedProfile(r, evidenceOnly = false) {
   const style = rows(`<thead><tr><th>持仓加权中位数</th><th>本期</th><th>上期同结构</th><th>有效A股权重覆盖</th></tr></thead><tbody>${specs.map(([key,label,unit])=>{const f=r.style.fields[key];const before=r.previous_style?.fields?.[key];return `<tr><th scope="row">${label}</th><td>${n(f.value)}${f.value==null?"":unit}</td><td>${before?.value==null?"—":n(before.value)+unit}</td><td>${p(f.valid_weight_coverage)}</td></tr>`}).join("")}</tbody>`);
   const history = rows(`<thead><tr><th>指标</th><th>最近有效值</th><th>对应报告期</th><th>此前任期中位数</th><th>历史样本</th></tr></thead><tbody>${behavior.map(([key,label])=>{const h=r.historical_behavior[key];const date=key==="concentration"?r.report_date:(r.behavior_report_dates?.[key]||r.behavior_report_date);return `<tr><th scope="row">${label}</th><td>${p(r.behavior[key])}</td><td>${escapeHTML(Number.isFinite(r.behavior[key])?(date||"暂无"):"—")}</td><td>${p(h.median)}</td><td>${h.n}期</td></tr>`}).join("")}</tbody>`);
   const industries = r.top_industries.map(([label,value])=>`<div class="profile-industry-row"><span>${escapeHTML(label)}</span><div class="profile-weight-track"><i style="width:${Math.max(0,Math.min(100,value*(r.a_share_nav_weight??0)*100))}%"></i></div><strong>${p(Number.isFinite(r.a_share_nav_weight)?value*r.a_share_nav_weight:null)}</strong></div>`).join("");
-  const changes = r.industry_changes?.length ? rows(`<thead><tr><th>行业</th><th>上期</th><th>本期</th><th>变化</th></tr></thead><tbody>${r.industry_changes.map(x=>`<tr><th scope="row">${escapeHTML(x.industry)}</th><td>${p(x.previous)}</td><td>${p(x.current)}</td><td>${x.change>0?"+":""}${(x.change*100).toFixed(1)}个百分点</td></tr>`).join("")}</tbody>`) : '<p class="method-note">暂无可比较的上一期同管理结构完整持仓。</p>';
+  const changes = r.industry_changes?.length ? rows(`<thead><tr><th>行业</th><th>上期·占A股持仓</th><th>本期·占A股持仓</th><th>变化</th></tr></thead><tbody>${r.industry_changes.map(x=>`<tr><th scope="row">${escapeHTML(x.industry)}</th><td>${p(x.previous)}</td><td>${p(x.current)}</td><td>${x.change>0?"+":""}${(x.change*100).toFixed(1)}个百分点</td></tr>`).join("")}</tbody>`) : '<p class="method-note">暂无可比较的上一期同管理结构完整持仓。</p>';
   const mandate = r.mandate;
   const link = mandate && /^https:\/\//.test(mandate.source_url || "") ? `<a href="${escapeHTML(mandate.source_url)}" target="_blank" rel="noopener noreferrer">查看文件原文（${escapeHTML((mandate.pdf_pages||[]).join("、"))}页）</a>` : "";
   const contract = mandate ? `<p>${escapeHTML(mandate.theme_numerator)}至少占${escapeHTML(mandate.theme_denominator_label)}的${p(mandate.theme_minimum,0)}。</p><p class="method-note">${escapeHTML(mandate.mapping_caution)} 文件公告：${escapeHTML(mandate.contract_publication_date)}；当前审阅版本，不代表完整历史生效核验。</p>${link}` : `<p>合同主题未人工核验。</p><p class="method-note">名称线索：${escapeHTML((r.name_theme_hints||[]).join("、")||"未命中")}。名称不是合同约束，未命中也不代表可全市场投资。</p>`;
@@ -560,9 +604,9 @@ function renderDisclosedProfile(r, evidenceOnly = false) {
     ${r.current_manager_match===false?'<div class="calibration-note"><strong>经理变更或任期待核对</strong><p>下方保留产品已披露持仓；旧经理行为不继承，当前经理画像仍待积累。</p></div>':""}
     ${evidenceOnly ? '' : renderDisclosedPercentiles(r)}
     <div class="profile-detail-grid"><article class="subpanel"><h3>实际股票风格</h3>${style}<p class="method-note">只统计A股，同报告期匹配；低于80%有效覆盖留空。PE/PB只取正值，ROE不等于完整质量评分。增长字段暂无可靠覆盖。</p></article>
-    <article class="subpanel"><h3>本期主要A股行业 · 占基金净值</h3>${industries}<p class="method-note">占已披露A股权重。A股占基金净资产${p(r.a_share_nav_weight)}；港股占股票资产${p(r.hk_share)}。</p></article></div>
+    <article class="subpanel"><h3>本期主要A股行业 · 占基金净值</h3>${industries}<p class="method-note">行业权重＝A股内部行业占比×A股占净值比例。A股占基金净值${p(r.a_share_nav_weight)}；港股占股票资产${p(r.hk_share)}。</p></article></div>
     <article class="subpanel"><h3>近期行为与历史习惯</h3><p class="method-note">最近行为期：${escapeHTML(r.behavior_report_date||"暂无")}；此前历史不含最近一期，仅同连续管理结构比较。集中度的本期值来自${escapeHTML(r.report_date)}。</p>${history}<details><summary>这些指标如何理解</summary><p class="method-note">调仓活跃度是剔除价格漂移后的持仓距离，不是官方换手率；持股延续率衡量上期股票是否继续持有；行业稳定性为1减二级行业主动距离，不是稳定概率。历史中位数是描述性基线，不直接控制模型仓位。</p></details></article>
-    <details class="subpanel"><summary>相对上期的行业变化 · ${escapeHTML(r.previous_report_date||"暂无上期")}</summary>${changes}<p class="method-note">披露截面变化包含股价涨跌，不等同主动增减仓，也不能据此识别期内所有交易。</p></details>
+    <details class="subpanel"><summary>相对上期的行业变化 · A股内部构成 · ${escapeHTML(r.previous_report_date||"暂无上期")}</summary>${changes}<p class="method-note">披露截面变化包含股价涨跌，不等同主动增减仓，也不能据此识别期内所有交易。</p></details>
     <details class="subpanel"><summary>产品主题与合同依据</summary>${contract}</details>
     <details class="subpanel"><summary>画像如何更新，识别如何验真</summary><p>完整持仓披露后，先用当时留档的预测验真，再生成下一版画像；旧预测和旧画像版本不改写。当前页面只展示披露画像，尚未接入主动权益实时识别成绩。</p><p class="method-note">本版生成：${escapeHTML(r.snapshot_generated_at||r.as_of)}。历史统计是披露后整理，不冒充当时在线预测。新经理重新积累样本。</p></details>`;
 }
@@ -609,7 +653,7 @@ function profileMetricComparison(r, key, metric) {
   } else if (!Number.isFinite(currentRank)) currentNote = `本期该项有效比较样本${count}只，未达30只；保留实际值。`;
   else currentNote = `同报告期 · ${count.toLocaleString()}只有效产品`;
   const observation = latest?.observations?.[metric];
-  const repairReasons = {missing_price:'区间股票行情不完整，无法扣除价格漂移；不是经理冷启动。',missing_nav:'区间净值不完整，无法计算净资产口径变动。',manager_unknown:'该期经理归属尚未核实，暂不生成任期行为。',no_anchor_ashare:'上期没有A股持仓，延续比例不适用。',invalid_disclosure:'区间完整披露未通过数据校验。'};
+  const repairReasons = {missing_price:'区间股票行情不完整，待补齐后计算剔除价格漂移的持仓变化。',missing_nav:'区间净值不完整，无法计算净资产口径变动。',manager_unknown:'该期经理归属尚未核实，暂不生成任期行为。',no_anchor_ashare:'上期没有A股持仓，延续比例不适用。',invalid_disclosure:'区间完整披露未通过数据校验。'};
   if (latest && allowed(latest) && !Number.isFinite(currentValue) && repairReasons[observation?.status]) currentNote = repairReasons[observation.status];
   if (behavior && Number.isFinite(currentValue)) currentNote += `；行为区间 ${latest.transition_start || '起点待核对'} 至 ${latest.date}`;
   const referenceRank = reference.length && ranked.length/reference.length >= .8 ? mean(ranked.map(p=>p.percentiles[source])) : null;

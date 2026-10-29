@@ -48,7 +48,16 @@
   };
   const shareSearchText = fund => (shareInfo(fund)?.aliases || []).map(a =>
     [a.code,a.name,a.full_name,a.share_class ? a.full_name+a.share_class : ''].join(' ')).join(' ');
-  const api = { finite, monthStart, range, weekly, uniquePeriods, quarterLag, peerWindow, shareInfo, portfolioName, representativeShare, shareSearchText };
+  const profileAvailability = profile => {
+    if (!profile) return {label:'画像资料待补',reason:'尚无当前基金经理组合的画像资料'};
+    if (profile.status==='mature_3plus') return {label:'成熟画像',reason:''};
+    if (profile.status==='usable_2') return {label:'可用画像',reason:''};
+    if (profile.regime_status==='regime_change') return {label:'基金经理组合暂不稳定',reason:'完整披露区间内基金经理组合发生变化，待形成连续区间'};
+    if (!profile.manager_names?.length) return {label:'基金经理信息待补',reason:'当前基金经理名单尚未核实'};
+    if (!profile.regime_start) return {label:'经理组合资料待补',reason:'尚未匹配当前基金经理组合的连续完整披露'};
+    return {label:'披露样本待积累',reason:`当前基金经理组合有${profile.full_disclosure_count || 0}期完整披露、${profile.completed_transition_count || 0}个合格转移区间；至少2个区间后生成行为画像`};
+  };
+  const api = { finite, monthStart, range, weekly, uniquePeriods, quarterLag, peerWindow, shareInfo, portfolioName, representativeShare, shareSearchText, profileAvailability };
   root.FundResearch = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -351,12 +351,13 @@ function activeEquityProfileCell(fund) {
       ? '<td class="fund-profile-cell pending-cell"><strong>画像暂不可用</strong><small>可在表头重试，其他数据仍可查看</small></td>'
       : '<td class="fund-profile-cell pending-cell"><strong>画像加载中</strong><small>正在读取低频画像数据</small></td>';
   }
-  if (!profile) return '<td class="fund-profile-cell pending-cell"><strong>冷启动</strong><small>当前管理结构尚未形成可用画像</small></td>';
+  const availability = FundResearch.profileAvailability(profile);
+  if (!profile) return `<td class="fund-profile-cell pending-cell"><strong>${escapeHtml(availability.label)}</strong><small>${escapeHtml(availability.reason)}</small></td>`;
   const groups = profile.groups || {};
   const percentiles = profile.percentiles || {};
-  const status = profile.status === "mature_3plus" ? "成熟画像" : profile.status === "usable_2" ? "可用画像" : "冷启动";
+  const status = availability.label;
   if (profile.status === "cold_start") {
-    return `<td class="fund-profile-cell pending-cell"><strong>${status}</strong><small>${profile.completed_transition_count || 0}个合格转移区间</small></td>`;
+    return `<td class="fund-profile-cell pending-cell"><strong>${status}</strong><small>${escapeHtml(availability.reason)}</small></td>`;
   }
   return `<td class="fund-profile-cell"><div class="fund-profile-chip-grid">
     <span title="调仓活跃度同类分位 ${profilePercentile(percentiles.turnover_activity)}"><b>调仓</b>${escapeHtml(groups.turnover_activity || "—")}</span>
@@ -375,7 +376,7 @@ function activeEquityProfileHeader() {
     ["concentration:高集中", "高集中组"],
     ["persistence:高延续", "高延续组"],
     ["industry:高稳定", "行业高稳定组"],
-    ["status:cold_start", "冷启动"],
+    ["status:cold_start", "画像待积累 / 资料待补"],
   ].map(([value, label]) => `<option value="${value}"${activeEquityProfileFilter === value ? " selected" : ""}>${label}</option>`).join("");
   const unavailable = !validHomepageFundMap(window.FUND_ACTIVE_EQUITY_PROFILES);
   const retry = activeEquityProfilesError ? `<button type="button" class="table-header-select" data-retry-profiles>重试画像</button><small>${escapeHtml(activeEquityProfilesError.message)}</small>` : '';
@@ -625,6 +626,12 @@ function renderListHead() {
   const table = listHead.closest("table");
   table?.classList.toggle("all-fund-mode", activeCategory === "all");
   if (activeCategory === 'active-equity') {
+    const widths = [240,100,...periods.map(()=>92),92,112,90,176,132,300];
+    const columns = document.createElement('colgroup');
+    columns.dataset.completeWidths = 'true';
+    columns.innerHTML = widths.map(width=>`<col style="width:${width}px">`).join('');
+    table.prepend(columns);
+    table.style.setProperty('--complete-table-width',`${widths.reduce((sum,width)=>sum+width,0)}px`);
     listHead.innerHTML = `<tr><th>基金 / 经理</th>${fundSizeHeader()}${periods.map(([key, label]) => equityPeriodHeader(key, label)).join('')}${equityPeriodHeader('ytd', '今年以来')}<th>当前回撤 / 同类位置</th>${extraHeaders()}</tr>`;
     return;
   }
