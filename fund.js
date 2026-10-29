@@ -3577,7 +3577,7 @@ function dailyFilterPanel(daily,options={},error='') {
   const rows=[...daily.names].sort((a,b)=>view.point?view.point.groups[b]-view.point.groups[a]:0),search=String(options.search||''),query=search.trim().toLocaleLowerCase();
   const matching=rows.filter(name=>name.toLocaleLowerCase().includes(query)).length;
   const displayWeight=value=>value>0&&value<.0001?pct(value,4):pct(value,2);
-  const ranking=rows.map(name=>{const value=view.point?.groups[name],hasValue=Number.isFinite(value),selected=view.industry===name;return `<li data-daily-row="${escapeHTML(name)}"${name.toLocaleLowerCase().includes(query)?'':' hidden'}><button type="button" class="daily-allocation-row${selected?' active':''}" data-daily-industry="${escapeHTML(name)}" aria-pressed="${selected}" aria-label="${escapeHTML(name)}，${hasValue?pct(value,4):'没有结果'}，查看走势"><span class="daily-allocation-name"><i style="background:${reconstructionColor(name)}" aria-hidden="true"></i>${escapeHTML(name)}</span><span class="daily-allocation-track" aria-hidden="true">${hasValue?`<i class="daily-allocation-bar" style="width:${Math.max(0,Math.min(100,value*(r.a_share_nav_weight??0)*100))}%;background:${reconstructionColor(name)}"></i>`:''}</span><strong class="daily-allocation-value" title="${hasValue?pct(value,4):'没有结果'}" data-daily-value="${hasValue?value:''}">${hasValue?displayWeight(value):'—'}</strong></button></li>`;}).join('');
+  const ranking=rows.map(name=>{const value=view.point?.groups[name],hasValue=Number.isFinite(value),selected=view.industry===name;return `<li data-daily-row="${escapeHTML(name)}"${name.toLocaleLowerCase().includes(query)?'':' hidden'}><button type="button" class="daily-allocation-row${selected?' active':''}" data-daily-industry="${escapeHTML(name)}" aria-pressed="${selected}" aria-label="${escapeHTML(name)}，${hasValue?pct(value,4):'没有结果'}，查看走势"><span class="daily-allocation-name"><i style="background:${reconstructionColor(name)}" aria-hidden="true"></i>${escapeHTML(name)}</span><span class="daily-allocation-track" aria-hidden="true">${hasValue?`<i class="daily-allocation-bar" style="width:${Math.max(0,Math.min(100,value*100))}%;background:${reconstructionColor(name)}"></i>`:''}</span><strong class="daily-allocation-value" title="${hasValue?pct(value,4):'没有结果'}" data-daily-value="${hasValue?value:''}">${hasValue?displayWeight(value):'—'}</strong></button></li>`;}).join('');
   const value=view.industry&&view.point?view.point.groups[view.industry]:null;
   const unknownWeight=view.point?.groups['未知残余'];
   const unknownNote=Number.isFinite(unknownWeight)&&unknownWeight>0?`<p class="method-note" data-kalman-unknown-note>有 ${displayWeight(unknownWeight)} 的股票仓位暂时不能归到具体行业，单列为“未知残余”，没有摊入已知行业。</p>`:'';
@@ -6368,6 +6368,14 @@ function createGenericTabLoader(fund, detail) {
       const complete = await renderTab(id);
       if (complete !== false) loadedTabs.add(id);
       else target.querySelector("[data-tab-data-retry]")?.addEventListener("click", () => loadTab(id));
+      if(complete!==false&&['assets','industries','holdings','rebalancing'].includes(id)){
+        const raw=window.FUND_HOLDING_HISTORY?.[fund.code];
+        const missing=[...new Set([raw?.q?.at(-1)?.d,raw?.f?.at(-1)?.d].filter(d=>d&&!window.FUND_HOLDING_CHARACTERISTICS?.[d]))];
+        if(missing.length){
+          target.insertAdjacentHTML('afterbegin',`<p class="method-note" role="status" data-optional-characteristics>持仓、行业与配置数据已载入；${missing.map(escapeHTML).join('、')}估值特征暂缺，相关指标显示“—”。 <button type="button" class="text-button" data-characteristics-retry>重试估值特征</button></p>`);
+          target.querySelector('[data-characteristics-retry]')?.addEventListener('click',()=>{resourcePromises.delete('holdings');loadedTabs.delete(id);void loadTab(id);});
+        }
+      }
     } catch (error) {
       target.innerHTML = genericTabLoadingPanel(`${error.message}。可点击重试或再次切换本页签`) + '<button type="button" class="button" data-tab-data-retry>重新加载本页数据</button>';
       target.querySelector("[data-tab-data-retry]")?.addEventListener("click", () => loadTab(id));
@@ -6845,10 +6853,13 @@ function loadGenericDetail(code) {
 }
 
 function loadHoldingCharacteristicDates(dates) {
-  return Promise.all([...new Set(dates.filter(Boolean))].map((date) => {
-    if (window.FUND_HOLDING_CHARACTERISTICS?.[date]) return Promise.resolve();
-    return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`, `${date} 持仓特征`, () => window.FUND_HOLDING_CHARACTERISTICS?.[date] || null);
-  }));
+  const unique=[...new Set(dates.filter(Boolean))];
+  return Promise.allSettled(unique.map(date=>{
+    if(window.FUND_HOLDING_CHARACTERISTICS?.[date])return Promise.resolve();
+    return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`,`${date} 持仓特征`,()=>{
+      if(!window.FUND_HOLDING_CHARACTERISTICS?.[date])throw new Error(`${date} 持仓特征内容缺失`);
+    },'',{maxAttempts:1,timeoutMs:6000});
+  })).then(results=>results.map((r,i)=>({date:unique[i],status:r.status,error:r.status==='rejected'?r.reason.message:null})));
 }
 
 function hydrateHoldingPeriodCharacteristics(period) {
@@ -6874,7 +6885,11 @@ function hydrateHoldingPeriodCharacteristics(period) {
 function loadGenericHoldingHistory(code) {
   const loadCharacteristics = (raw) => {
     const latestDates = [raw?.q?.at(-1)?.d, raw?.f?.at(-1)?.d].filter(Boolean);
-    return loadHoldingCharacteristicDates(latestDates).then(() => normalizeGenericHoldingHistory(raw));
+    return loadHoldingCharacteristicDates(latestDates).then(results=>{
+      const history=normalizeGenericHoldingHistory(raw);
+      if(history)history.characteristic_load_errors=results.filter(r=>r.status==='rejected');
+      return history;
+    });
   };
   if (window.FUND_HOLDING_HISTORY?.[code]) return loadCharacteristics(window.FUND_HOLDING_HISTORY[code]);
   return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holdings/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 持仓历史`, () => window.FUND_HOLDING_HISTORY?.[code] || null).then(loadCharacteristics);
