@@ -129,3 +129,10 @@ body.workbench.warm-workbench :is(button,input,select,textarea,svg text){font-fa
 @media(max-width:620px){.multi-asset-attribution-workbench .toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end}.multi-asset-attribution-workbench .toolbar label{width:100%}.multi-asset-attribution-workbench .toolbar select{width:100%;min-width:0}.multi-asset-attribution-workbench .toolbar label:last-child:nth-child(3),.multi-asset-attribution-workbench .toolbar label:only-child{grid-column:1/-1}}
 
 @media(max-width:620px){.multi-asset-attribution-workbench .metric-four strong{font-size:clamp(16px,4.5vw,20px);line-height:1.35;white-space:nowrap}}
+
+/* Compact direct page selection in both list pagination bars. */
+body.workbench .fund-pagination .page-jump {display:inline-flex;align-items:center;gap:8px;margin:0;flex:none;}
+body.workbench .fund-pagination .page-jump label {display:inline-flex;align-items:center;gap:5px;white-space:nowrap;margin:0;color:#625b55;font:inherit;}
+body.workbench .fund-pagination .page-jump input {box-sizing:border-box;width:54px;min-width:0;min-height:32px;padding:5px 6px;text-align:center;font:inherit;font-variant-numeric:tabular-nums;color:#332c27;border:1px solid #a89987;border-radius:3px;background:#fff;}
+body.workbench .fund-pagination .page-jump input:focus-visible {outline:2px solid #8d3532;outline-offset:2px;}
+@media(max-width:600px){body.workbench .fund-pagination{flex-wrap:wrap;gap:8px;}body.workbench .fund-pagination .page-jump input{min-height:40px;width:48px;}.page-jump{gap:6px;}}

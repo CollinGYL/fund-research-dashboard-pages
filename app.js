@@ -711,7 +711,10 @@ function renderPagination(total) {
   currentPage = Math.min(currentPage, pageCount);
   pagination.innerHTML = `
     <button data-page="prev" ${currentPage === 1 ? "disabled" : ""}>上一页</button>
-    <span>第 ${currentPage} / ${pageCount} 页</span>
+    <form class="page-jump" data-page-jump data-page-count="${pageCount}" novalidate>
+      <label>第 <input name="page" type="text" inputmode="numeric" autocomplete="off" maxlength="6" value="${currentPage}" aria-label="跳转页码" title="输入1至${pageCount}页，按回车跳转"> / ${pageCount} 页</label>
+      <button type="submit">跳转</button>
+    </form>
     <button data-page="next" ${currentPage === pageCount ? "disabled" : ""}>下一页</button>`;
   document.querySelector('#fund-pagination-top').innerHTML = pagination.innerHTML;
 }
@@ -1125,6 +1128,27 @@ document.addEventListener("click", (event) => {
   currentPage += button.dataset.page === "next" ? 1 : -1;
   renderFunds();
   document.querySelector("#samples")?.scrollIntoView({ block: "start" });
+});
+
+// Both pagination bars share the same page state and preserve existing filters.
+document.addEventListener("submit", (event) => {
+  const form = event.target.closest("[data-page-jump]");
+  if (!form) return;
+  event.preventDefault();
+  const input = form.querySelector('input[name="page"]');
+  const value = input.value.trim();
+  const pageCount = Number(form.dataset.pageCount);
+  if (!/^\d+$/.test(value)) {
+    input.setCustomValidity(`请输入1至${pageCount}之间的整数页码`);
+    input.reportValidity();
+    return;
+  }
+  currentPage = Math.max(1, Math.min(Number(value), pageCount));
+  renderFunds();
+  document.querySelector("#samples")?.scrollIntoView({ block: "start" });
+});
+document.addEventListener("input", (event) => {
+  if (event.target.matches('.page-jump input')) event.target.setCustomValidity('');
 });
 
 function ensureStockClassification() {
