@@ -1260,7 +1260,7 @@ function campisiDateNote(d,reg,label){
 function renderCampisi(d){
   const c=d.campisi;
   if(!c||!c.full)return `<p class="tab-lead">五因子净值归因（Campisi / RBA）</p>`+campisiDateNote(d,null)+
-    sub("业绩归因","净值回归",`<div class="data-boundary"><p class="eyebrow">历史不足</p><h3>净值历史过短</h3><p>该基金净值有效观测 &lt;120，暂无五因子回归结果。</p></div>`);
+    sub("业绩归因","净值回归",`<div class="data-boundary"><p class="eyebrow">历史不足</p><h3>净值历史过短</h3><p>该基金共同净值样本不足60个有效观测，暂无五因子回归结果。</p></div>`);
   const regWin=c.reg_win||{};
   const availWins=Object.keys(FAC_WIN_LABEL).filter(k=>regWin[k]);
   if(!curFacWin||!regWin[curFacWin])curFacWin=availWins.includes("ytd")?"ytd":availWins[0];
@@ -1280,7 +1280,7 @@ function renderCampisi(d){
   const samePerfWindow=Boolean(campisiDate(fr.start)&&campisiDate(fr.end)&&stageMatch?.d0===fr.start&&stageMatch?.d1===fr.end);
   const capNote=arithAnn==null?"":`<p class="method-note">贡献合计 ${P(arithAnn,2)} · ${isAnnualized?"算术年化":"日收益之和"} · ${esc(fr.start||"—")}—${esc(fr.end||"—")}${stageMatch?`<br>业绩窗口 ${esc(stageMatch.d0||"—")}—${esc(stageMatch.d1||"—")} · ${isAnnualized?"复利年化":"累计收益"} ${P(isAnnualized?realAnn:realCum,2)}`:""}</p>`;
   const winSelectorBlock=`<div class="fac-win-bar"><span>选择窗口</span><select class="period" data-pb-onchange="switchFacWin(this.value)">${winOpts}</select></div>`;
-  const contribBlock=sub("收益贡献分解",`${isAnnualized?"年化":"未年化·实际累计"} · β×Σ因子 · ${fr.start}→${fr.end}（${fr.years||""}年,n=${fr.n},R²=${NN(fr.r2,3)}）`,
+  const contribBlock=sub("收益贡献分解",`${isAnnualized?"年化":"未年化·日收益之和"} · β×Σ因子 · ${fr.start}→${fr.end}（${fr.years||""}年,n=${fr.n},R²=${NN(fr.r2,3)}）`,
     `<div>${waterfallChart(fr.contrib,{w:700,h:220})}</div>`+capNote);
 
   // 自动生成的画像总结句
@@ -1332,7 +1332,7 @@ function renderCampisi(d){
     peerChartIds=[id1,id2];
     setTimeout(()=>{wirePeerCursor([id1,id2],ts);linkChartsMulti([id1,id2]);},0);
     pctlBlock=sub("同类百分位定位",
-      `日频 · 60交易日滚动窗 · vs 中长期纯债同类（${esc(ts.dt[0])} ~ ${esc(ts.dt[T-1])}，共 ${T} 个交易日锚点）`,
+      `日频 · 60交易日滚动窗 · vs ${ts.sector==="2001010302000000"?"短期纯债":"中长期纯债"}同类（${esc(ts.dt[0])} ~ ${esc(ts.dt[T-1])}，共 ${T} 个交易日锚点）`,
       `<div class="subpanel-note">五因子同类分位
         <span class="fac-chips" id="peerPctlChips">${peerPctlChips()}</span></div>`+
       `<div id="peerPctlWrap">${c1}</div>`+
