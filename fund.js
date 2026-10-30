@@ -243,7 +243,7 @@ function renderActiveEquityProfilePanel(fund) {
   const profile = payload?.funds?.[fund.code];
   if (!profile || profile.status === "cold_start") {
     const availability=FundResearch.profileAvailability(profile);
-    return `<div class="panel-intro"><div><p class="eyebrow">CURRENT MANAGER PROFILE</p><h2>基金画像 · ${escapeHTML(availability.label)}</h2></div><p>${escapeHTML(availability.reason)}</p></div><article class="subpanel"><div class="research-metric-grid metric-three">${metric("当前基金经理组合", escapeHTML((profile?.manager_names || fund.manager || []).join("、") || "—"))}${metric("完整披露", profile ? `${profile.full_disclosure_count || 0}期` : "资料待补")}${metric("合格转移", profile ? `${profile.completed_transition_count || 0}个` : "资料待补")}</div><p class="method-note">半年报、年报公布完整持仓后更新；基金经理组合变化后，从新组合重新积累披露区间。</p></article>`;
+    return `<div class="panel-intro"><div><p class="eyebrow">CURRENT MANAGER PROFILE</p><h2>基金画像 · ${escapeHTML(availability.label)}</h2></div><p>${escapeHTML(availability.reason)}</p></div><article class="subpanel"><div class="research-metric-grid metric-three">${metric("当前基金经理组合", escapeHTML((profile?.manager_names || fund.manager || []).join("、") || "—"))}${metric("完整持仓披露", profile ? `${profile.full_disclosure_count || 0}期` : "资料待补")}${metric("可比较的持仓变化", profile ? `${profile.completed_transition_count || 0}个` : "资料待补")}</div><p class="method-note">半年报、年报公布完整持仓后更新；基金经理组合变化后，从新组合重新积累披露区间。</p></article>`;
   }
   const values = profile.values || {};
   const percentiles = profile.percentiles || {};
@@ -259,7 +259,7 @@ function renderActiveEquityProfilePanel(fund) {
         ${activeProfilePercentileRow("持股延续性", groups.holding_persistence, percentiles.holding_persistence, formatRaw(values.holding_persistence), "上期净值权重不低于0.1%的A股在下期仍持有的比例。")}
         ${activeProfilePercentileRow("行业稳定性", groups.industry_stability, percentiles.industry_stability, formatRaw(values.industry_active_distance), "二级行业主动距离的反向分位；分位越高表示行业结构越稳定。")}
       </article>
-      <aside class="active-profile-status"><span>PROFILE RELIABILITY</span><strong>${status}</strong><p>当前结构：${escapeHTML((profile.manager_names || []).join("、") || "—")}<br>起始：${escapeHTML(profile.regime_start || "—")}<br>完整披露：${profile.full_disclosure_count || 0}期<br>合格转移：${profile.completed_transition_count || 0}个<br>画像可得：${escapeHTML(profile.profile_as_of || "—")}</p></aside>
+      <aside class="active-profile-status"><span>PROFILE RELIABILITY</span><strong>${status}</strong><p>现任经理：${escapeHTML((profile.manager_names || []).join("、") || "—")}<br>起始：${escapeHTML(profile.regime_start || "—")}<br>完整披露：${profile.full_disclosure_count || 0}期<br>可比较的持仓变化：${profile.completed_transition_count || 0}段<br>画像可得：${escapeHTML(profile.profile_as_of || "—")}</p></aside>
     </div>
     <article class="subpanel"><div class="subpanel-heading"><div><h3>历史行业偏好</h3><span>当前管理结构内的长期平均持仓权重</span></div></div><ul class="active-profile-industry-list">${industries.length ? industries.map((item) => `<li>${escapeHTML(item.name)}<b>${pct(item.weight, 1)}</b></li>`).join("") : "<li>待积累</li>"}</ul><p class="method-note">行业偏好是历史持仓描述，不表示相对同类超配，也不预测下一期必然买入。</p></article>
     <div class="calibration-note"><strong>解读边界</strong><p>分位是当前主动权益可用画像的横截面相对位置，不是评级或综合得分；不同维度的预测力不同，调仓活跃度的历史稳定性较强，集中度和行业偏好主要作描述性画像。</p></div>`;
@@ -322,7 +322,7 @@ function profilePeerCards(peers, key = '') {
 function profilePairShell(r) {
   if (!FundLifecycle.currentCompareEligible(r)) return '<p class="lifecycle-current-block">该组合已退出当前对比，历史净值可从页面上方的历史对比入口查看。</p>';
   if (!profilePairCandidates(r).length) return '';
-  return `<section class="profile-pair-shell" data-profile-pair="${escapeHTML(r.code)}" aria-label="两只基金联动对比"><div class="subpanel-heading"><div><h3>同一对基金，一起看画像与净值</h3><span>选择上方候选或下方相关性榜单中的“画像与净值对比”</span></div><label class="history-window-label">净值区间 <select data-pair-window aria-label="两只基金净值对比区间">${[['1m','近1月'],['3m','近3月'],['6m','近6月'],['ytd','今年以来'],['1y','近1年'],['3y','近3年'],['5y','近5年'],['all','共同历史']].map(([key,label])=>`<option value="${key}">${label}</option>`).join('')}</select></label></div><div data-pair-output aria-live="polite"><p class="empty-copy">选择基金后加载两只基金的净值。</p></div></section>`;
+  return `<section class="profile-pair-shell" data-profile-pair="${escapeHTML(r.code)}" aria-label="两只基金联动对比"><div class="subpanel-heading"><div><h3>同一对基金，一起看画像与净值</h3><span>选择上方候选或下方相关性榜单中的“画像与净值对比”</span></div></div><div data-pair-output aria-live="polite"><p class="empty-copy">选择基金后加载两只基金的净值。</p></div><div class="subpanel-heading" data-pair-nav-controls><h4>净值走势与相关性</h4><label class="history-window-label">净值区间 <select data-pair-window aria-label="两只基金净值对比区间">${[['1m','近1月'],['3m','近3月'],['6m','近6月'],['ytd','今年以来'],['1y','近1年'],['3y','近3年'],['5y','近5年'],['all','共同历史']].map(([key,label])=>`<option value="${key}">${label}</option>`).join('')}</select></label></div></section>`;
 }
 
 function pairNavSeries(detail) {
@@ -532,9 +532,11 @@ async function updateProfilePair(fund, requestedCode, requestedWindow) {
     button.closest('.profile-peer-card')?.classList.toggle('is-pair-selected',selected);
   }
   const key=selectedProfileWindow(r), rangeKey=select.value;
+  const navControls=shell.querySelector('[data-pair-nav-controls]');
   const host=shell.querySelector('[data-pair-output]');
-  host.innerHTML=`<div data-pair-request><h4>${escapeHTML(fund.name)} 与 ${escapeHTML(peer.name)} · 画像对照</h4><div data-pair-profile-output><p class="loading-state">正在读取所选基金的已有画像…</p></div><div data-pair-nav-output><p class="loading-state">正在读取两只基金的净值…</p></div></div>`;
+  host.innerHTML=`<div data-pair-request><h4>${escapeHTML(fund.name)} 与 ${escapeHTML(peer.name)} · 画像对照</h4><div data-pair-profile-output><p class="loading-state">正在读取所选基金的已有画像…</p></div><div data-pair-nav-controls-target></div><div data-pair-nav-output><p class="loading-state">正在读取两只基金的净值…</p></div></div>`;
   const request=host.firstElementChild;
+  request.querySelector('[data-pair-nav-controls-target]').append(navControls);
   // Portrait and NAV render independently: either can finish or fail on its own.
   const profileTask=Promise.allSettled([loadProfileDetails(fund.code),loadProfileDetails(peer.code)]).then(results=>{
     if (!request.isConnected) return;
@@ -683,9 +685,11 @@ function renderHistoricalProfile(r, key) {
     const prior=validReference.length?validReference.reduce((sum,p)=>sum+(p.industry[name]||0)*p.a_weight,0)/validReference.length:null;
     return `<div class="profile-industry-comparison"><div><span>${escapeHTML(name)}</span><strong>本期 ${pct(value,1)}</strong><small>此前 ${Number.isFinite(prior)?pct(prior,1):'—'}</small></div><div class="profile-weight-track"><i style="width:${Math.min(value*100,100)}%"></i></div>${Number.isFinite(prior)?`<div class="profile-weight-track profile-reference-weight"><i style="width:${Math.min(prior*100,100)}%"></i></div>`:''}</div>`;
   }).join('');
+  const managerAvailability=FundResearch.profileAvailability(r);
+  const managerNotice=r.reliability==='cold_start'?`<div class="calibration-note" data-current-profile-status><strong>${escapeHTML(managerAvailability.label)}</strong><p>${escapeHTML(managerAvailability.reason)}</p>${managerAvailability.sample?`<p class="method-note">${escapeHTML(managerAvailability.sample)}</p>`:""}${managerAvailability.detail?`<details><summary>行为画像需要哪些数据</summary><p class="method-note">${escapeHTML(managerAvailability.detail)}</p></details>`:""}</div>`:'';
   const header = `<div class="profile-head"><div><h2>披露持仓画像</h2><p>最近一期为主，历史窗口为参照；不等同实时持仓或投资评级。</p></div>${profileWindowControl(r,key)}</div>`;
   if (!latest) return `<div data-historical-profile="${escapeHTML(r.code)}">${header}<p class="empty-copy">尚无已公开的完整持仓，不以季度前十大充当完整组合。</p></div>`;
-  return `<div data-historical-profile="${escapeHTML(r.code)}">${header}<div class="profile-date-strip"><span>最近完整持仓 <strong>${escapeHTML(latest.date)}</strong></span><span>公告 <strong>${escapeHTML(latest.announcement)}</strong></span><span>历史参照 <strong>${escapeHTML(w.label)} · 此前${reference.length}期</strong></span></div>
+  return `<div data-historical-profile="${escapeHTML(r.code)}">${header}<div class="profile-date-strip"><span>最近完整持仓 <strong>${escapeHTML(latest.date)}</strong></span><span>公告 <strong>${escapeHTML(latest.announcement)}</strong></span><span>历史参照 <strong>${escapeHTML(w.label)} · 此前${reference.length}期</strong></span></div>${managerNotice}
     <div class="profile-comparison-legend"><span><i class="profile-current-key"></i>本期分位</span><span><i class="profile-reference-key"></i>此前平均位置（不含本期）</span></div>
     <p class="method-note">历史参照范围：${escapeHTML(w.requested_start || '任期待核对')} 至 ${escapeHTML(w.as_of)}${reference.length?`；实际此前披露 ${escapeHTML(reference[0].date)} 至 ${escapeHTML(reference.at(-1).date)}`:''}。${key==='tenure' ? (w.requested_start ? escapeHTML(w.tenure_start_note) : '当前经理未核对一致；本期股票风格仅保留产品披露，不归属当前经理。') : '产品历史包含期间历任经理；跨经理转移不作为连续经理的行为样本。'} 不足年限只用实际可得部分。分位高低不是好坏评分。</p>
     <div class="history-metric-grid">${cards}</div><div class="profile-detail-grid"><article class="subpanel"><h3>主要A股投向 · 占基金净值</h3>${inds || '<p class="empty-copy">本期暂无有效A股行业。</p>'}<p class="method-note">按本期前十行业展示；${reference.length?`实色条为本期，细线条为此前${reference.length}期均值`:'仅展示本期，所选窗口尚无此前均值'}，每期先换算为占基金净值，再计算此前均值。港股占本期股票资产${pct(latest.hk_share,1)}，港股未混入A股风格。</p></article>

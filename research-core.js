@@ -49,13 +49,18 @@
   const shareSearchText = fund => (shareInfo(fund)?.aliases || []).map(a =>
     [a.code,a.name,a.full_name,a.share_class ? a.full_name+a.share_class : ''].join(' ')).join(' ');
   const profileAvailability = profile => {
-    if (!profile) return {label:'画像资料待补',reason:'尚无当前基金经理组合的画像资料'};
-    if (profile.status==='mature_3plus') return {label:'成熟画像',reason:''};
-    if (profile.status==='usable_2') return {label:'可用画像',reason:''};
-    if (profile.regime_status==='regime_change') return {label:'基金经理组合暂不稳定',reason:'完整披露区间内基金经理组合发生变化，待形成连续区间'};
-    if (!profile.manager_names?.length) return {label:'基金经理信息待补',reason:'当前基金经理名单尚未核实'};
-    if (!profile.regime_start) return {label:'经理组合资料待补',reason:'尚未匹配当前基金经理组合的连续完整披露'};
-    return {label:'披露样本待积累',reason:`当前基金经理组合有${profile.full_disclosure_count || 0}期完整披露、${profile.completed_transition_count || 0}个合格转移区间；至少2个区间后生成行为画像`};
+    if (!profile) return {label:'画像资料待补',reason:'还没有当前基金经理组合的画像资料。'};
+    const status=profile.reliability || profile.status;
+    if (status==='mature_3plus') return {label:'画像样本较充足',reason:''};
+    if (status==='usable_2') return {label:'行为画像已可用',reason:''};
+    if (profile.regime_status==='regime_change') return {label:'经理组合尚未稳定',reason:'完整持仓披露期间发生了经理变更，正在积累新经理组合的连续数据。'};
+    if (profile.current_manager_match===false) return {label:'经理任期资料待核实',reason:'最近完整持仓的经理名单与现任经理尚未核对一致，当前经理的行为画像待补。'};
+    if (!(profile.manager_names || profile.managers)?.length) return {label:'基金经理信息待补',reason:'当前基金经理名单尚未核实。'};
+    if (!profile.regime_start) return {label:'经理任期资料待补',reason:'还没有匹配到现任经理组合的连续完整持仓记录。'};
+    const reports=Number.isFinite(profile.full_disclosure_count)?profile.full_disclosure_count:(profile.history || []).filter(r=>r.date>=profile.regime_start).length;
+    const comparisons=profile.completed_transition_count ?? profile.completed_transitions ?? 0;
+    if (comparisons>=2) return {label:'现任经理画像资料待核实',reason:'已有至少2段完整持仓比较记录，画像所需的其余数据仍待核实。'};
+    return {label:'行为画像数据待积累',reason:'当前经理组合的数据还不够，暂时不能生成稳定的行为画像。',sample:`现任经理组合已有${reports}次完整持仓披露、${comparisons}段可比较的持仓变化。`,detail:'行为画像需要同一经理组合至少2段有效的完整持仓比较记录。完整持仓来自半年报和年报，季度前十大不计入完整持仓。'};
   };
   const api = { finite, monthStart, range, weekly, uniquePeriods, quarterLag, peerWindow, shareInfo, portfolioName, representativeShare, shareSearchText, profileAvailability };
   root.FundResearch = api;

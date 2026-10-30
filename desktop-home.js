@@ -8,6 +8,7 @@
   const pagination = document.querySelector('.desktop-pagination-bar');
   const samples = document.querySelector('#samples');
   const tableWrap = document.querySelector('.fund-list-wrap');
+  const topScroll = document.querySelector('#table-top-scroll');
   const tableHead = document.querySelector('#fund-list-head');
   const table = tableHead?.closest('table');
   const desktop = window.matchMedia('(min-width:761px)');
@@ -54,6 +55,7 @@
   }
   let scheduled = false;
   let headShift = 0;
+  let scrollShift = 0;
   function setPixels(name, value) {
     const next = `${Math.ceil(value)}px`;
     if (root.style.getPropertyValue(name) !== next) root.style.setProperty(name, next);
@@ -64,6 +66,12 @@
       tableHead.style.removeProperty('transform');
       tableHead.classList.remove('is-frozen');
       headShift = 0;
+      if (topScroll) {
+        topScroll.style.removeProperty('transform');
+        topScroll.classList.remove('is-frozen');
+      }
+      scrollShift = 0;
+      setPixels('--desktop-scrollbar-space', 0);
       return;
     }
     const headRect = tableHead.getBoundingClientRect();
@@ -71,14 +79,31 @@
     // Keep the real header in its original table so column widths and controls stay aligned.
     // Subtract the preceding transform to prevent accumulated movement between frames.
     const naturalTop = headRect.top - headShift;
+    const scrollRect = topScroll?.getBoundingClientRect();
+    const showScroll = Boolean(topScroll && !topScroll.hidden && scrollRect.height > 0 && scrollRect.width > 0);
+    const scrollNaturalTop = showScroll ? scrollRect.top - scrollShift : naturalTop;
+    // Move the real upper scrollbar and header as one group. Their natural gap
+    // includes the scrollbar itself and the table border, so the header cannot
+    // paint over the drag target. Clamp the whole group to the table's end.
+    const groupTop = showScroll ? Math.min(scrollNaturalTop, naturalTop) : naturalTop;
     const maxShift = Math.max(0, tableRect.bottom - headRect.height - naturalTop);
-    const nextShift = Math.min(maxShift, Math.max(0, toolbar.getBoundingClientRect().bottom - naturalTop));
+    const nextShift = Math.min(maxShift, Math.max(0, toolbar.getBoundingClientRect().bottom - groupTop));
     setPixels('--desktop-table-head-height', headRect.height);
+    setPixels('--desktop-scrollbar-space', showScroll ? naturalTop - groupTop : 0);
     if (nextShift !== headShift) {
       tableHead.style.transform = nextShift ? `translateY(${nextShift}px)` : '';
       headShift = nextShift;
     }
     tableHead.classList.toggle('is-frozen', headShift > 0);
+    if (topScroll) {
+      const nextScrollShift = showScroll ? nextShift : 0;
+      if (nextScrollShift !== scrollShift || !showScroll) {
+        if (nextScrollShift) topScroll.style.transform = `translateY(${nextScrollShift}px)`;
+        else topScroll.style.removeProperty('transform');
+        scrollShift = nextScrollShift;
+      }
+      topScroll.classList.toggle('is-frozen', scrollShift > 0);
+    }
   }
   function measure() {
     scheduled = false;

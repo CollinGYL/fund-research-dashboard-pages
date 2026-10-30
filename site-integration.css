@@ -16,7 +16,8 @@ body.workbench.warm-workbench .header-fund-search input{width:100%;height:31px;p
 .shared-search-suggestions[hidden]{display:none}
 body.workbench.warm-workbench .overview-return-button{background:#e9f1fc;color:#17569a;border:1px solid #95b5dc;border-radius:3px;padding:6px 10px;font-size:12px;white-space:nowrap}
 .overview-return-button[hidden]{display:none!important}
-body.workbench.warm-workbench .locate-fund-category{display:block;margin-top:7px;font-size:11px;color:#17569a;font-weight:500}
+body.compact-home.workbench.warm-workbench.desktop-home .fund-list-table a.locate-fund-category{display:block;margin-top:7px;font-size:11px;color:#17569a;font-weight:500;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+body.compact-home.workbench.warm-workbench.desktop-home .fund-list-table a.locate-fund-category:focus-visible{outline:2px solid #17569a;outline-offset:3px;border-radius:2px}
 body.workbench.warm-workbench .located-fund-row{outline:2px solid #648fc7;outline-offset:-2px;background:#edf4fd!important}
 body.workbench.warm-workbench .all-fund-core-cell{width:320px;min-width:320px;max-width:320px}
 body.workbench.warm-workbench .all-fund-core-grid{display:block}
