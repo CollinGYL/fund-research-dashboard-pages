@@ -5977,18 +5977,22 @@ function navAttributionView(data,state) {
   return `${controls}${pendingNote}<div class="attribution-period-line"><strong>${escapeHTML(model.start)} → ${escapeHTML(model.end)}</strong><span>净值 ${escapeHTML(d.nav_basis_code||data.code)} · 因子截至 ${escapeHTML(d.meta?.as_of||model.end)}</span></div><section class="research-metric-grid metric-four">${metric('共同样本',`${model.n}个`)}${metric('拟合优度R²',pct(model.r2,1))}${metric('净值端点收益',pct(model.interval_nav_cum,2,true))}${metric('截距贡献（'+unit+'）',attributionNumber(model.contrib.alpha==null?null:model.contrib.alpha*100,2,true))}</section>${attributionStack(entries,v=>attributionNumber(v==null?null:v*100,2,true)+unit)}<div class="attribution-beta-list">${keys.map((k,i)=>`<div><span>${NAV_ATTRIBUTION_LABELS[k]}</span><div>${model.betas[k]==null?'':`<i style="left:${model.betas[k]<0?50-Math.abs(model.betas[k])/max*48:50}%;width:${Math.abs(model.betas[k])/max*48}%;background:${ATTRIBUTION_COLORS[i]}"></i><b style="left:${50+model.betas[k]/max*48}%;background:${ATTRIBUTION_COLORS[i]}"></b>`}</div><strong>${attributionNumber(model.betas[k],3,true)}</strong></div>`).join('')}</div>${renderTable(['因子','β','收益贡献（'+unit+'）'],entries.map((e,i)=>[e.label,i<keys.length?attributionNumber(model.betas[keys[i]],3,true):'—',attributionNumber(e.value==null?null:e.value*100,3,true)]),'holdings-table-wrap')}<p class="method-note">贡献为线性收益分解，复利净值收益另列。${model.clipped_count?`日频收益按原方法裁剪至±10%，本窗口${model.clipped_count}个。`:''}</p><details class="subpanel"><summary>因子与样本口径</summary><p class="method-note">五个债券因子沿用固定久期与顺序正交化；转债、权益因子为各自指数减国债指数收益。日频60、周频26个共同样本起算。因子采用当前全样本正交口径。</p></details>`;
 }
 function multiAssetViewContent(data,state) {
+  if(state.allowedMethods&&!state.allowedMethods.includes(state.method))state.method='nav';
   if(state.method==='financial')return financialAttributionView(data,state);
   if(state.method==='nav')return navAttributionView(data,state);
   return `<div class="toolbar"><label>季度区间<select id="multi-asset-attribution-period">${(data?.periods||[]).slice().reverse().map(r=>`<option value="${escapeHTML(r.start)}"${r.start===state.period?' selected':''}>${escapeHTML(r.start)} → ${escapeHTML(r.end)}</option>`).join('')}</select></label></div>${multiAssetAttributionPeriod(data,state.period)}${multiAssetStockAttribution(data,state)}`;
 }
-function genericMultiAssetAttributionPanel(data) {
+function genericMultiAssetAttributionPanel(data, navOnly = false) {
   const state=attributionViewState(data);
+  state.allowedMethods=navOnly?['nav']:['holdings','financial','nav'];
+  if(!state.allowedMethods.includes(state.method))state.method='nav';
+  if(navOnly)return `<div id="multi-asset-attribution-workbench" class="multi-asset-attribution-workbench"><div class="panel-intro"><div><h2>业绩归因</h2></div><p>基于复权净值与七类市场因子的收益分解。</p></div><div id="multi-asset-attribution-output">${navAttributionView(data,state)}</div></div>`;
   return `<div id="multi-asset-attribution-workbench" class="multi-asset-attribution-workbench"><div class="panel-intro"><div><h2>业绩归因</h2></div><p>按披露持仓、财报金额和净值收益三个口径查看。</p></div><div class="attribution-view-tabs" role="tablist" aria-label="业绩归因口径">${[['holdings','持仓归因'],['financial','财报归因'],['nav','净值归因']].map(([k,v])=>`<button type="button" role="tab" data-attribution-view="${k}" aria-selected="${state.method===k}">${v}</button>`).join('')}</div><div id="multi-asset-attribution-output">${multiAssetViewContent(data,state)}</div></div>`;
 }
 function bindGenericMultiAssetAttribution(data) {
   const root=document.querySelector('#multi-asset-attribution-workbench');if(!root)return;const state=attributionViewState(data);
   const paint=()=>{root.querySelectorAll('[data-attribution-view]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.attributionView===state.method)));root.querySelector('#multi-asset-attribution-output').innerHTML=multiAssetViewContent(data,state);};
-  root.addEventListener('click',event=>{const b=event.target.closest('[data-attribution-view]');if(b&&root.contains(b)){state.method=b.dataset.attributionView;paint();}});
+  root.addEventListener('click',event=>{const b=event.target.closest('[data-attribution-view]');if(b&&root.contains(b)&&(!state.allowedMethods||state.allowedMethods.includes(b.dataset.attributionView))){state.method=b.dataset.attributionView;paint();}});
   root.addEventListener('change',event=>{const t=event.target;if(t.id==='multi-asset-attribution-period')state.period=t.value;else if(t.matches('[data-financial-period]'))state.financialPeriod=t.value;else if(t.matches('[data-financial-unit]'))state.financialUnit=t.value;else if(t.matches('[data-financial-scale]'))state.scale=t.value;else if(t.matches('[data-nav-attribution-frequency]'))state.frequency=t.value;else if(t.matches('[data-nav-attribution-window]'))state.window=t.value;else if(t.matches('[data-attribution-stock-period]'))state.stockPeriod=t.value;else return;paint();});
 }
 
@@ -6000,7 +6004,7 @@ function genericAttributionPanel(fund, brinson, multiAssetAttribution) {
     return `<div class="panel-intro"><div><p class="eyebrow">BRINSON-FACHLER</p><h2>业绩归因</h2></div><p>该基金目前没有可连续计算的完整持仓区间。</p></div><article class="subpanel"><p class="empty-copy">通常是现任管理团队成立后尚未披露半年报/年报完整持仓，或对应A股持仓缺少可定价区间；不使用季度前十大替代完整持仓归因。</p></article>`;
   }
   if (fund.category === "index-enhanced") return "";
-  return genericMultiAssetAttributionPanel(multiAssetAttribution);
+  return genericMultiAssetAttributionPanel(multiAssetAttribution, fund.category === "hybrid-bond");
 }
 
 const CAMPISI_LABELS = {
@@ -6392,7 +6396,7 @@ function createGenericTabLoader(fund, detail) {
         const [brinsonData, multiAssetData, fusion] = await Promise.all([
           fund.category === "active-equity" ? brinson() : Promise.resolve(null),
           ["hybrid-bond", "convertible-bond"].includes(fund.category) ? multiAsset() : Promise.resolve(null),
-          ["hybrid-bond", "convertible-bond"].includes(fund.category) ? BondCBFusion.load(fund) : Promise.resolve(null),
+          fund.category === "convertible-bond" ? BondCBFusion.load(fund) : Promise.resolve(null),
         ]);
         target.innerHTML = genericAttributionPanel(fund, brinsonData, multiAssetData) + (fusion ? BondCBFusion.attributionAudit(multiAssetData, fusion) : "");
         bindGenericBrinson(brinsonData);
