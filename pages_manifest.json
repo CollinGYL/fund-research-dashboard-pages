@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-30T12:47:08+08:00",
+  "generatedAt": "2026-10-30T13:54:58+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "app.js": {
-      "size": 104018,
-      "sha256": "e11c64b225e4b9814c6389393bbb46356c5632ce7338424a68bd983d6b788231"
+      "size": 104148,
+      "sha256": "71eb7b722839f4c9ad9351f59b8bb604f2e11389f2642846221728507ef28fd6"
     },
     "bond-cb-fusion.css": {
       "size": 2251,
@@ -21,8 +21,8 @@
       "sha256": "b28f2748bae80bd3d99f1987acb9ffe4127d9eb3a4f11428ce75a4b1285d8da9"
     },
     "bond-complete.js": {
-      "size": 18882,
-      "sha256": "9fdeec22df39f5e5fa1763986ab73a26a31e2fce474675937dd47ae659d3cb4e"
+      "size": 19493,
+      "sha256": "534cecfa95b7b4210b9b1845c451566b00a84d0b21088484c7c9c750faa7ec42"
     },
     "bond-equity-fusion.js": {
       "size": 22387,
@@ -117,16 +117,16 @@
       "sha256": "935daf516ae9b517946c303caa6ee69589112dd6caee852ce6d8b919046c5ef5"
     },
     "fund.html": {
-      "size": 4962,
-      "sha256": "fd38c254754b71eb655a0076008d3bcbc116f6a4a9af782336e4014006058f06"
+      "size": 5184,
+      "sha256": "8287e576351dce0efd28488d2692f6ddfd981f73f5171e81841cf7bd6470923b"
     },
     "fund.js": {
       "size": 624511,
       "sha256": "e8b71e6e30bfeb1873d72ac3e9326ab896438fd174f25cf8651c60e8ea40899f"
     },
     "index.html": {
-      "size": 13557,
-      "sha256": "109bc081ea64d614fce641fa52c40750f7a096f608297dee41e3d2f05f61bafc"
+      "size": 13876,
+      "sha256": "2980eac061a9041177d557a91031f031d88ffdba585043ce797ba9bcc263641a"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -187,6 +187,18 @@
     "warm-ui-repair.css": {
       "size": 9711,
       "sha256": "23ad8276b80d91a0486a2ac6d3a1cc78dc95514602e0c179f713fbf7732a8210"
+    },
+    "bond-advanced-pack.js": {
+      "size": 16392,
+      "sha256": "eac19bfda49165f62182a17dda1fd73aac45511483f02da55f8e4e21d924ace6"
+    },
+    "bond-advanced-pack.css": {
+      "size": 2115,
+      "sha256": "ce9ff789c6d288d4e9fa5e7ed622e35d4ac42a077e381c895bd60b7db86eb59b"
+    },
+    "bond-advanced-integration.js": {
+      "size": 5046,
+      "sha256": "cd03b5fd30e58b6cf83c8229eba36a5a00f04fbfc1e9d219df7c9b7679947ac4"
     }
   },
   "pathReplacements": {
@@ -221,6 +233,8 @@
     "research-core.js": 1,
     "review-core.js": 0,
     "site-integration.js": 0,
-    "warm-performance.js": 1
+    "warm-performance.js": 1,
+    "bond-advanced-pack.js": 0,
+    "bond-advanced-integration.js": 1
   }
 }

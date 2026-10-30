@@ -45,7 +45,7 @@
  const windows={'1m':'近1月','2m':'近2月','3m':'近3月','6m':'近6月',ytd:'今年以来','1y':'近1年','3y':'近3年','5y':'近5年',all:'可得历史'};
  function correlationOutput(p,key){const source=p.correlations?.schema_version==='bond_complete_correlation.v1'?p.correlations:p.correlation;const w=source?.windows?.[key];if(!w)return note('该窗口没有足够有效净值。');const grid=(title,rows)=>section(title,table(['基金','相关系数','共同有效日'],(rows||[]).map(x=>[`<a href="fund.html?code=${encodeURIComponent(x.code)}">${esc(x.name)}</a><small>${esc(x.code)}</small>`,num(x.correlation),String(x.observations)])));return note(`区间 ${w.start} 至 ${w.end}；同类池${w.pool_size}个组合，有效比较${w.n_valid_peers}个；每对至少${w.min_observations}个共同有效日。日收益裁切在±10%，缺净值不前填；相关性不代表利率久期或因果关系。`)+grid('相关性最高的同类基金',w.positive)+grid('相关性最低的同类基金',w.negative);}
  function correlationPanel(p){return section('同类基金相关性',note('一级和二级债同池，转债基金独立池；同组合的不同份额已合并，剔除自身。各基金使用实际净值截止日。')+`<label class="bc-control">区间<select data-bc-window>${Object.entries(windows).map(([k,v])=>`<option value="${k}"${k==='1y'?' selected':''}>${v}</option>`).join('')}</select></label><div data-bc-correlation>${correlationOutput(p,'1y')}</div>`);}
- function fundPanel(p){const rows=p.fund_investment||[],latest=rows.at(-1);return section('基金与ETF投资',latest?note(`资产配置报告期 ${latest.date}，基金投资占净资产 ${pct(latest.fund)}。${latest.fund===0?'该资产表明确为零，不能据此推断整个历史没有投资。':finite(latest.fund)?'资产表有基金投资，具体持有的子基金/ETF明细尚待补齐。':'资产表基金投资字段缺失，不能判断为零。'}`):note('暂无可用基金投资资产表。'))+section('基金投资历史',table(['报告期','基金投资/NAV'],rows.slice().reverse().map(x=>[esc(x.date),pct(x.fund)])))+note('本板块仅展示本基金自身投资。其他FOF持有本基金的数据属于相反方向，不混入这里。');}
+ function fundPanel(p){const rows=p.fund_investment||[],latest=rows.at(-1);return section('基金与ETF投资',latest?note(`资产配置报告期 ${latest.date}，基金投资占净资产 ${pct(latest.fund)}。${latest.fund===0?'该资产表明确为零，不能据此推断整个历史没有投资。':finite(latest.fund)?'资产表有基金投资，具体持有的子基金/ETF明细尚待补齐。':'资产表基金投资字段缺失，不能判断为零。'}`):note('暂无可用基金投资资产表。'))+`<details class="bc-legacy-details"><summary>基金投资历史（${rows.length}期）</summary>${table(['报告期','基金投资/占净值'],rows.slice().reverse().map(x=>[esc(x.date),pct(x.fund)]))}</details>`+note('本板块仅展示本基金自身投资。其他FOF持有本基金的数据属于相反方向，不混入这里。');}
  const cache=new Map();
  async function load(fund){
   const expected=root.BOND_COMPLETE_INDEX?.payloads?.[fund.code];if(!expected)throw new Error('该基金新增分析尚未登记');
@@ -99,7 +99,7 @@
    const p=await load(fund);
    if(id==='funds'){
     const current=Array.isArray(detail?.asset_history)&&detail.asset_history.length?{...p,fund_investment:detail.asset_history.map(x=>({date:x.date,fund:x.fund??null}))}:p;
-    host.innerHTML=fundPanel(current);return;
+    host.innerHTML=fundPanel(current)+'<div data-bap-own-funds></div>';if(root.BondAdvancedUI)await root.BondAdvancedUI.mount(host.querySelector('[data-bap-own-funds]'),'ownFunds',fund.code);return;
    }
    if(id==='correlation'){
     host.innerHTML=correlationPanel(p)+'<details class="bc-legacy-details"><summary>既有基金与代表指数相关性（原统计口径）</summary><div data-bc-market-correlation></div></details>';
@@ -122,13 +122,14 @@
     return;
    }
    if(id==='bonds'){
-    host.insertAdjacentHTML('afterbegin',bondPanel(p));
+    host.insertAdjacentHTML('afterbegin','<div data-bap-features></div><details class="bc-legacy-details"><summary>转债仓位、集中度与历史资料</summary>'+bondPanel(p)+'</details>');
+    if(root.BondAdvancedUI)await root.BondAdvancedUI.mount(host.querySelector('[data-bap-features]'),'features',fund.code);
     host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details"><summary>转债逐券、正股映射与既有历史资料</summary><div data-panel="convertibles"></div></details>');
     const fold=host.querySelector('.bc-legacy-details');fold.addEventListener('toggle',()=>{if(fold.open)void base('convertibles');});if(requestedTab==='convertibles')fold.open=true;bind(host,p);return;
    }
    if(id==='attribution'){
-    host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details"><summary>打新估算、回款与价差口径</summary><div data-panel="ipo"></div></details>');
-    const fold=host.querySelector('.bc-legacy-details');fold.addEventListener('toggle',()=>{if(fold.open)void base('ipo');});if(requestedTab==='ipo')fold.open=true;
+    host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details" data-bap-ipo-fold><summary>打新获配、锁定口径与收益估算</summary><div data-bap-ipo></div></details>');
+    const fold=host.querySelector('[data-bap-ipo-fold]');fold.addEventListener('toggle',()=>{if(fold.open&&root.BondAdvancedUI)void root.BondAdvancedUI.mount(fold.querySelector('[data-bap-ipo]'),'ipo',fund.code);});if(requestedTab==='ipo')fold.open=true;
    }
   }
   function loader(id){
