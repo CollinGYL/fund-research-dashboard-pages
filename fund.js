@@ -6521,27 +6521,25 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
   }
 
   const assetHistory = (detail?.asset_history || []).map((item) => {
-    const percent = (value) => isFiniteValue(value) ? Number(value) * 100 : 0;
+    const percent = (value) => isFiniteValue(value) ? Number(value) * 100 : null;
     const bond = percent(item.bond);
-    const knownBond = percent(item.government_bond) + percent(item.financial_bond)
-      + percent(item.corporate_bond) + percent(item.convertible_bond) + percent(item.abs);
     return {
       dt: item.date,
       gov: percent(item.government_bond),
       fin: percent(item.financial_bond),
       corp: percent(item.corporate_bond),
       cb: percent(item.convertible_bond),
-      bill: 0,
+      bill: null,
       absv: percent(item.abs),
-      cds: 0,
-      othbd: Math.max(0, bond - knownBond),
-      other: 0,
+      cds: null,
+      othbd: percent(item.other_bond),
+      other: null,
       bond,
       cash: percent(item.cash),
       stk: percent(item.stock),
       fund: percent(item.fund),
       othasset: percent(item.other),
-      mm: 0,
+      mm: null,
       na: isFiniteValue(item.net_asset) ? Number(item.net_asset) / 1e8 : null,
       lev: isFiniteValue(item.leverage) ? Number(item.leverage) : null,
     };

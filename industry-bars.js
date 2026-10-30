@@ -14,17 +14,16 @@
     return Object.entries(weights || {}).filter(([,v])=>typeof v==='number' && Number.isFinite(v) && v>0).sort((a,b)=>b[1]-a[1] || a[0].localeCompare(b[0],'zh-CN'));
   }
   function markup(record, selected, stockWeight, assetDate="") {
-    if(stockWeight===0) return '<span class="industry-empty">无股票持仓</span>';
-    if(!record) return '<span class="industry-empty">暂无完整行业披露</span>';
-    if(record.disclosed_stock_weight===0) return '<span class="industry-empty">无股票持仓</span>';
+    if(stockWeight===0 && assetDate) return `<span class="industry-empty">无股票持仓</span><small class="industry-date">${escape(assetDate)} · 资产配置披露</small>`;
+    if(!record?.report_date) return '<span class="industry-empty">暂无完整行业披露</span>';
     const rows=entries(record,selected), total=rows.reduce((s,[,v])=>s+v,0), scale=Math.max(1,total);
-    if(!rows.length) return '<span class="industry-empty">该层级暂无行业映射</span>';
+    if(!rows.length) return `<span class="industry-empty">${record.disclosed_stock_weight==null || record.disclosed_stock_weight===0?'该报告期暂无可用股票明细':'该层级暂无行业映射'}</span>`;
     const segment=([name,value])=>`<span class="industry-segment" tabindex="0" style="width:${value/scale*100}%;background:${color(name)}" aria-label="${escape(name)}，占净值${percent(value)}" title="${escape(name)} · 占净值 ${percent(value)}"><span class="industry-tooltip">${escape(name)} ${percent(value)}</span></span>`;
     const legend=([name,value])=>`<span class="industry-key"><i style="background:${color(name)}"></i><span>${escape(name)}</span><b>${percent(value)}</b></span>`;
     return `<div class="industry-stack" aria-label="${labels[selected]}分布，占净值，合计${percent(total)}">${rows.map(segment).join('')}${total<1?`<span class="industry-remainder" style="width:${(1-total)*100}%" title="其余净值比例 ${(100-total*100).toFixed(1)}%"></span>`:''}</div><div class="industry-top">${rows.slice(0,3).map(legend).join('')}</div><details class="industry-breakdown"><summary>全部 ${rows.length} 项 · 合计 ${percent(total)}</summary><div>${rows.map(legend).join('')}</div></details><small class="industry-date">${escape(record.report_date || '报告期未提供')} · ${labels[selected]} · 占净值${total>1?' · 条长按合计缩放':''}</small>`;
   }
   function placeholder(fund) {
-    return `<div class="industry-composition" data-industry-code="${escape(fund.code)}" data-asset-date="${escape(fund.asset?.report_date || '')}" data-stock-weight="${typeof fund.asset?.stock_weight==='number'?fund.asset.stock_weight:''}"><span class="industry-empty">${fund.asset?.stock_weight===0?'无股票持仓':'行业分布加载中…'}</span></div>`;
+    return `<div class="industry-composition" data-industry-code="${escape(fund.code)}" data-asset-date="${escape(fund.asset?.report_date || '')}" data-stock-weight="${typeof fund.asset?.stock_weight==='number'?fund.asset.stock_weight:''}"><span class="industry-empty">${fund.asset?.stock_weight===0 && fund.asset?.report_date?'无股票持仓':'行业分布加载中…'}</span></div>`;
   }
   function load(prefix) {
     if(window.INDUSTRY_BAR_SHARDS?.[prefix]) return Promise.resolve();
@@ -50,7 +49,7 @@
   function hydrate(root=document) {
     root.querySelectorAll('[data-industry-code]').forEach(node=>{
       const code=node.dataset.industryCode,prefix=code.slice(0,3);
-      if(node.dataset.stockWeight==='0'||window.FUND_STOCK_CLASSIFICATION?.funds?.[code]||window.INDUSTRY_BAR_SHARDS?.[prefix]) return paint(node);
+      if((node.dataset.stockWeight==='0' && node.dataset.assetDate)||window.FUND_STOCK_CLASSIFICATION?.funds?.[code]||window.INDUSTRY_BAR_SHARDS?.[prefix]) return paint(node);
       load(prefix).then(()=>paint(node),()=>paint(node));
     });
   }

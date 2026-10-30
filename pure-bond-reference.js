@@ -365,12 +365,15 @@ function stackArea(rows,keys,opt={}){
   stackArea.lastId=id;
   setTimeout(()=>wireStackArea(id,rows,keys,{pl,pr,pt,pb,pw,ph,x0,x1,xs,colors,names}),0);
   // ★2026-08-17 全期为 0 的科目:图例保留但灰化。判据是该键在所有报告期都不>0。
-  const lgZero=k=>rows.every(r=>!((r[k]||0)>0));
+  const missingValue=v=>typeof v!=="number" || !Number.isFinite(v);
+  const lgZero=k=>rows.every(r=>!missingValue(r[k]) && r[k]===0);
+  const lgMissing=k=>rows.every(r=>missingValue(r[k]));
+  const latestMissing=k=>missingValue(rows.at(-1)[k]);
   return `<div class="chart-wrap">${svg}</div><div class="chart-legend">`+keys.map(k=>{
     const z=lgZero(k);
     return `<span class="${z?"lg-zero":""}"${z?' title="本基金全期该科目均为 0（科目存在，但该基金未持有）"':""}>`
       +`<i class="sw" style="height:10px;width:10px;border-radius:2px;background:${colors[k]}"></i>${names[k]}`
-      +`${z?"（无）":""}</span>`;
+      +`${lgMissing(k)?"（未披露）":latestMissing(k)?"（本期未披露）":z?"（无）":""}</span>`;
   }).join("")+`</div>`;
 }
 function wireStackArea(id,rows,keys,g){
@@ -384,7 +387,7 @@ function wireStackArea(id,rows,keys,g){
     let bi=0,bd=Infinity;
     g.xs.forEach((x,i)=>{const dd=Math.abs(x-t);if(dd<bd){bd=dd;bi=i;}});
     const row=rows[bi];
-    const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${NN(row[k],1)}%</b>`).join("<br>");
+    const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${typeof row[k]==="number" && Number.isFinite(row[k])?NN(row[k],1)+"%":"未披露"}</b>`).join("<br>");
     showTT(`<div style="opacity:.75">${esc(row.dt)}</div>${lines}`,ev);
   });
   hit.addEventListener("mouseleave",()=>{hideTT();vl.setAttribute("opacity","0");});
@@ -887,7 +890,7 @@ function renderBondStruct(d){
   // 换算放前端:每行都带 bond,不必重跑 2457 只的数据文件。
   const bStyle=style.filter(r=>(r.bond||0)>0).map(r=>{
     const o={dt:r.dt,bond:r.bond};
-    SKEYS.forEach(k=>{o[k]=(r[k]||0)/r.bond*100;});
+    SKEYS.forEach(k=>{o[k]=typeof r[k]==="number" && Number.isFinite(r[k])?r[k]/r.bond*100:null;});
     return o;
   });
   const bondChart=bStyle.length?stackArea(bStyle,SKEYS,{h:320,colors:SC,names:SCN,refLine:100})
@@ -896,7 +899,7 @@ function renderBondStruct(d){
   const structSummary=lastB?`<div style="margin-top:auto;padding-top:14px">
       <div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">
         ${SKEYS.filter(k=>k!=="other").map(k=>
-          `<div class="rmetric"><span>${SCN[k]}</span><strong>${NN(lastB[k],1)}%</strong></div>`).join("")}
+          `<div class="rmetric"><span>${SCN[k]}</span><strong>${typeof lastB[k]==="number" && Number.isFinite(lastB[k])?NN(lastB[k],1)+"%":"未披露"}</strong></div>`).join("")}
       </div>
       ${(lastB.other||0)>0.5?`<div class="method-note" style="margin-top:10px">⚠ 本期"未明细"为 ${NN(lastB.other,1)}%，说明该报告期未把券种明细披露完整。</div>`:""}
     </div>`:"";
@@ -915,7 +918,7 @@ function renderBondStruct(d){
   }
   return `<p class="tab-lead">券种分布 · 重仓债券（前五大）· 持仓集中度 · 换手率</p>`+
     `<div class="two-column">
-      ${sub("券种分布","八券种占固定收益投资市值（季度）· 合计=100%",bondChart+structSummary)}
+      ${sub("券种分布","已披露券种占固定收益投资市值（季度）",bondChart+structSummary)}
       ${sub("重仓债券","按报告期切换 · 前五大",holdHtml)}
     </div>
     <div class="two-column">

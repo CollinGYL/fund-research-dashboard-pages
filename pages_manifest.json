@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-30T10:17:02+08:00",
+  "generatedAt": "2026-10-30T10:57:10+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "app.js": {
-      "size": 103062,
-      "sha256": "97c111d128e389611b51bdaec3f79c3e8e725781acbb7990876d3395fb7efcb0"
+      "size": 104018,
+      "sha256": "e11c64b225e4b9814c6389393bbb46356c5632ce7338424a68bd983d6b788231"
     },
     "bond-cb-fusion.css": {
       "size": 2251,
@@ -66,7 +66,7 @@
     },
     "bond-original-single.html": {
       "size": 729080,
-      "sha256": "689087499c16ab01c33861d0594c475c35fec3213db0821e8c7c03983f8dd56a"
+      "sha256": "545664af76e278076a85b89629002168b5d11ff41a0dbe1b056bd41f8c77f4c0"
     },
     "bond-research.html": {
       "size": 6193,
@@ -118,19 +118,19 @@
     },
     "fund.html": {
       "size": 4962,
-      "sha256": "4a12f9d3542ad860d516036539f26543563d71bcf75bd7987075444d03b29804"
+      "sha256": "cb227d08eb726c93128f13db0374ee58073be1cfae309bfc3dfb31ede42856ac"
     },
     "fund.js": {
-      "size": 623115,
-      "sha256": "1b086b806be1f74aea91109b59afb51398644dcfc17300d11f0fd6a214e579da"
+      "size": 622951,
+      "sha256": "b1388b093d6addff4d0885ef2aa2e7459079082ef3c3950f67c1edbd4bde45f2"
     },
     "index.html": {
-      "size": 14174,
-      "sha256": "45f7bba20993f242e2ae5ea738d0b2cea18c3fce3805d552b701154bd8d465a5"
+      "size": 13557,
+      "sha256": "85b57485d707e9fdb6ca7e7a45b0860a6caddeddd98029011a3971daefa081db"
     },
     "industry-bars.js": {
-      "size": 6987,
-      "sha256": "1cf79a3891c2f02ace1faa567e9c8ecc48fa3bbc102f4087a2ee92d34c7c3536"
+      "size": 7160,
+      "sha256": "d7e2104c05da3ca1c47692af45f0c0d247e04b28948efabaa47de185967b3a6b"
     },
     "integration-bootstrap.js": {
       "size": 1761,
@@ -145,8 +145,8 @@
       "sha256": "c88ab8454792d1365e868e4aafbc101d7114ac495360a8bb24816809e96813a3"
     },
     "pure-bond-reference.js": {
-      "size": 114212,
-      "sha256": "83d00d491dd327d7fc5aa72e023ec7b0338b3ff3f7f006e8a3b87a7d2c6f3c08"
+      "size": 114658,
+      "sha256": "de7fdef2314780297079fffdc57bd676c01c1d5089c4a16ea08ea61980143fd9"
     },
     "research-core.js": {
       "size": 22658,

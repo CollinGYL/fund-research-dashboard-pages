@@ -252,10 +252,11 @@ function topWeight(weights, excludeMarketBuckets = false) {
 }
 
 function classificationSummary(fund) {
-  if (fund.asset?.stock_weight === 0) return {sector:'无股票持仓 / 不适用', industry:'无股票持仓 / 不适用', date:fund.asset.report_date};
+  if (fund.asset?.stock_weight === 0 && fund.asset?.report_date) return {sector:'无股票持仓 / 不适用', industry:'无股票持仓 / 不适用', date:fund.asset.report_date};
   const fullMarket = window.FUND_STOCK_CLASSIFICATION?.funds?.[fund.code]
     || window.FUND_STOCK_CLASSIFICATION_SUMMARY?.funds?.[fund.code];
   if (fullMarket) {
+    if (!fullMarket.report_date) return {sector:'暂无完整披露', industry:'暂无完整披露', date:null};
     return {
       sector: topWeight(fullMarket.sector_weights) || "未映射",
       industry: topWeight(fullMarket.industry_weights?.[classificationRankState.industryLevel], true) || "暂无A股行业数据",
@@ -1232,6 +1233,15 @@ async function ensureHomepageHelpers() {
   await Promise.all(jobs.map(([src,label,read]) => read() || loadHomepageScript(src,label,read)));
 }
 
+function renderCoverageDates(sourceFunds) {
+  const body=document.querySelector('#coverage-sample-dates');
+  if(!body) return;
+  const codes=['000001.OF','000032.OF','000005.OF','000118.OF','000297.OF'];
+  const byCode=new Map((sourceFunds || []).map(f=>[f.code,f]));
+  const rows=codes.map(code=>byCode.get(code)).filter(Boolean);
+  body.innerHTML=rows.map(f=>`<tr><td>${escapeHtml(f.subtype || f.category_label || '—')}</td><td>${escapeHtml(FundResearch.portfolioName?.(f) || f.name)}</td><td>${escapeHtml(f.code)}</td><td>${escapeHtml(f.performance?.latest_date || '—')}</td><td>${escapeHtml(f.asset?.report_date || '—')}</td><td>${escapeHtml(f.duration?.report_date || '—')}</td></tr>`).join('') || '<tr><td colspan="6">暂无代表基金的数据日期。</td></tr>';
+}
+
 function initializeCatalog() {
   if (catalogPromise) return catalogPromise;
   resultCount.textContent = '正在加载基金目录…';
@@ -1252,6 +1262,7 @@ function initializeCatalog() {
     document.querySelector("#fund-count").textContent = funds.length.toLocaleString("zh-CN");
     const visibleScopeNote=document.querySelector('#visible-scope-note');
     if (visibleScopeNote) visibleScopeNote.textContent=`四类目录收录 ${funds.length.toLocaleString("zh-CN")} 个基金主体，覆盖主动权益、纯债、混合债基和转债；列表按基金范围与实际净值日期筛选。下表列出代表基金的数据日期，具体日期以各基金页面为准。`;
+    renderCoverageDates(funds);
     document.querySelector("#update-date").textContent = catalogData.generated_at?.slice(0, 10) || catalogData.as_of;
     const completion = document.querySelector("#completed-category-label");
     if (completion) completion.textContent = "四类目录";
