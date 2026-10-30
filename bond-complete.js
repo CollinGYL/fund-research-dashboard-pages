@@ -127,7 +127,6 @@
     const fold=host.querySelector('.bc-legacy-details');fold.addEventListener('toggle',()=>{if(fold.open)void base('convertibles');});if(requestedTab==='convertibles')fold.open=true;bind(host,p);return;
    }
    if(id==='attribution'){
-    host.insertAdjacentHTML('afterbegin',note('归因各项须区分市场、配置、选择和未解释残差。现有历史结果与新口径串联验收分开；缺收益、费用或融资字段不作零，也不把残差全部称为Alpha。'));
     host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details"><summary>打新估算、回款与价差口径</summary><div data-panel="ipo"></div></details>');
     const fold=host.querySelector('.bc-legacy-details');fold.addEventListener('toggle',()=>{if(fold.open)void base('ipo');});if(requestedTab==='ipo')fold.open=true;
    }

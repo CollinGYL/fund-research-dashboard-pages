@@ -5919,79 +5919,73 @@ function genericPendingPanel(fund, id) {
   return `<div class="panel-intro"><div><p class="eyebrow">DATA PIPELINE</p><h2>${escapeHTML(title)}</h2></div><p>${escapeHTML(description)}</p></div><article class="subpanel"><p class="empty-copy">该基金已进入全量目录；模块级明细尚未生成时保留明确缺失状态，不使用示例数据替代。</p></article>`;
 }
 
-const MULTI_ASSET_ATTR_LABELS = {
-  market: "市场基准",
-  allocation: "资产配置",
-  selection: "证券选择",
-  residual: "隐形交易与残差",
-};
-
-function multiAssetAttributionPeriod(data, periodStart) {
-  const period = (data?.periods || []).find((item) => item.start === periodStart) || data?.periods?.at(-1);
-  if (!period) return '<p class="empty-copy">该基金没有可复现的持仓法归因区间。</p>';
-  const assetRows = (period.assets || []).map((item) => [
-    `<strong>${escapeHTML(item.asset)}</strong>`,
-    pct(item.portfolio_weight, 2),
-    pct(item.benchmark_weight, 2),
-    pct(item.benchmark_return, 2, true),
-    item.portfolio_return === null || item.portfolio_return === undefined ? "—" : pct(item.portfolio_return, 2, true),
-    pct(item.benchmark_contribution, 2, true),
-    pct(item.allocation, 2, true),
-    pct(item.selection, 2, true),
-  ]);
-  const bondRows = (period.bond_categories || []).filter((item) => Number(item.weight || 0) > 0).map((item) => [
-    escapeHTML(item.category), pct(item.weight, 2), pct(item.benchmark_return, 2, true),
-    item.contribution === null || item.contribution === undefined ? "—" : pct(item.contribution, 2, true),
-  ]);
-  const bf = data?.stock_bf?.periods?.find((item) => item.start === period.start);
-  const bfDetails = bf ? (data.stock_bf.details || []).filter((item) => item.start === period.start).sort((left, right) => Math.abs(Number(right.allocation || 0) + Number(right.selection || 0)) - Math.abs(Number(left.allocation || 0) + Number(left.selection || 0))).slice(0, 15) : [];
-  const bfRows = bfDetails.map((item) => [
-    escapeHTML(item.industry), pct(item.portfolio_weight, 2), pct(item.benchmark_weight, 2),
-    pct(item.portfolio_return, 2, true), pct(item.benchmark_return, 2, true),
-    pct(item.allocation, 2, true), pct(item.selection, 2, true),
-  ]);
-  const scope = period.stock_scope === "full" ? "中报/年报完整股票持仓" : period.stock_scope === "quarterly_top10" ? "季报前十大" : "该期无股票持仓明细";
-  return `
-    <div class="calibration-note"><strong>归因结果</strong><p>${escapeHTML(period.start)} 至 ${escapeHTML(period.end)}：基金实际收益 ${pct(period.actual_return, 2, true)}，市场基准、配置、选择与残差合计严格对齐该区间收益。</p></div>
-    <section class="research-metric-grid metric-four">
-      ${metric(MULTI_ASSET_ATTR_LABELS.market, pct(period.market, 2, true))}
-      ${metric(MULTI_ASSET_ATTR_LABELS.allocation, pct(period.allocation, 2, true))}
-      ${metric(MULTI_ASSET_ATTR_LABELS.selection, pct(period.selection, 2, true))}
-      ${metric(MULTI_ASSET_ATTR_LABELS.residual, pct(period.residual, 2, true))}
-    </section>
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>大类资产归因明细</h3><span>基准权重=该基金近8个季度仓位中位数</span></div></div>${renderTable(["资产", "实际权重", "基准权重", "代理指数收益", "持仓法收益", "市场基准", "配置贡献", "选择贡献"], assetRows, "holdings-table-wrap")}</article>
-    <div class="research-grid two-column-grid">
-      <article class="subpanel"><div class="subpanel-heading"><div><h3>纯债类属贡献</h3><span>披露债券类属结构外推</span></div></div>${bondRows.length ? renderTable(["券种", "估算仓位", "类属指数收益", "对净值贡献"], bondRows, "holdings-table-wrap") : '<p class="empty-copy">该期无可分类纯债持仓。</p>'}<p class="method-note">债券披露覆盖 ${pct(period.bond_disclosed_coverage, 1)}，分类覆盖 ${pct(period.bond_classification_coverage, 1)}，指数代理覆盖 ${pct(period.pure_bond_proxy_coverage, 1)}。</p></article>
-      <article class="subpanel"><div class="subpanel-heading"><div><h3>股票子组合口径</h3><span>${escapeHTML(scope)}</span></div></div><div class="research-metric-grid metric-two">${metric("可定价股票", `${period.stock_count || 0}只`)}${metric("持仓收益覆盖", pct(period.stock_return_coverage, 1))}</div><p class="method-note">季报只有前十大，只作高频跟踪；股票 BF 行业归因仅在中报/年报完整持仓区间展示。</p></article>
-    </div>
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>股票部分收益归因</h3><span>${bf ? `Brinson-Fachler · 完整持仓独立区间 ${escapeHTML(bf.start)} 至 ${escapeHTML(bf.end)} · 中证800统一A股代理` : "该区间不是完整持仓起点"}</span></div></div>${bf ? `<section class="research-metric-grid metric-four">${metric("股票组合收益", pct(bf.portfolio_return, 2, true))}${metric("中证800收益", pct(bf.benchmark_return, 2, true))}${metric("行业配置", pct(bf.allocation, 2, true))}${metric("个股选择", pct(bf.selection, 2, true))}</section>${renderTable(["中信一级行业", "基金权重", "基准权重", "持仓收益", "基准收益", "配置贡献", "选择贡献"], bfRows, "holdings-table-wrap")}<p class="method-note">股票部分收益归因仅使用中报/年报完整持仓，并按完整披露周期单独计算；它与上方季度多资产归因的结束日期可能不同。</p>` : '<p class="empty-copy">季报前十大不作为完整行业结构，因此本区间不计算股票部分收益归因。</p>'}</article>`;
+const MULTI_ASSET_ATTR_LABELS = { market: '市场基准', allocation: '资产配置', selection: '证券选择', residual: '其他差额' };
+const multiAssetViewStates = new Map();
+const ATTRIBUTION_COLORS = ['#927044','#5b8184','#b2745a','#aa9b75','#7d8791','#7e675c','#b29b91'];
+function attributionViewState(data) {
+  const key = data?.code || 'missing';
+  if (!multiAssetViewStates.has(key)) multiAssetViewStates.set(key, { method:'holdings', period:data?.periods?.at(-1)?.start, financialPeriod:data?.financial_attribution?.periods?.at(-1)?.p, financialUnit:'amount', scale:'blend', frequency:'daily', window:'1y', stockPeriod:data?.stock_bf?.periods?.at(-1)?.start });
+  return multiAssetViewStates.get(key);
 }
-
+function attributionNumber(value, digits=2, signed=false) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const v=Number(Number(value).toFixed(digits));return `${signed && v>0?'+':''}${v.toLocaleString('zh-CN',{minimumFractionDigits:digits,maximumFractionDigits:digits})}`;
+}
+function attributionPP(value,digits=2) { return value==null?'—':attributionNumber(value*100,digits,true)+'个百分点'; }
+function attributionStack(entries, format) {
+  const valid=entries.filter(e=>e.value!=null && Number.isFinite(e.value)),pos=valid.filter(e=>e.value>0),neg=valid.filter(e=>e.value<0),max=Math.max(pos.reduce((a,e)=>a+e.value,0),-neg.reduce((a,e)=>a+e.value,0),1e-12);
+  return `<div class="attribution-stack">${[[pos,'正向贡献'],[neg,'负向贡献']].map(([rows,label])=>`<div class="attribution-stack-row"><span>${label}</span><div class="attribution-stack-track">${rows.map(e=>`<span style="width:${Math.abs(e.value)/max*100}%;background:${e.color}" title="${escapeHTML(e.label+' '+format(e.value))}"></span>`).join('')}</div></div>`).join('')}<div class="attribution-legend">${valid.map(e=>`<span><i style="background:${e.color}"></i>${escapeHTML(e.label)} <b>${format(e.value)}</b></span>`).join('')}</div></div>`;
+}
+function multiAssetStockAttribution(data,state) {
+  const bf=data?.stock_bf;const period=bf?.periods?.find(p=>p.start===state.stockPeriod)||bf?.periods?.at(-1);
+  if(!period)return `<details class="subpanel"><summary>股票行业归因</summary><p class="empty-copy">${escapeHTML(data?.update_metadata?.stock_bf_pending_reason||'尚无可计算的完整股票持仓区间。')}</p></details>`;
+  const details=(bf.details||[]).filter(r=>r.start===period.start).sort((a,b)=>Math.abs(b.allocation+b.selection)-Math.abs(a.allocation+a.selection));
+  return `<details class="subpanel"><summary>股票行业归因 · ${escapeHTML(period.start)} → ${escapeHTML(period.end)}</summary><div class="toolbar"><label>完整持仓区间<select data-attribution-stock-period>${bf.periods.slice().reverse().map(r=>`<option value="${escapeHTML(r.start)}"${r.start===period.start?' selected':''}>${escapeHTML(r.start)} → ${escapeHTML(r.end)}</option>`).join('')}</select></label></div><section class="research-metric-grid metric-four">${metric('股票组合收益',pct(period.portfolio_return,2,true))}${metric('中证800收益',pct(period.benchmark_return,2,true))}${metric('行业配置',pct(period.allocation,2,true))}${metric('个股选择',pct(period.selection,2,true))}</section>${renderTable(['中信一级行业','基金权重','基准权重','持仓收益','基准收益','配置贡献','选择贡献'],details.map(r=>[escapeHTML(r.industry),pct(r.portfolio_weight,2),pct(r.benchmark_weight,2),pct(r.portfolio_return,2,true),pct(r.benchmark_return,2,true),pct(r.allocation,2,true),pct(r.selection,2,true)]),'holdings-table-wrap')}<p class="method-note">完整披露的A股子组合 · 中证800行业基准 · 股票内部权重。${escapeHTML(data?.stock_bf?.pending_intervals?.map(r=>r.reason).join('；')||'')}</p></details>`;
+}
+function multiAssetAttributionPeriod(data,periodStart) {
+  const period=(data?.periods||[]).find(r=>r.start===periodStart)||data?.periods?.at(-1);
+  if(!period)return '<p class="empty-copy">尚无可对齐的完整季度区间。</p>';
+  const partial=period.coverage_status && period.coverage_status!=='available';
+  const entries=['market','allocation','selection','residual'].map((k,i)=>({label:partial&&k==='selection'?'已覆盖选择':MULTI_ASSET_ATTR_LABELS[k],value:period[k],color:ATTRIBUTION_COLORS[i]}));
+  const scope=period.stock_scope==='full'?'完整股票持仓':period.stock_scope==='quarterly_top10'?'季报前十大':'未取得股票清单';
+  const assets=(period.assets||[]).map(r=>[escapeHTML(r.asset),pct(r.portfolio_weight,2),pct(r.benchmark_weight,2),pct(r.benchmark_return,2,true),pct(r.portfolio_return,2,true),attributionNumber(r.benchmark_contribution==null?null:r.benchmark_contribution*100,2,true),attributionNumber(r.allocation==null?null:r.allocation*100,2,true),attributionNumber(r.selection==null?null:r.selection*100,2,true)]);
+  const bonds=(period.bond_categories||[]).filter(r=>r.weight!=null && r.weight>0).map(r=>[escapeHTML(r.category+(r.included_in_ordinary_bond===false?'（单列）':'')),pct(r.weight,2),pct(r.benchmark_return,2,true),attributionNumber(r.contribution==null?null:r.contribution*100,2,true)]);
+  return `<div class="attribution-period-line"><strong>${escapeHTML(period.start)} → ${escapeHTML(period.end)}</strong><span>代表份额净值收益 ${pct(period.actual_return,2,true)}</span></div>${period.missing_inputs?.length?`<p class="attribution-gap">待补：${period.missing_inputs.map(escapeHTML).join('；')}</p>`:''}<section class="research-metric-grid metric-four">${entries.map(e=>metric(e.label+'（百分点）',attributionNumber(e.value==null?null:e.value*100,2,true))).join('')}</section>${attributionStack(entries,v=>attributionPP(v))}<details class="subpanel" open><summary>大类资产明细</summary>${assets.length?renderTable(['资产','实际权重','近8季基准权重','代理指数收益','持仓法收益','市场基准（百分点）','配置贡献（百分点）','选择贡献（百分点）'],assets,'holdings-table-wrap'):'<p class="empty-copy">该期资产仓位字段待补。</p>'}<p class="method-note">权重占净值，贡献为区间收益百分点；转债缺逐券收益时使用指数代理。其他差额含费用、期间交易及未覆盖部分。</p></details><div class="research-grid two-column-grid"><details class="subpanel" open><summary>债券类属贡献</summary>${bonds.length?renderTable(['券种','占净值','指数收益','代理贡献（百分点）'],bonds,'holdings-table-wrap'):'<p class="empty-copy">该期券种结构或指数收益待补。</p>'}<p class="method-note">${period.bond_category_basis?.includes('disjoint')?'按原报告独立券种；短融、中票从企业债大类中剔重。':'披露持债结构代理。'}类属覆盖 ${pct(period.pure_bond_proxy_coverage,1)}。${period.abs_contribution_separate_from_main?'ABS单列，保留在上方其他差额中。':''}</p></details><details class="subpanel"><summary>股票与来源口径</summary><p>${escapeHTML(scope)} · 可定价 ${period.stock_count??0}只 · 行情覆盖 ${pct(period.stock_return_coverage,1)}</p>${period.bond_category_sources?.length?`<p class="method-note">${escapeHTML(period.bond_category_basis?.includes('disjoint')?'原报告券种金额／同一产品净资产，交叉核对已有披露字段。':'披露持债明细及现有指数行情。')}</p>`:''}<p class="method-note">基准仓位使用当期及此前最多8个季度的有效披露中位数。</p></details></div>`;
+}
+const FINANCIAL_GROUP_LABELS={bond:'债券',stock:'股票',other_assets:'其他投资',cash_mgmt:'现金管理',other_income:'其他收入',expenses:'费用'};
+const FINANCIAL_ITEM_LABELS={bond_coupon:'债券票息',bond_trade:'债券买卖',bond_float:'债券估值变动',stock_div:'股票分红',stock_trade:'股票买卖',stock_float:'股票估值变动',abs:'资产支持证券',metal:'贵金属',derivative:'衍生工具',fund:'基金投资',repo:'回购收入',cash:'存款利息',fx:'汇兑',other:'其他收入',expense:'费用',dividend_unsplit:'未拆分股利'};
+function financialAttributionView(data,state) {
+  const d=data?.financial_attribution,period=d?.periods?.find(r=>r.p===state.financialPeriod)||d?.periods?.at(-1);
+  if(!period)return `<p class="empty-copy">${escapeHTML(d?.reason||'尚未取得可核验的年度或半年度利润表。')}</p>`;
+  const rate=state.financialUnit==='return',scale=period.scales?.[state.scale],format=v=>v==null?'—':rate?(scale>0?attributionNumber(v/scale*100,3,true)+'个百分点':'—'):attributionNumber(v/10000,2,true)+'万元';
+  const rows=Object.entries(FINANCIAL_GROUP_LABELS).map(([k,label],i)=>({label,value:period.groups?.[k],color:ATTRIBUTION_COLORS[i]}));
+  const gap=period.accounting_gap,notes=[];if(period.source_checks?.some(r=>!r.passed))notes.push('接口与原报告存在金额差异；表内采用原报告，相关平均规模待核对。');if(d.refresh_pending_reason)notes.push(d.refresh_pending_reason);if(rate&&!(scale>0))notes.push(state.scale==='management'?period.fee_note:state.scale==='profit'?period.profit_note:[period.fee_note,period.profit_note].filter(Boolean).join('；'));
+  return `<div class="attribution-period-line"><strong>${escapeHTML(period.d0)} → ${escapeHTML(period.d1)}</strong><span>产品合计 · 公告 ${escapeHTML(period.ann||'日期待补')}</span></div>${notes.filter(Boolean).length?`<p class="attribution-gap">${notes.filter(Boolean).map(escapeHTML).join('；')}</p>`:''}<div class="toolbar"><label>报告期<select data-financial-period>${d.periods.slice().reverse().map(r=>`<option value="${escapeHTML(r.p)}"${r.p===period.p?' selected':''}>${escapeHTML(r.p.replace('H1','年上半年').replace('H2','年下半年'))}</option>`).join('')}</select></label><label>单位<select data-financial-unit><option value="amount"${!rate?' selected':''}>金额（万元）</option><option value="return"${rate?' selected':''}>折算收益贡献</option></select></label><label>平均规模口径<select data-financial-scale>${[['blend','管理费与利润率均值'],['management','管理费反推'],['profit','加权利润率反推'],['quarter','季末规模均值']].map(([k,v])=>`<option value="${k}"${state.scale===k?' selected':''}>${v}</option>`).join('')}</select></label></div><section class="research-metric-grid metric-four">${metric('产品净利润',attributionNumber(period.net_profit==null?null:period.net_profit/10000,2,true)+'万元')}${metric('会计核对差额',attributionNumber(gap,2,true)+'元')}${metric('代表份额净值收益',pct(period.ret,2,true))}${metric('所选平均规模',scale>0?attributionNumber(scale/1e8,2)+'亿元':'待补')}</section>${rate&&!(scale>0)?'<p class="empty-copy">所选平均规模缺失；可切换金额查看已核验财报。</p>':attributionStack(rows,format)}${renderTable(['收入／费用','金额（万元）',...(rate?['折算贡献（百分点）']:[])],rows.map(r=>[r.label,attributionNumber(r.value==null?null:r.value/10000,2,true),...(rate?[scale>0?attributionNumber(r.value==null?null:r.value/scale*100,3,true):'—']:[])]),'holdings-table-wrap')}<details class="subpanel"><summary>查看逐项金额与原报告</summary>${renderTable(['项目','金额（万元）'],Object.entries(FINANCIAL_ITEM_LABELS).map(([k,v])=>[v,attributionNumber(period.amounts?.[k]==null?null:period.amounts[k]/10000,2,true)]),'holdings-table-wrap')}${period.pdf?.href?`<p><a href="${escapeHTML(period.pdf.href)}" target="_blank" rel="noopener">打开原报告</a></p>`:''}<p class="method-note">年度、中报为累计金额；下半年逐项用年报减中报。规模使用产品合计，净值收益使用 ${escapeHTML(d.representative_nav_code||data.code)}。${period.coverage_status==='partial'?'未拆分项目与会计差额保留。':''}</p></details>`;
+}
+const NAV_ATTRIBUTION_LABELS={level:'利率水平',slope:'曲线斜率',curve:'曲线凸度',credit:'信用利差',default:'违约利差',convert:'转债超额收益',equity:'权益超额收益'};
+function navAttributionView(data,state) {
+  const d=data?.nav_attribution,model=d?.models?.[state.frequency]?.[state.window];
+  const controls=`<div class="toolbar"><label>频率<select data-nav-attribution-frequency><option value="daily"${state.frequency==='daily'?' selected':''}>日频</option><option value="weekly"${state.frequency==='weekly'?' selected':''}>周频</option></select></label><label>区间<select data-nav-attribution-window>${Object.entries(d?.meta?.windows||{ytd:'今年以来','1y':'近1年','2y':'近2年','3y':'近3年','5y':'近5年',all:'可得历史'}).map(([k,v])=>`<option value="${k}"${state.window===k?' selected':''}>${escapeHTML(v)}</option>`).join('')}</select></label></div>`;
+  if(!model)return `${controls}<p class="empty-copy">${escapeHTML(d?.reason||'该窗口共同样本不足：日频至少60个、周频至少26个。')}</p>`;
+  const pendingNote=d?.meta?.refresh_pending_reason?`<p class="attribution-gap">${escapeHTML(d.meta.refresh_pending_reason)}；当前使用 ${escapeHTML(d.meta.as_of)} 以前的共同样本。</p>`:'';
+  const keys=Object.keys(NAV_ATTRIBUTION_LABELS),max=Math.max(...keys.map(k=>Math.abs(model.betas[k]||0)),1e-12),unit=model.annualized?'百分点／年':'百分点';
+  const entries=keys.map((k,i)=>({label:NAV_ATTRIBUTION_LABELS[k],value:model.contrib[k],color:ATTRIBUTION_COLORS[i]}));entries.push({label:'截距',value:model.contrib.alpha,color:'#bda993'},{label:'拟合残差',value:model.contrib.resid,color:'#a4a3a0'});
+  return `${controls}${pendingNote}<div class="attribution-period-line"><strong>${escapeHTML(model.start)} → ${escapeHTML(model.end)}</strong><span>净值 ${escapeHTML(d.nav_basis_code||data.code)} · 因子截至 ${escapeHTML(d.meta?.as_of||model.end)}</span></div><section class="research-metric-grid metric-four">${metric('共同样本',`${model.n}个`)}${metric('拟合优度R²',pct(model.r2,1))}${metric('净值端点收益',pct(model.interval_nav_cum,2,true))}${metric('截距贡献（'+unit+'）',attributionNumber(model.contrib.alpha==null?null:model.contrib.alpha*100,2,true))}</section>${attributionStack(entries,v=>attributionNumber(v==null?null:v*100,2,true)+unit)}<div class="attribution-beta-list">${keys.map((k,i)=>`<div><span>${NAV_ATTRIBUTION_LABELS[k]}</span><div>${model.betas[k]==null?'':`<i style="left:${model.betas[k]<0?50-Math.abs(model.betas[k])/max*48:50}%;width:${Math.abs(model.betas[k])/max*48}%;background:${ATTRIBUTION_COLORS[i]}"></i><b style="left:${50+model.betas[k]/max*48}%;background:${ATTRIBUTION_COLORS[i]}"></b>`}</div><strong>${attributionNumber(model.betas[k],3,true)}</strong></div>`).join('')}</div>${renderTable(['因子','β','收益贡献（'+unit+'）'],entries.map((e,i)=>[e.label,i<keys.length?attributionNumber(model.betas[keys[i]],3,true):'—',attributionNumber(e.value==null?null:e.value*100,3,true)]),'holdings-table-wrap')}<p class="method-note">贡献为线性收益分解，复利净值收益另列。${model.clipped_count?`日频收益按原方法裁剪至±10%，本窗口${model.clipped_count}个。`:''}</p><details class="subpanel"><summary>因子与样本口径</summary><p class="method-note">五个债券因子沿用固定久期与顺序正交化；转债、权益因子为各自指数减国债指数收益。日频60、周频26个共同样本起算。因子采用当前全样本正交口径。</p></details>`;
+}
+function multiAssetViewContent(data,state) {
+  if(state.method==='financial')return financialAttributionView(data,state);
+  if(state.method==='nav')return navAttributionView(data,state);
+  return `<div class="toolbar"><label>季度区间<select id="multi-asset-attribution-period">${(data?.periods||[]).slice().reverse().map(r=>`<option value="${escapeHTML(r.start)}"${r.start===state.period?' selected':''}>${escapeHTML(r.start)} → ${escapeHTML(r.end)}</option>`).join('')}</select></label></div>${multiAssetAttributionPeriod(data,state.period)}${multiAssetStockAttribution(data,state)}`;
+}
 function genericMultiAssetAttributionPanel(data) {
-  if (!data?.periods?.length) return `<div class="panel-intro"><div><p class="eyebrow">HOLDINGS-BASED ATTRIBUTION</p><h2>持仓法多资产归因</h2></div><p>该基金尚无可复现的连续披露区间。</p></div><article class="subpanel"><p class="empty-copy">通常是基金成立时间较短，或净值、资产与持仓无法在同一区间对齐。</p></article>`;
-  const latest = data.periods.at(-1);
-  return `
-    <div class="panel-intro"><div><p class="eyebrow">HOLDINGS-BASED MULTI-ASSET ATTRIBUTION</p><h2>持仓法多资产业绩归因</h2></div><p>参考交接材料的固收基金框架，将区间收益拆分为市场基准、资产配置、证券选择与残差。</p></div>
-    <article class="subpanel"><div class="subpanel-heading"><div><h3>归因实现状态</h3><span>先确认可解释范围，再阅读贡献结果</span></div></div>${renderTable(["归因维度", "实现状态", "当前口径"], [
-      ["市场基准收益", '<span class="status-pill entered">已实现</span>', "股票/转债/纯债/现金代理指数"],
-      ["资产配置收益", '<span class="status-pill entered">已实现</span>', "实际权重相对近8季仓位中枢"],
-      ["股票选择收益", '<span class="status-pill entered">已实现</span>', "完整持仓区间可计算Brinson-Fachler归因"],
-      ["转债选择收益", '<span class="status-pill added">部分实现</span>', "指数代理；逐券行情覆盖不足时不强算"],
-      ["纯债选择收益", '<span class="status-pill entered">已实现</span>', "官方类属仓位×对应债券财富指数"],
-      ["打新收益", '<span class="status-pill reduced">未单独剥离</span>', "逐笔覆盖与价差口径见打新分析"],
-      ["隐形交易与残差", '<span class="status-pill unchanged">轧差项</span>', "不可直接解释为基金经理交易能力"],
-    ])}</article>
-    <div class="toolbar"><label>披露区间<select id="multi-asset-attribution-period">${data.periods.slice().reverse().map((item) => `<option value="${escapeHTML(item.start)}"${item.start === latest.start ? " selected" : ""}>${escapeHTML(item.start)} → ${escapeHTML(item.end)}</option>`).join("")}</select></label></div>
-    <div id="multi-asset-attribution-output">${multiAssetAttributionPeriod(data, latest.start)}</div>
-    <div class="calibration-note"><strong>口径边界</strong><p>${(data.limitations || []).map(escapeHTML).join("；")}</p></div>
-    <p class="method-note">公式：市场基准=Σwₑ×rₑ；资产配置=Σ(wₚ−wₑ)×rₑ；证券选择=Σwₚ×(rₚ−rₑ)；残差=基金实际区间收益−前三项。这是披露持仓静态估算，不是逐日交易归因。</p>`;
+  const state=attributionViewState(data);
+  return `<div id="multi-asset-attribution-workbench" class="multi-asset-attribution-workbench"><div class="panel-intro"><div><h2>业绩归因</h2></div><p>按披露持仓、财报金额和净值收益三个口径查看。</p></div><div class="attribution-view-tabs" role="tablist" aria-label="业绩归因口径">${[['holdings','持仓归因'],['financial','财报归因'],['nav','净值归因']].map(([k,v])=>`<button type="button" role="tab" data-attribution-view="${k}" aria-selected="${state.method===k}">${v}</button>`).join('')}</div><div id="multi-asset-attribution-output">${multiAssetViewContent(data,state)}</div></div>`;
 }
-
 function bindGenericMultiAssetAttribution(data) {
-  const select = document.querySelector("#multi-asset-attribution-period");
-  const output = document.querySelector("#multi-asset-attribution-output");
-  if (!select || !output || !data) return;
-  select.addEventListener("change", () => { output.innerHTML = multiAssetAttributionPeriod(data, select.value); });
+  const root=document.querySelector('#multi-asset-attribution-workbench');if(!root)return;const state=attributionViewState(data);
+  const paint=()=>{root.querySelectorAll('[data-attribution-view]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.attributionView===state.method)));root.querySelector('#multi-asset-attribution-output').innerHTML=multiAssetViewContent(data,state);};
+  root.addEventListener('click',event=>{const b=event.target.closest('[data-attribution-view]');if(b&&root.contains(b)){state.method=b.dataset.attributionView;paint();}});
+  root.addEventListener('change',event=>{const t=event.target;if(t.id==='multi-asset-attribution-period')state.period=t.value;else if(t.matches('[data-financial-period]'))state.financialPeriod=t.value;else if(t.matches('[data-financial-unit]'))state.financialUnit=t.value;else if(t.matches('[data-financial-scale]'))state.scale=t.value;else if(t.matches('[data-nav-attribution-frequency]'))state.frequency=t.value;else if(t.matches('[data-nav-attribution-window]'))state.window=t.value;else if(t.matches('[data-attribution-stock-period]'))state.stockPeriod=t.value;else return;paint();});
 }
 
 function genericAttributionPanel(fund, brinson, multiAssetAttribution) {
@@ -7134,7 +7128,7 @@ function loadGenericBrinson(code) {
 function loadGenericMultiAssetAttribution(code) {
   const read = () => { const value = window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]; return value || null; };
   if (window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 多资产归因`, read, `${code} 多资产归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}-three-methods-v1`, `${code} 多资产归因`, read, `${code} 多资产归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
 }
 
 function bindGenericBrinson(brinson) {

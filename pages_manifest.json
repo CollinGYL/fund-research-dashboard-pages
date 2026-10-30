@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-29T18:28:25+08:00",
+  "generatedAt": "2026-10-30T10:17:02+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -21,8 +21,8 @@
       "sha256": "b28f2748bae80bd3d99f1987acb9ffe4127d9eb3a4f11428ce75a4b1285d8da9"
     },
     "bond-complete.js": {
-      "size": 19131,
-      "sha256": "4fa8593dbaeffdec575a9047dc814a9aed9cea2857638a2714719a754db1c76a"
+      "size": 18882,
+      "sha256": "9fdeec22df39f5e5fa1763986ab73a26a31e2fce474675937dd47ae659d3cb4e"
     },
     "bond-equity-fusion.js": {
       "size": 22387,
@@ -66,7 +66,7 @@
     },
     "bond-original-single.html": {
       "size": 729080,
-      "sha256": "15a265f9f8a60c60810c9b49f3647ba5c5111fabdda835184900abfb4b2889de"
+      "sha256": "689087499c16ab01c33861d0594c475c35fec3213db0821e8c7c03983f8dd56a"
     },
     "bond-research.html": {
       "size": 6193,
@@ -78,7 +78,7 @@
     },
     "compare.html": {
       "size": 4798,
-      "sha256": "2ae4911136ada3e5393753b84c471057b830c8ec99b8859f503894378f0f467e"
+      "sha256": "00da76b0c4dee065e38e7c238554b31ed0b9f05cb9bfd9ed45780481e630b913"
     },
     "compare.js": {
       "size": 7151,
@@ -118,15 +118,15 @@
     },
     "fund.html": {
       "size": 4962,
-      "sha256": "ede72f156c26c61803999a49b999244f71cab14ad7a7374c0dd5262a56901edb"
+      "sha256": "4a12f9d3542ad860d516036539f26543563d71bcf75bd7987075444d03b29804"
     },
     "fund.js": {
-      "size": 613569,
-      "sha256": "28f57c24b2bf8ed669ce5da065feb5d7b8cbcc2eb26a4e9d58b3e6ab1b7e5614"
+      "size": 623115,
+      "sha256": "1b086b806be1f74aea91109b59afb51398644dcfc17300d11f0fd6a214e579da"
     },
     "index.html": {
       "size": 14174,
-      "sha256": "a6dddb0d86049e17548b1279cf727e339c934bbed32c6699b7b15df7c004ac7e"
+      "sha256": "45f7bba20993f242e2ae5ea738d0b2cea18c3fce3805d552b701154bd8d465a5"
     },
     "industry-bars.js": {
       "size": 6987,
@@ -165,8 +165,8 @@
       "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
     },
     "site-integration.css": {
-      "size": 15702,
-      "sha256": "26b3da74832f2c296ab425bc6259248585a7692248619c14cd297a6c0d8e67b0"
+      "size": 19445,
+      "sha256": "ece96f2d7dae2685803ddd2a7338857d1d6c0c412c8280f66222ba9c8237d8e9"
     },
     "site-integration.js": {
       "size": 6977,
