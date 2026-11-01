@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-30T16:45:01+08:00",
+  "generatedAt": "2026-10-30T18:13:53+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -66,7 +66,7 @@
     },
     "bond-original-single.html": {
       "size": 729080,
-      "sha256": "ca6b2a2a5b29afacf4f44977c3c2d8f68bec703715f82c9501135ecbc89220d3"
+      "sha256": "98d356424daa8ab2d17d9a22980c97df898771f95eb07324a386a23a44dfee19"
     },
     "bond-research.html": {
       "size": 6193,
@@ -78,7 +78,7 @@
     },
     "compare.html": {
       "size": 4798,
-      "sha256": "f8ffd4b3c7a092a9793076f604ea058a02ab2d62e09c1208e07fc272d73516a4"
+      "sha256": "a6e8ab7b818873f816f64b4f1c0ebb0a89e38afd4558e7f67514592713aa68b7"
     },
     "compare.js": {
       "size": 7151,
@@ -113,20 +113,20 @@
       "sha256": "0650bd1ceefaa30de8f1fae939bbf5acb1d0c62c69dca153bb3c52de95f3ced8"
     },
     "fund-lifecycle.js": {
-      "size": 7053,
-      "sha256": "935daf516ae9b517946c303caa6ee69589112dd6caee852ce6d8b919046c5ef5"
+      "size": 7204,
+      "sha256": "819679d5b4141ad7ef57ba65fae60fde7834718942b22a79fe6911b9bd024a69"
     },
     "fund.html": {
       "size": 5184,
-      "sha256": "7cc142dba1413775245a2fb9707d0d2f1dba7f721bfb153d63ef7ae5bb0cea6a"
+      "sha256": "c6ab3ff100a82dc096c3bb90100bb80875f1c1559e3a88c0d6d98d59f67fa631"
     },
     "fund.js": {
-      "size": 624511,
-      "sha256": "e8b71e6e30bfeb1873d72ac3e9326ab896438fd174f25cf8651c60e8ea40899f"
+      "size": 625911,
+      "sha256": "4218f5d101407a81ff7b5ba093ec0395e7041c0026dc65ef833c988a670647c9"
     },
     "index.html": {
       "size": 13876,
-      "sha256": "f92c295efe37b8db07086657d1b7db4350b97c9697582dc327baaf9efe3235bf"
+      "sha256": "a145f9abbc99391b5f8e71cfcdab55ad26fcc17c9c7302cdd61fd4e2085e695b"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -145,8 +145,8 @@
       "sha256": "c88ab8454792d1365e868e4aafbc101d7114ac495360a8bb24816809e96813a3"
     },
     "pure-bond-reference.js": {
-      "size": 114727,
-      "sha256": "80741e00912403ee47305671d594e22d390a5c065a76f4aa2ac0642d41dc17f4"
+      "size": 115202,
+      "sha256": "b06f8760af3a54aea5e65b681663a7625dc838686de5d4ed2afed6cfb78e660a"
     },
     "research-core.js": {
       "size": 23594,

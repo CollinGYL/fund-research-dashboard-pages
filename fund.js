@@ -5291,7 +5291,7 @@ function genericBondHistoryTable(period, compact = false) {
       holding.change === "新进" ? '<span class="status-pill entered">疑似新进</span>'
         : holding.change === "加仓" ? '<span class="status-pill added">加仓</span>'
         : holding.change === "减仓" ? '<span class="status-pill reduced">减仓</span>'
-        : '<span class="status-pill unchanged">持平</span>',
+        : holding.change ? '<span class="status-pill unchanged">持平</span>' : '—',
     ]);
     const exited = (period.exited || []).map((item) => item.name).join("、");
     return `${renderTable(["债券代码", "市值占净值", "环比"], rows, "pure-bond-heavy-table")}${exited ? `<div class="bond-exit-note"><strong>本期退出披露：</strong>${escapeHTML(exited)}</div>` : ""}<p class="method-note">公告日 ${escapeHTML(period.announcement_date || "—")}；“疑似新进”仅表示上期重仓债券披露未见，不等于此前完全未持有。</p>`;
@@ -6631,6 +6631,22 @@ function bondOriginalResearchPanel(fund) {
     </div><p class="simulation-warning">这些是交接时的历史研究成果。当前生产久期与原版实验可能使用不同模型版本；因子构建及实验重估仍缺的原始依赖列在研究目录中。</p>`;
 }
 
+function applyCurrentPureBondHoldings(reference, history) {
+  const periods=new Map((reference.bonds||[]).map(row=>[row.dt,row]));
+  for (const period of history||[]) {
+    if(period.scope!=='reported_bond_rows_not_full_portfolio')continue;
+    const bonds=period.holdings.map(row=>{
+      const attr=window.FUND_BOND_CHARACTERISTICS?.bonds?.[row.code]||{};
+      return {code:row.code,name:row.name,wt:row.weight*100,btype:attr.chinabond_level1||attr.choice_level1||null,
+        ptm:attr.remaining_years??null,rating:attr.bond_rating||attr.issuer_rating||null,rating_src:attr.bond_rating?'债项':'主体',
+        chg:null,attribute_date:attr.as_of||null};
+    });
+    periods.set(period.report_date,{dt:period.report_date,n:bonds.length,wt_sum:bonds.reduce((n,b)=>n+b.wt,0),bonds,cleared:[],turnover_available:false,
+      source_note:'本期已披露重仓券；个券属性采用现有最新快照，未取得的字段留空。',announcement_date:period.announcement_date});
+  }
+  reference.bonds=Array.from(periods.values()).sort((a,b)=>a.dt.localeCompare(b.dt));
+}
+
 function createPureBondTabLoader(fund, detail) {
   let deepLoader;
   const loadedTabs = new Set();
@@ -6699,6 +6715,7 @@ function createPureBondTabLoader(fund, detail) {
       else if (id === "documents") target.innerHTML = genericDocumentsPanel(fund, await loadGenericDocuments(fund.code));
       else {
         const reference = await bundle();
+        if (id === 'bond') { const [history]=await Promise.all([loadGenericBondHistory(fund.code),loadCategoryAssets(fund.category)]); applyCurrentPureBondHoldings(reference,history); }
         if (id === 'perf') { try { await WarmPerformance.load(fund.code); } catch(error) { fund.warm_context_error=error.message; } }
         if (!target.isConnected) return;
         const render = {perf:window.__PB.renderPerf, alloc:window.__PB.renderAlloc, bond:window.__PB.renderBondStruct, corr:window.__PB.renderCorr, campisi:window.__PB.renderCampisi}[id];
@@ -7045,7 +7062,7 @@ function normalizeGenericBondHistory(raw) {
       const difference = Number(holding.weight) - Number(oldWeight);
       return {
         ...holding,
-        change: !previous.has(holding.code) ? "新进"
+        change: period.scope === "reported_bond_rows_not_full_portfolio" ? null : !previous.has(holding.code) ? "新进"
           : difference > 0.0001 ? "加仓"
           : difference < -0.0001 ? "减仓"
           : "持平",
@@ -7055,6 +7072,7 @@ function normalizeGenericBondHistory(raw) {
     const result = {
       report_date: period.d,
       announcement_date: period.a,
+      source: period.source,scope: period.scope,
       holdings,
       entered: decode(period.e || []),
       exited: decode(period.x || []),

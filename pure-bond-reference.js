@@ -676,6 +676,7 @@ function getCorr(d){
   if(d.corr&&d.corr.windows)return d.corr;
   const value=window.CORR_SNAP?.[d.code];return value&&value.windows&&typeof value.windows==="object"?value:null;
 }
+function getIndexCorr(d){return getCorr(d)?.index_windows||d.index_corr;}
 /* corr 分片按需加载:只在打开"相关性"tab 时拉本基金所在的那一片(约 640 KB),
    首屏不载 —— 这是路径B的另一半收益(首屏 192->165 KB)。 */
 // Keep this renderer usable without fund.js. Share only in-flight requests;
@@ -927,7 +928,7 @@ function renderBondStruct(d){
     </div>`;
 }
 function turnoverChart(bonds){
-  const rows=bonds.map(b=>{
+  const rows=bonds.filter(b=>b.turnover_available!==false).map(b=>{
     let neu=0,add=0,cut=0;
     (b.bonds||[]).forEach(x=>{
       if(!x.chg)return;
@@ -979,7 +980,7 @@ function bondTable(period){
   const table=values=>head+values.join("")+tail;
   const h=rows.length<=previewRows?table(rows):
     `<div class="research-table-preview" data-table-total="${rows.length}" data-table-preview="${previewRows}" style="--research-table-columns:9">${table(rows.slice(0,previewRows))}<details class="research-table-more"><summary><span class="table-more-closed">展开其余 ${rows.length-previewRows} 条持仓（本期共 ${rows.length} 条）</span><span class="table-more-open">收起明细，仅显示前 ${previewRows} 条持仓</span></summary>${table(rows.slice(previewRows))}</details></div>`;
-  return h+(miss?`<div class="method-note">${miss}</div>`:"");
+  return h+(period.source_note?`<div class="method-note">${esc(period.source_note)} 公告日 ${esc(period.announcement_date||"—")}</div>`:"")+(miss?`<div class="method-note">${miss}</div>`:"");
 }
 
 const CWL={"1m":"近1月","2m":"近2月","3m":"近3月","6m":"近6月","ytd":"今年以来","1y":"近1年","3y":"近3年","5y":"近5年","all":"成立以来"};
@@ -1018,11 +1019,12 @@ function renderCorr(d){
       </div>`;
   }
   let idxHtml=`<div class="method-note">无相关性数据</div>`;
-  if(d.index_corr){
-    const wins=Object.keys(d.index_corr).filter(k=>d.index_corr[k].pos&&d.index_corr[k].pos.length);
+  const IC=getIndexCorr(d);
+  if(IC){
+    const wins=Object.keys(IC).filter(k=>IC[k].pos&&IC[k].pos.length);
     const def=wins.includes("3y")?"3y":wins[wins.length-1];
     const opts=wins.map(k=>`<option value="${k}"${k===def?" selected":""}>${CWL[k]||k}</option>`).join("");
-    idxHtml=`<select class="period" id="indexCorrWin" data-pb-onchange="switchIndexCorrWin(this.value)">${opts}</select><div id="indexCorrTbl" style="margin-top:12px">${indexCorrTable(d.index_corr[def])}</div>`;
+    idxHtml=`<select class="period" id="indexCorrWin" data-pb-onchange="switchIndexCorrWin(this.value)">${opts}</select><div id="indexCorrTbl" style="margin-top:12px">${indexCorrTable(IC[def])}</div>`;
   }
   return `<p class="tab-lead">与其他基金相关性 · 与其他指数相关性</p>`+
     `<div class="two-column">
@@ -1032,16 +1034,16 @@ function renderCorr(d){
 }
 function corrTable(win){
   if(!win||!win.pos)return `<div class="method-note">该窗口无数据</div>`;
-  let h=`<div class="rt-wrap"><table class="rt"><thead><tr><th>代码</th><th>名称</th><th>管理人</th><th>相关系数</th></tr></thead><tbody>`;
-  win.pos.slice(0,12).forEach(r=>{h+=`<tr><td style="font-family:ui-monospace,Consolas">${esc(r.code)}</td><td>${esc(r.nm)}</td><td style="color:var(--muted)">${esc(r.corp)}</td><td><b>${NN(r.corr,3)}</b></td></tr>`;});
-  h+=`</tbody></table></div><div class="method-note">窗口有效样本 ${win.n_valid||"—"} 只，重叠观测门槛 ${win.min_obs||"—"}。</div>`;
+  let h=`<div class="rt-wrap"><table class="rt"><thead><tr><th>代码</th><th>名称</th><th>管理人</th><th>相关系数</th><th>观测截至</th></tr></thead><tbody>`;
+  win.pos.slice(0,12).forEach(r=>{h+=`<tr><td style="font-family:ui-monospace,Consolas">${esc(r.code)}</td><td>${esc(r.nm)}</td><td style="color:var(--muted)">${esc(r.corp)}</td><td><b>${NN(r.corr,3)}</b></td><td>${esc(r.actual_end||win.end||"—")}</td></tr>`;});
+  h+=`</tbody></table></div><div class="method-note">区间 ${esc(win.start||"—")} 至 ${esc(win.end||"—")} · 有效样本 ${win.n_valid??"—"} 只，重叠观测门槛 ${win.min_obs||"—"}。</div>`;
   return h;
 }
 function indexCorrTable(win){
   if(!win||!win.pos)return `<div class="method-note">该窗口无数据</div>`;
-  let h=`<div class="rt-wrap"><table class="rt"><thead><tr><th>代码</th><th>名称</th><th>口径</th><th>相关系数</th></tr></thead><tbody>`;
-  win.pos.slice(0,12).forEach(r=>{h+=`<tr><td style="font-family:ui-monospace,Consolas">${esc(r.code)}</td><td>${esc(r.nm)}</td><td style="color:var(--muted)">${esc(r.koujing)}</td><td><b>${NN(r.corr,3)}</b></td></tr>`;});
-  h+=`</tbody></table></div><div class="method-note">窗口有效样本 ${win.n_valid||"—"} 只，重叠观测门槛 ${win.min_obs||"—"}。口径：财富/全价指数（不含净价）。</div>`;
+  let h=`<div class="rt-wrap"><table class="rt"><thead><tr><th>代码</th><th>名称</th><th>口径</th><th>相关系数</th><th>观测截至</th></tr></thead><tbody>`;
+  win.pos.slice(0,12).forEach(r=>{h+=`<tr><td style="font-family:ui-monospace,Consolas">${esc(r.code)}</td><td>${esc(r.nm)}</td><td style="color:var(--muted)">${esc(r.koujing)}</td><td><b>${NN(r.corr,3)}</b></td><td>${esc(r.actual_end||win.end||"—")}</td></tr>`;});
+  h+=`</tbody></table></div><div class="method-note">区间 ${esc(win.start||"—")} 至 ${esc(win.end||"—")} · 有效样本 ${win.n_valid??"—"} 只，重叠观测门槛 ${win.min_obs||"—"}。口径：财富/全价指数（不含净价）。</div>`;
   return h;
 }
 
@@ -1635,7 +1637,7 @@ function switchFacWin(k){
 }
 function switchBondPeriod(i){CURRENT&&(document.getElementById("bondTbl").innerHTML=bondTable(CURRENT.bonds[+i]));}
 function switchCorrWin(k){const CO=CURRENT&&getCorr(CURRENT);CO&&(document.getElementById("corrTbl").innerHTML=corrTable(CO.windows[k]));}
-function switchIndexCorrWin(k){CURRENT&&(document.getElementById("indexCorrTbl").innerHTML=indexCorrTable(CURRENT.index_corr[k]));}
+function switchIndexCorrWin(k){CURRENT&&(document.getElementById("indexCorrTbl").innerHTML=indexCorrTable(getIndexCorr(CURRENT)?.[k]));}
 function switchIndexBucket(code){
   if(!CURRENT)return;
   idxZoom=null;   // 切换对比指数时重置缩放,避免旧区间跟新指数的数据范围对不上
