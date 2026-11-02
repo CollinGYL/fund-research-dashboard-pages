@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-02T09:25:30+08:00",
+  "generatedAt": "2026-11-02T09:56:30+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -78,7 +78,7 @@
     },
     "compare.html": {
       "size": 4798,
-      "sha256": "a6e8ab7b818873f816f64b4f1c0ebb0a89e38afd4558e7f67514592713aa68b7"
+      "sha256": "ef8f885d093ea8b84bcec4a9e9802d6b8d4b27881e077c67118314e0845cde58"
     },
     "compare.js": {
       "size": 7151,
@@ -118,7 +118,7 @@
     },
     "fund.html": {
       "size": 5184,
-      "sha256": "70e7abb8075c78a4876425c895ec08a1f8f0e636acd2f5aa65d76273a09674f7"
+      "sha256": "9fd57dd825c1f7e77a951e4669186de57addd8e3d83053b943d685ff09712515"
     },
     "fund.js": {
       "size": 626846,
@@ -126,7 +126,7 @@
     },
     "index.html": {
       "size": 13876,
-      "sha256": "7fc54e695fcfcfb14d9f70e206dd1fc85643809cf7b03ef253e8cec9ddf5830e"
+      "sha256": "ba77c35b307ce6e360cb315f6d6b524ad95fc6e9bf0772f0f00986e5b73583ae"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -149,8 +149,8 @@
       "sha256": "b06f8760af3a54aea5e65b681663a7625dc838686de5d4ed2afed6cfb78e660a"
     },
     "research-core.js": {
-      "size": 23594,
-      "sha256": "681c95b6b68aed9519cb6c6c4035435d02dde7c47dba9ebbfed33487ee7282cd"
+      "size": 25703,
+      "sha256": "1af044235c2422572bd6b3baac03ae5e397aa2990e7c0f7a7f5d974673979583"
     },
     "review-core.js": {
       "size": 3797,
@@ -197,8 +197,8 @@
       "sha256": "7c65ecf53c208b86e410e6df182b889c76a8d0744141c35118316e224ebc0fc2"
     },
     "bond-advanced-integration.js": {
-      "size": 5046,
-      "sha256": "cd03b5fd30e58b6cf83c8229eba36a5a00f04fbfc1e9d219df7c9b7679947ac4"
+      "size": 5170,
+      "sha256": "97f7ebccabd75b80c00f0bfaf476f5d89304100d513c84f500510b9856ab9aee"
     }
   },
   "pathReplacements": {
@@ -230,7 +230,7 @@
     "integration-bootstrap.js": 1,
     "profile-integration.js": 1,
     "pure-bond-reference.js": 5,
-    "research-core.js": 1,
+    "research-core.js": 2,
     "review-core.js": 0,
     "site-integration.js": 0,
     "warm-performance.js": 1,

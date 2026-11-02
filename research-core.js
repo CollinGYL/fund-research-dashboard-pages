@@ -67,6 +67,40 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 
+/* One shared freshness request for all category market panels. */
+(function(root){
+  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let pending;
+  function load(){
+    if(root.FUND_MARKET_UPDATE_STATUS)return Promise.resolve(root.FUND_MARKET_UPDATE_STATUS);
+    if(pending)return pending;
+    pending=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');let done=false;
+      const finish=error=>{if(done)return;done=true;clearTimeout(timer);script.remove();error?reject(error):resolve(root.FUND_MARKET_UPDATE_STATUS);};
+      const timer=setTimeout(()=>finish(new Error('市场更新时间暂未加载')),12000);
+      script.src='https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/market_update_status.js';
+      script.onload=()=>finish(root.FUND_MARKET_UPDATE_STATUS?.categories?null:new Error('市场更新时间暂未加载'));
+      script.onerror=()=>finish(new Error('市场更新时间暂未加载'));
+      document.head.append(script);
+    }).catch(error=>{pending=null;throw error;});
+    return pending;
+  }
+  function text(item){
+    if(!item)return '更新时间暂未加载';
+    const parts=Object.entries(item.data_dates||{}).map(([label,date])=>esc(label)+' '+esc(date||'暂无数据'));
+    parts.push('生成时间 '+esc(item.generated_at?item.generated_at.slice(0,19).replace('T',' '):'未记录'));
+    if(item.status==='failed')parts.push('本轮更新失败，保留上次结果');
+    return parts.join(' · ');
+  }
+  async function mount(host,category){
+    if(!host)return;
+    host.textContent='正在读取更新时间…';
+    try{const data=await load();if(host.isConnected)host.innerHTML=text(data.categories?.[category]);}
+    catch(error){if(host.isConnected)host.textContent=error.message;}
+  }
+  root.FundMarketStatus={load,mount,text};
+})(typeof window!=='undefined'?window:globalThis);
+
 /* Category overview: one small cached payload, no per-fund downloads or fitting. */
 (function(root){
   const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -168,10 +202,11 @@
   function render(host,d){
     const size=d.classes.reduce((a,c)=>a+c.size,0),sc=d.classes.reduce((a,c)=>a+c.size_count,0);
     host.innerHTML=`<div class="market-overview"><div class="section-heading"><div><p class="eyebrow">纯债基金</p><h2>纯债基金的市场概览</h2></div><p>${esc(d.date)} · 产品口径，A/C等份额合并</p></div>
-      <div class="market-facts"><div><small>纯债组合</small><strong>${d.total.toLocaleString()}<em>只</em></strong></div><div><small>${esc(d.report_date)} 披露规模 · ${sc}只</small><strong>${fmt(size/1e12)}<em>万亿元</em></strong></div><div><small>日频久期可用</small><strong>${d.available.toLocaleString()}<em>只</em></strong></div><div><small>久期至 ${esc(d.date)}</small><strong>${d.current.toLocaleString()}<em>只</em></strong></div></div>
+      <p class="method-note" data-market-status></p><div class="market-facts"><div><small>纯债组合</small><strong>${d.total.toLocaleString()}<em>只</em></strong></div><div><small>${esc(d.report_date)} 披露规模 · ${sc}只</small><strong>${fmt(size/1e12)}<em>万亿元</em></strong></div><div><small>日频久期可用</small><strong>${d.available.toLocaleString()}<em>只</em></strong></div><div><small>久期至 ${esc(d.date)}</small><strong>${d.current.toLocaleString()}<em>只</em></strong></div></div>
       <div class="market-grid market-comparison-layout"><article class="subpanel"><h3>市场规模与分类结构</h3><p class="method-note">${esc(d.report_date)} · 净资产合计</p><div class="market-class-bars">${d.classes.map(c=>`<div><span>${esc(c.name)}</span><div><i style="width:${size?c.size/size*100:0}%"></i></div><b>${fmt(c.size/1e8,0)}亿元</b><small>${c.count}只 · 同期规模${c.size_count}只</small></div>`).join('')}</div><p class="method-note">${d.unavailable}只日频估计暂无可用结果 · ${d.available-d.current}只保留较早日期</p></article>
       <article class="subpanel market-comparison" data-market-comparison></article></div>
       <article class="subpanel"><div class="market-panel-head"><h3>走势对照：聚合久期、10Y 国债与10Y−1Y期限利差</h3><select data-market-range aria-label="市场走势区间"><option value="all">可得历史</option><option value="custom">自选区间</option><option value="1y">近1年</option><option value="6m">近6月</option><option value="3m">近3月</option></select></div><div data-market-trend></div></article></div>`;
+    void root.FundMarketStatus.mount(host.querySelector('[data-market-status]'),'pure-bond');
     root.FundMarketComparison.mount(host.querySelector('[data-market-comparison]'));
     mountDurationHistory(host.querySelector('[data-market-trend]'),d);
   }

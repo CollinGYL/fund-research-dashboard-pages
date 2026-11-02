@@ -52,7 +52,7 @@
    const secondary=category==='hybrid-bond';const key=secondary?'secondary-bond':category;
    host.innerHTML=(secondary?'<div class="bap-market-switch" role="group" aria-label="债基市场类型"><button type="button" data-bap-context="secondary-bond" aria-pressed="true">二级债基市场</button><button type="button" data-bap-context="primary-bond" aria-pressed="false">一级债基市场</button></div>':'')+'<div data-advanced-market-body></div>';
    const body=host.querySelector('[data-advanced-market-body]');
-   const show=k=>{body.innerHTML=root.BondAdvancedPack.market(p,k);root.BondAdvancedPack.bind(body,p,'market',k);host.querySelectorAll('[data-bap-context]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.bapContext===k)));};
+   const show=k=>{body.innerHTML='<p class="method-note" data-market-status></p>'+root.BondAdvancedPack.market(p,k);root.FundMarketStatus?.mount(body.querySelector('[data-market-status]'),k);root.BondAdvancedPack.bind(body,p,'market',k);host.querySelectorAll('[data-bap-context]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.bapContext===k)));};
    host.querySelectorAll('[data-bap-context]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.bapContext)));show(key);
   }catch(e){if(host.dataset.advancedCategory!==category)return;delete host.dataset.advancedCategory;host.innerHTML=`<p class="method-note">市场概览暂未加载：${esc(e.message)}</p><button type="button" data-advanced-market-retry>重试</button>`;host.querySelector('button').addEventListener('click',()=>mountMarket(host,category));}
  }
