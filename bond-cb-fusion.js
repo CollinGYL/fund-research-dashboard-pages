@@ -88,6 +88,7 @@
   return `${name==='BondTurnover20'?'<p class="method-note">成交额单位待核，此项保留为换手代理。</p>':''}${renderMiniLineChart(chartPoints,[{key:'value',label:source.label+(unit?'（'+unit+'）':''),color:'#B01625',width:2.6,format}],source.label+'历史')}<details><summary>历史数值与覆盖</summary>${table(['报告期',esc(source.label)+(unit?'（'+unit+'）':''),'覆盖权重'],points.slice().reverse().map(([date,value,coverage])=>[esc(date),percent?pct(value):sourcePercent?pp(value):num(value,4),pct(coverage)]))}</details>`;
  }
  function industryArchive(d,level='l1',date){
+  if(root.BondVisualCB)return root.BondVisualCB.view(d,level,date);
   const periods=d.archive?.cb.industry?.[level]||[];
   const last=periods.find(p=>p.dt===date)||periods.at(-1);if(!last)return empty('没有可用的转债正股行业历史。');
   return `<p class="method-note">${esc(last.dt)} · 转债正股名义映射 · 原包覆盖标志 ${last.full===true?'完整':'未核完整'}。此处只列转债，与“行业分析”中的直接股票分别查看。</p>${table(['正股行业／板块','转债名义占净值'],last.rows.map(r=>[esc(r.name),pp(r.wt)]))}`;
@@ -110,7 +111,7 @@
   if(!isEligible(fund))return empty('此基金不在当前一级、二级债基或转债分类中。');
   const archive=d.archive;
   return currentConvertible(fund,d)+section('转债与正股历史特征','指标按各自实际日期展示',archiveControls(d))+
-   (archive?section('转债正股行业',`历史报告 ${archive.source_holding_date}`,`<label class="fusion-control">行业层级<select data-fusion-industry>${[['sector','板块'],['l1','中信一级'],['l2','中信二级'],['l3','中信三级']].map(([key,label])=>`<option value="${key}"${key==='l1'?' selected':''}>${label}</option>`).join('')}</select></label><label class="fusion-control">报告期<select data-fusion-industry-period>${(archive.cb.industry?.l1||[]).slice().reverse().map(p=>`<option value="${p.dt}">${p.dt}</option>`).join('')}</select></label><div data-fusion-industry-output>${industryArchive(d)}</div>`):'')+
+   (archive?section('转债正股行业',`历史报告 ${archive.source_holding_date}`,`<label class="fusion-control">行业层级<select data-fusion-industry>${[['l1','一级行业'],['l2','二级行业'],['l3','三级行业'],['sector','产业板块'],['chain','上下游产业链'],['style','风格板块']].map(([key,label])=>`<option value="${key}"${key==='l1'?' selected':''}>${label}</option>`).join('')}</select></label><label class="fusion-control">报告期<select data-fusion-industry-period>${(archive.cb.industry?.l1||[]).slice().reverse().map(p=>`<option value="${p.dt}">${p.dt}</option>`).join('')}</select></label><div data-fusion-industry-output>${industryArchive(d)}</div>`):'')+
    positionArchive(d)+
    section('条款、次新与评级','历史价格条件与发行人公告分开',clauseBody(d));
  }
@@ -130,7 +131,7 @@
  }
  function bind(host,d){
   host.querySelector('[data-fusion-feature]')?.addEventListener('change',event=>{host.querySelector('[data-fusion-feature-output]').innerHTML=featureBody(d,event.target.value);bindMiniLineCharts();});
-  const updateIndustry=()=>{host.querySelector('[data-fusion-industry-output]').innerHTML=industryArchive(d,host.querySelector('[data-fusion-industry]').value,host.querySelector('[data-fusion-industry-period]').value);};
+  const updateIndustry=()=>{const level=host.querySelector('[data-fusion-industry]').value,select=host.querySelector('[data-fusion-industry-period]'),periods=d.archive?.cb.industry?.[level]||[],selected=periods.some(p=>p.dt===select.value)?select.value:periods.at(-1)?.dt;select.innerHTML=periods.length?periods.slice().reverse().map(p=>`<option value="${p.dt}"${p.dt===selected?' selected':''}>${p.dt}</option>`).join(''):'<option value="">暂无可得日期</option>';select.disabled=!periods.length;host.querySelector('[data-fusion-industry-output]').innerHTML=industryArchive(d,level,selected);};
   host.querySelector('[data-fusion-industry]')?.addEventListener('change',updateIndustry);
   host.querySelector('[data-fusion-industry-period]')?.addEventListener('change',updateIndustry);
   bindMiniLineCharts();

@@ -30,6 +30,7 @@ const DASHBOARD_GLOBAL_ASSETS = {
   "research_summary.js": "FUND_RESEARCH_SUMMARY",
   "stock_classification.js": "FUND_STOCK_CLASSIFICATION",
   "bond_holdings.js": "FUND_BOND_HOLDINGS",
+  "bond_market_overview.js": "FUND_BOND_MARKET",
   "bond_characteristics.js": "FUND_BOND_CHARACTERISTICS",
   "convertible_characteristics.js": "FUND_CONVERTIBLE_CHARACTERISTICS",
   "index_constituents.js": "FUND_INDEX_CONSTITUENTS",
@@ -3853,7 +3854,7 @@ const GENERIC_TABS = {
   "active-equity": [["performance", "业绩表现"], ["profile", "基金画像"], ["assets", "资产配置"], ["industries", "行业分析"], ["holdings", "持股分析"], ["simulation", "持仓模拟"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "index-enhanced": [["performance", "业绩表现"], ["industries", "行业分析（相比基准）"], ["holdings", "持股分析（相比基准）"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["documents", "公告原文"]],
   "pure-bond": [["perf", "业绩表现"], ["alloc", "资产配置"], ["bond", "券种结构"], ["corr", "相关性分析"], ["campisi", "业绩归因"], ["documents", "公告原文"]],
-  "hybrid-bond": [["performance", "业绩表现"], ["profile", "权益画像"], ["evaluation", "五维评价"], ["assets", "资产配置"], ["bonds", "券种与利率敏感性"], ["convertibles", "转债穿透"], ["ipo", "打新分析"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
+  "hybrid-bond": [["performance", "业绩表现"], ["profile", "权益画像"], ["evaluation", "五维评价"], ["selection", "基金优选"], ["assets", "资产配置"], ["bonds", "券种与利率敏感性"], ["convertibles", "转债穿透"], ["ipo", "打新分析"], ["industries", "行业分析"], ["holdings", "持股分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
   "convertible-bond": [["performance", "业绩表现"], ["profile", "权益画像"], ["assets", "资产配置"], ["bonds", "券种与利率敏感性"], ["convertibles", "转债穿透"], ["ipo", "打新分析"], ["industries", "行业分析"], ["holdings", "持股与转债分析"], ["rebalancing", "调仓跟踪"], ["correlation", "相关性分析"], ["attribution", "业绩归因"], ["documents", "公告原文"]],
 };
 
@@ -6242,6 +6243,9 @@ function createGenericTabLoader(fund, detail) {
   const renderTab = async (id) => {
     const target = document.querySelector(`[data-panel="${id}"]`);
     if (!target) return;
+    if (id === "selection" && fund.category === "hybrid-bond") {
+      return await window.FundSelection.mount(target, { currentCode: fund.code, version: DASHBOARD_DATA_VERSION, loader: loadDataScript });
+    }
     if (id === "original") {
       target.innerHTML = bondOriginalResearchPanel(fund);
       return;

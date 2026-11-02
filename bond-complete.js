@@ -26,20 +26,24 @@
  }
  function assetPanel(p){
   const rows=p.metrics.position||[];
-  return section('转债仓位与四季度波动',note('仓位以基金净资产为分母。波动采用最近4个连续季度的样本标准差/平均仓位；缺失不作零。报告序列为历史披露描述，不是每日持仓估计。')+line(rows.map(x=>[x.report_date,x.convertible_weight_nav]),'转债占净资产（小数）')+`<details><summary>全部历史仓位与变异系数（${rows.length}期）</summary>${table(['报告期','股票/NAV','普通债/NAV','转债/NAV','总资产/NAV','转债仓位CV（4季度）'],rows.slice().reverse().map(x=>[esc(x.report_date),pct(x.stock_weight_nav),pct(x.ordinary_bond_weight_nav),pct(x.convertible_weight_nav),finite(x.gross_assets_to_nav)?num(x.gross_assets_to_nav,3)+'倍':'—',num(x.cb_position_cv_4q)]))}</details>`);
+  return section('转债仓位与四季度波动',`<div class="bc-position-pair"><div><h4>转债占净资产（%）</h4>${line(rows.map(x=>[x.report_date,finite(x.convertible_weight_nav)?x.convertible_weight_nav*100:null]),'转债占净资产（%）')}</div><div><h4>仓位波动（四季度变异系数）</h4>${line(rows.map(x=>[x.report_date,x.cb_position_cv_4q]),'仓位变异系数')}</div></div>`+note('使用已保存的四个连续季度结果；缺失不作零。报告序列不是每日持仓估计。')+`<details><summary>历史仓位与变异系数（${rows.length}期）</summary>${table(['报告期','股票/NAV','普通债/NAV','转债/NAV','总资产/NAV','转债仓位CV（4季度）'],rows.slice().reverse().map(x=>[esc(x.report_date),pct(x.stock_weight_nav),pct(x.ordinary_bond_weight_nav),pct(x.convertible_weight_nav),finite(x.gross_assets_to_nav)?num(x.gross_assets_to_nav,3)+'倍':'—',num(x.cb_position_cv_4q)]))}</details>`);
+ }
+ function featurePair(features,date,key,control){
+  const entries=Object.entries(features||{});if(!features?.[key])key=entries[0]?.[0];
+  const item=features?.[key],percentage=percentFields.has(key),suffix=percentage||nativePercentFields.has(key)?'（%）':fieldUnits[key]?'（'+fieldUnits[key]+'）':'';
+  const chart=line((item?.points||[]).filter(x=>x[0]<=date).map(x=>[x[0],finite(x[1])&&percentage?x[1]*100:x[1]]),(item?.label||'特征')+suffix);
+  return `<div class="bc-feature-pair"><div>${fieldTable(features,date)}</div><div><label class="bc-control">历史指标<select ${control}>${entries.map(([k,v])=>`<option value="${esc(k)}"${k===key?' selected':''}>${esc(v.label)}</option>`).join('')}</select></label>${chart}<p class="method-note">${esc(item?.label||'特征')}${esc(suffix)}；历史截止 ${esc((item?.points||[]).filter(x=>x[0]<=date).at(-1)?.[0]||'—')}。空值不连线。</p></div></div>`;
  }
  function reportDates(p){return [...new Set([...(p.metrics.position||[]).map(x=>x.report_date),...(p.metrics.concentration_turnover||[]).map(x=>x.report_date),...(p.advanced.clause?.rows||[]).map(x=>x.dt)])].filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort().reverse();}
  function distribution(title,rows){return section(title,table(['分组','占基金净资产','占已披露转债'],(rows||[]).map(x=>[esc(x.k),pct(finite(x.w)?x.w/100:null),finite(x.share)?num(x.share,1)+'%':'—'])));}
- function bondOutput(p,date,key='BondClose'){
+ function bondOutput(p,date,key='BondZGYJL',stockKey='S_DQ_MV'){
   const m=p.metrics.concentration_turnover.find(x=>x.report_date===date),position=p.metrics.position.find(x=>x.report_date===date),c=p.advanced.clause?.rows?.find(x=>x.dt===date),q=p.advanced.quote_coverage?.find(x=>x.report_date===date),f=p.advanced.features||{};
   const cards=`<div class="research-metric-grid metric-four">${metric('披露转债只数',m?String(m.holding_count):'—')}${metric('披露转债内部HHI',num(m?.hhi_disclosed_cb))}${metric('单期权重变化合计',pp(m?.turnover_single_nav))}${metric('四期累计权重变化',pp(m?.turnover_roll4q_nav))}</div>`;
   const source=note(`报告期 ${date}。披露转债占净值 ${pct(m?.disclosed_cb_weight_nav)}；资产表全部转债 ${pct(position?.convertible_weight_nav)}；同日报价权重 ${pct(q?.same_date_quote_weight_nav)}；后向匹配旧报价权重 ${pct(q?.stale_quote_weight_nav)}${q?.max_quote_lag_days?`，最大滞后${q.max_quote_lag_days}天`:''}。转债HHI及各均值限于已披露部分，不能冒充全组合。`);
-  const options=Object.entries(f).map(([k,v])=>`<option value="${esc(k)}"${k===key?' selected':''}>${esc(v.label)}</option>`).join('');
-  const historical=section('转债特征历史',`<label class="bc-control">指标<select data-bc-feature>${options}</select></label>${line((f[key]?.points||[]).filter(x=>x[0]<=date).map(x=>[x[0],x[1]]),f[key]?.label||'转债特征')}`);
-  const features=section('转债估值与交易特征',fieldTable(f,date)+note('未接通或供应商无值的字段显示“—”。价格采用全价；收益率和溢价率只换算一次百分比。余额、动量、换手和历史评级仍按实际覆盖保留空缺。'));
-  const underlying=section('转债对应正股特征',fieldTable(p.underlying.features,date)+note('这里按转债名义市值计算加权均值。直接股票板块继续使用本项目权益方法。财务以公告日门控，历史修订版本尚未完整核验。'));
+  const features=section('转债估值与交易特征',featurePair(f,date,key,'data-bc-feature')+note('市值加权；价格为全价，缺字段为—。覆盖分母分别为已披露转债与资产表全部转债。'));
+  const underlying=section('转债对应正股特征',featurePair(p.underlying.features,date,stockKey,'data-bc-underlying')+note('按转债名义市值加权；总市值单位亿元。财务使用已保存公告日匹配，历史修订版本待核。'));
   const clauses=c?section('次新债、转股期与条款价格条件',table(['指标','该期数值'],[['次新债（上市≤180天）占净值',pct(c.w_new180/100)],['次新债（上市≤90天）占净值',pct(c.w_new90/100)],['尚未进入转股期占净值',pct(c.w_pre_convert/100)],['距强赎价格线的加权距离',finite(c.sh_dist_wavg)?num(c.sh_dist_wavg,2)+' pp':'—'],['接近强赎价格线占净值',pct(c.w_sh_near/100)],['达到强赎价格线占净值',pct(c.w_sh_over/100)],['达到下修价格线占净值',pct(c.w_xz_hit/100)],['强赎价格条件有效覆盖',pct(c.sh_cov)],['下修价格条件有效覆盖',pct(c.xz_cov)]])+note(`条款来源快照 ${c.terms_snapshot_date}，历史条款版本未核。只计算价格条件，不代表满足连续天数或发行人决定强赎/下修；转股起始日未知时保持未知。`))+distribution('券龄分布',c.age_buckets)+distribution('转股溢价率分布',c.prem_buckets)+distribution('评级分布',c.rating_buckets):note('该报告期缺少可用转债结构明细，不能推断无转债。');
-  return source+cards+historical+features+underlying+clauses;
+  return source+cards+features+underlying+clauses;
  }
  function bondPanel(p){const dates=reportDates(p);return section('可转债专题',note('权重变化为Σ绝对披露权重变化，不除2；包含价格、申赎和披露影响，不是实际交易换手。首期无比较基期，缺明细不当清仓。')+`<label class="bc-control">报告期<select data-bc-date>${dates.map(d=>`<option value="${d}">${d}</option>`).join('')}</select></label><div data-bc-output>${dates.length?bondOutput(p,dates[0]):note('尚无可用报告序列。')}</div>`);}
  const windows={'1m':'近1月','2m':'近2月','3m':'近3月','6m':'近6月',ytd:'今年以来','1y':'近1年','3y':'近3年','5y':'近5年',all:'可得历史'};
@@ -112,11 +116,11 @@
   const task=(async()=>{let p=root.BOND_COMPLETE_DATA?.[fund.code];if(p?.source_payload_sha256!==expected){if(root.BOND_COMPLETE_DATA)delete root.BOND_COMPLETE_DATA[fund.code];await loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_complete/${encodeURIComponent(fund.code)}.js?v=${expected.slice(0,16)}`,'债券专题分析',()=>root.BOND_COMPLETE_DATA?.[fund.code]);p=root.BOND_COMPLETE_DATA?.[fund.code];}if(p?.schema_version!=='bond_complete_view.v1'||p?.code!==fund.code||p.source_payload_sha256!==expected)throw new Error('债券专题数据版本不匹配，请重试');return p;})().catch(e=>{cache.delete(fund.code);throw e;});cache.set(fund.code,task);return task;
  }
  function bind(host,p){
-  const draw=()=>{const date=host.querySelector('[data-bc-date]')?.value,key=host.querySelector('[data-bc-feature]')?.value||'BondClose';host.querySelector('[data-bc-output]').innerHTML=bondOutput(p,date,key);host.querySelector('[data-bc-feature]')?.addEventListener('change',draw);};
-  host.querySelector('[data-bc-date]')?.addEventListener('change',draw);host.querySelector('[data-bc-feature]')?.addEventListener('change',draw);
+  const draw=()=>{const date=host.querySelector('[data-bc-date]')?.value,key=host.querySelector('[data-bc-feature]')?.value||'BondZGYJL',stockKey=host.querySelector('[data-bc-underlying]')?.value||'S_DQ_MV';host.querySelector('[data-bc-output]').innerHTML=bondOutput(p,date,key,stockKey);host.querySelector('[data-bc-feature]')?.addEventListener('change',draw);host.querySelector('[data-bc-underlying]')?.addEventListener('change',draw);};
+  host.querySelector('[data-bc-date]')?.addEventListener('change',draw);host.querySelector('[data-bc-feature]')?.addEventListener('change',draw);host.querySelector('[data-bc-underlying]')?.addEventListener('change',draw);
   host.querySelector('[data-bc-window]')?.addEventListener('change',e=>{host.querySelector('[data-bc-correlation]').innerHTML=correlationOutput(p,e.target.value);});
  }
- const api={portfolioRows,portfolioChart,portfolioTable,enhancePortfolioAssets,load,assetPanel,bondPanel,bondOutput,correlationPanel,correlationOutput,fundPanel,reportDates,fieldTable,formatField,line,pct,bind};root.BondComplete=api;
+ const api={portfolioRows,portfolioChart,portfolioTable,enhancePortfolioAssets,load,assetPanel,bondPanel,bondOutput,correlationPanel,correlationOutput,fundPanel,reportDates,fieldTable,featurePair,formatField,line,pct,bind};root.BondComplete=api;
  if(typeof module!=='undefined')module.exports=api;
  if(typeof createGenericTabLoader==='undefined'||typeof GENERIC_TABS==='undefined')return;
  for(const key of ['profilePanel','holdingsPanel']){
@@ -129,7 +133,7 @@
  if(typeof renderGenericFund!=='undefined'){
   const originalRender=renderGenericFund;
   renderGenericFund=function(fund,...args){
-   if(oldTabs[fund.category])GENERIC_TABS[fund.category]=eligible(fund)?layout.map(x=>x.slice()):oldTabs[fund.category];
+   if(oldTabs[fund.category]){const tabs=layout.map(x=>x.slice());if(fund.category==='hybrid-bond')tabs.splice(2,0,['selection','基金优选']);GENERIC_TABS[fund.category]=eligible(fund)?tabs:oldTabs[fund.category];}
    if(eligible(fund)&&typeof query!=='undefined'){
     const aliases={profile:'stocks',industries:'stocks',holdings:'stocks',rebalancing:'stocks',convertibles:'bonds',ipo:'attribution',evaluation:'assets'};
     if(aliases[query.get('tab')])query.set('tab',aliases[query.get('tab')]);
@@ -174,6 +178,15 @@
    if(host.querySelector('[data-tab-data-retry]'))return false;
    if(id==='assets'){
      if(fund.category==='hybrid-bond')enhancePortfolioAssets(host,p);
+     if(fund.category==='hybrid-bond'&&root.BondVisualDuration){
+      const durationHost=[...host.querySelectorAll('.hybrid-bond-asset-trends article')].find(a=>a.querySelector('h3')?.textContent==='久期时间序列');
+      if(durationHost){
+       let market=root.FUND_BOND_MARKET,marketError='';
+       if(!market&&typeof loadDashboardAsset==='function'){try{await loadDashboardAsset('bond_market_overview.js');market=root.FUND_BOND_MARKET;}catch(error){marketError=error.message||'国债数据加载失败';}}
+       durationHost.innerHTML='<div class="subpanel-heading"><h3>久期时间序列</h3><span>利率敏感性披露反推 · 与国债走势对照</span></div><div data-bvd-host></div>';
+       root.BondVisualDuration.mount(durationHost.querySelector('[data-bvd-host]'),detail,market);if(marketError)durationHost.insertAdjacentHTML('beforeend',note('国债曲线暂未加载：'+marketError));
+      }
+     }
     host.insertAdjacentHTML('beforeend',assetPanel(p));
     if(fund.category==='hybrid-bond'){
      host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details" data-bc-evaluation><summary>既有五维评价</summary><div data-panel="evaluation"></div></details>');
