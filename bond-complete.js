@@ -182,10 +182,14 @@
     return;
    }
    if(id==='bonds'){
-    host.insertAdjacentHTML('afterbegin','<div data-bap-features></div><details class="bc-legacy-details"><summary>转债仓位、集中度与历史资料</summary>'+bondPanel(p)+'</details>');
+    if(root.BondVisualDetails&&typeof loadGenericBondHistory==='function'){
+     const history=await loadGenericBondHistory(fund.code);
+     root.BondVisualDetails.mountBonds(host,p,history||[],root.FUND_BOND_CHARACTERISTICS?.bonds||{});
+    }
+    host.insertAdjacentHTML('beforeend','<div data-bap-features></div><details class="bc-legacy-details"><summary>转债仓位、集中度与历史资料</summary>'+bondPanel(p)+'</details>');
     if(root.BondAdvancedUI)await root.BondAdvancedUI.mount(host.querySelector('[data-bap-features]'),'features',fund.code);
-    host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details"><summary>转债逐券、正股映射与既有历史资料</summary><div data-panel="convertibles"></div></details>');
-    const fold=host.querySelector('.bc-legacy-details');fold.addEventListener('toggle',()=>{if(fold.open)void base('convertibles');});if(requestedTab==='convertibles')fold.open=true;bind(host,p);return;
+    host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details" data-bc-convertibles-fold><summary>转债逐券、正股映射与既有历史资料</summary><div data-panel="convertibles"></div></details>');
+    const fold=host.querySelector('[data-bc-convertibles-fold]');fold.addEventListener('toggle',()=>{if(fold.open)void base('convertibles');});if(requestedTab==='convertibles')fold.open=true;bind(host,p);return;
    }
    if(id==='attribution'){
     host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details" data-bap-ipo-fold><summary>打新获配、锁定口径与收益估算</summary><div data-bap-ipo></div></details>');
