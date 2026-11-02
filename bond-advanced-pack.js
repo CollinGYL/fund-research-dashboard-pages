@@ -15,9 +15,10 @@
   const controls=`<label>数据视图<select data-bap-feature-period>${opts.map(([k,v])=>`<option value="${esc(k)}"${k===selection?' selected':''}>${esc(v)}</option>`).join('')}</select></label>`;
   if(!current)return section('转债高级特征',controls+note('该视图缺少可用持仓或对应日期行情。'));
   const dates=current.view_kind?`持仓报告 ${current.holdings_report_date}；行情 ${current.quote_date}。按最近披露的原权重计算，并非当前真实仓位，也未按价格漂移估计仓位。`:`持仓与特征报告期 ${current.report_date}。默认只使用7个自然日内可得的源观察值，旧报价不计入本期均值。`;
-  const rows=Object.values(current.features||{}).map(x=>[esc(x.label),field(x),esc(unit(x.unit)),pct(x.coverage_disclosed),pct(x.coverage_all_CB)]);
+  const dated=!!current.feature_observation_dates;
+  const rows=Object.entries(current.features||{}).map(([key,x])=>{const row=[esc(x.label),field(x),esc(unit(x.unit)),pct(x.coverage_disclosed),pct(x.coverage_all_CB)];if(dated){const ds=ok(x.value)?(current.feature_observation_dates[key]||[]):[];row.push(esc(ds.length===1?ds[0]:ds.length?ds[0]+' ～ '+ds.at(-1):'—'));}return row;});
   const under=Object.values(current.underlying||{}).map(x=>[esc(x.label),field(x),esc(unit(x.unit)),pct(x.coverage_disclosed),pct(x.coverage_all_CB)]);
-  return section('转债高级特征',controls+note(dates)+note(`披露转债占净资产 ${pct(current.disclosed_cb_weight_nav)}；资产表全部转债 ${pct(current.asset_cb_weight_nav)}；可定价权重覆盖 ${pct(current.priced_weight_coverage)}。`)+table(['特征','市值加权均值','单位','占披露转债有效覆盖','占全部转债有效覆盖'],rows))+section('转债对应正股特征',table(['特征','市值加权均值','单位','占披露转债有效覆盖','占全部转债有效覆盖'],under))+note('直接股票、转债名义正股映射和Delta敞口分别处理；无Delta输入，不生成股票等价仓位。同事BS边界参数与可复算隐波分列；条款和映射的完整历史生效版本尚未核实。');
+  return section('转债高级特征',controls+note(dates)+note(`披露转债占净资产 ${pct(current.disclosed_cb_weight_nav)}；资产表全部转债 ${pct(current.asset_cb_weight_nav)}；可定价权重覆盖 ${pct(current.priced_weight_coverage)}。`)+table(['特征','市值加权均值','单位','占披露转债有效覆盖','占全部转债有效覆盖',...(dated?['实际行情日']:[])],rows))+section('转债对应正股特征',table(['特征','市值加权均值','单位','占披露转债有效覆盖','占全部转债有效覆盖'],under))+note('直接股票、转债名义正股映射和Delta敞口分别处理；无Delta输入，不生成股票等价仓位。同事BS边界参数与可复算隐波分列；条款和映射的完整历史生效版本尚未核实。');
  }
  function ownFunds(p,selection){
   const all=p.periods||[],selected=all.find(x=>x.report_date===selection)||all.at(-1);const periods=all.slice().reverse().map(x=>`<option value="${x.report_date}"${x===selected?' selected':''}>${x.report_date}</option>`).join('');

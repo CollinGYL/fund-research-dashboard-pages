@@ -51,7 +51,14 @@
       ? `<span>所选 ${esc(normalize(requestedCode))} 与 ${esc(canonicalCode(subject))} 为同一组合，以下保留代表份额资料。</span>` : '';
     if (!e) return `<details class="lifecycle-note" data-lifecycle-state="${esc(s.state)}"><summary>基金状态：${esc(label(subject))}</summary><p>目录观察日 ${esc(s.as_of)}；状态沿用供应商目录，合同与公告尚待逐只核实。</p>${alias}</details>`;
     const source = data().sources[e.source_id];
-    return `<aside class="lifecycle-notice" data-lifecycle-state="${esc(s.state)}"><strong>${esc(r.name)} · ${esc(label(subject))}</strong><p>${e.last_operation_date?`最后运作日 ${esc(e.last_operation_date)} · `:""}${e.kind==="liquidation_start"?"清算开始":"状态生效"} ${esc(e.effective_on)} · 公告日 ${esc(e.published_on)}。</p><p>已退出当前筛选、排名和对比，历史净值与披露资料保留。<a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">查看公告</a> · <a href="compare.html?codes=${encodeURIComponent(canonicalCode(subject))}&mode=history">历史净值对比</a></p>${alias}</aside>`;
+    return `<aside class="lifecycle-notice" data-lifecycle-state="${esc(s.state)}"><strong>${esc(r.name)} · ${esc(label(subject))}</strong><p>${e.last_operation_date?`最后运作日 ${esc(e.last_operation_date)} · `:'最后运作日待核 · '}${e.kind==="liquidation_start"?"清算开始":"状态生效"} ${esc(e.effective_on)} · 公告日 ${esc(e.published_on)}。</p><p>已退出当前筛选、排名和对比，历史净值与披露资料保留。<a href="${esc(source.url)}" target="_blank" rel="noopener noreferrer">查看公告</a> · <a href="${esc(historicalComparisonLink(canonicalCode(subject)))}">历史净值对比</a></p>${!e.last_operation_date ? `<p>${e.verified && e.kind === 'liquidation_start' && validDate(e.effective_on) ? '历史净值按已核清算开始日前保留。' : '截断日期待核，保留可得历史净值。'}</p>` : ''}${alias}</aside>`;
+  }
+  function historicalComparisonLink(code) {
+    const source = new URLSearchParams(root.location?.search || ''), params = new URLSearchParams({codes:code, mode:'history'});
+    const cutoff = source.get('navDate') || new URLSearchParams(source.get('list') || '').get('navDate');
+    if (validDate(cutoff)) params.set('navDate', cutoff);
+    if (source.has('list')) params.set('list', source.get('list'));
+    return `compare.html?${params}`;
   }
   function comparisonCodes(codes, historical = false) {
     for (const code of codes) {
@@ -62,9 +69,31 @@
     }
     return [...new Set(codes.map(canonicalCode))];
   }
+  function validDate(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return false;
+    const day = new Date(value + 'T00:00:00Z');
+    return Number.isFinite(day.valueOf()) && day.toISOString().slice(0, 10) === value;
+  }
   function historicalNav(detail) {
     const e = exitEvent(detail.fund || detail.code);
-    return e ? {...detail, nav: detail.nav.filter(row => row[0] <= e.last_operation_date)} : detail;
+    if (!e) return detail;
+    if (validDate(e.last_operation_date)) return {...detail, nav: detail.nav.filter(row => row[0] <= e.last_operation_date)};
+    // A verified liquidation start is a separate bound, never a fabricated last operation date.
+    if (e.verified && e.kind === 'liquidation_start' && validDate(e.effective_on)) {
+      return {...detail, nav: detail.nav.filter(row => row[0] < e.effective_on)};
+    }
+    return detail;
+  }
+  function windowValidity(firstDate, lastDate, months, inceptionDate = null) {
+    const n = Number(months), label = n % 12 === 0 ? `${n / 12}年` : `${n}月`;
+    if (!validDate(firstDate) || !validDate(lastDate) || !Number.isInteger(n) || n <= 0) return {complete: false, requestedStart: null, label: `不足${label}`};
+    const date = new Date(lastDate + 'T00:00:00Z'), day = date.getUTCDate();
+    date.setUTCDate(1); date.setUTCMonth(date.getUTCMonth() - n);
+    const monthEnd = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+    date.setUTCDate(Math.min(day, monthEnd));
+    const requestedStart = date.toISOString().slice(0, 10);
+    const complete = firstDate <= requestedStart && (!validDate(inceptionDate) || inceptionDate <= requestedStart);
+    return {complete, requestedStart, label: complete ? `近${label}` : `不足${label}`};
   }
   function loadRanks() {
     if (root.FUND_LIFECYCLE_RANKS?.catalog_generated_at === data().catalog_generated_at) return Promise.resolve(root.FUND_LIFECYCLE_RANKS);
@@ -101,6 +130,6 @@
     return {return_top_pct: r ? r.rank / r.n : null, return_top_pct_n: r?.n || null,
       drawdown_top_pct: r && dd ? dd[0] / dd[1] : null};
   }
-  root.FundLifecycle = {data, status, canonicalCode, currentEligible, currentCompareEligible, exitEvent, label, badge, notice, comparisonCodes, historicalNav, loadRanks, ranks, rankSummary};
+  root.FundLifecycle = {data, status, canonicalCode, currentEligible, currentCompareEligible, exitEvent, label, badge, notice, comparisonCodes, historicalNav, validDate, windowValidity, loadRanks, ranks, rankSummary};
   if (typeof module !== 'undefined') module.exports = root.FundLifecycle;
 })(typeof window === 'undefined' ? globalThis : window);

@@ -31,7 +31,27 @@
   if(spanDays>160)return `${date.slice(0,7)} · Q${Math.ceil(Number(date.slice(5,7))/3)}`;
   return date.slice(5,10);
  }
- root.ReviewCore={matches,normalize,scale,dateLabel};
+ // Report snapshots are separate columns: null is never an interpolated zero.
+ function stackColumns(dates,values,{left=0,right=1,maxWidth=18}={}){
+  if(dates.length!==values.length)throw Error('堆积图日期与数值行数不一致');
+  const times=dates.map(d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')?Date.parse(d):NaN);
+  if(times.some((t,i)=>!Number.isFinite(t)||new Date(t).toISOString().slice(0,10)!==dates[i]||(i&&t<=times[i-1])))throw Error('堆积图报告日期须有效、唯一且递增');
+  const xs=times.map(t=>left+(times.at(-1)===times[0]?.5:(t-times[0])/(times.at(-1)-times[0]))*(right-left));
+  return values.map((row,i)=>{
+   const neighbours=[xs[i]-xs[i-1],xs[i+1]-xs[i]].filter(v=>Number.isFinite(v)&&v>0);
+   const half=Math.min(maxWidth/2,neighbours.length?Math.min(...neighbours)*.4:maxWidth/2);
+   const x=Math.max(left,xs[i]-half),end=Math.min(right,xs[i]+half),missing=[],bands=[];
+   let total=0;const invalid=row.some(v=>typeof v==='number'&&Number.isFinite(v)&&v<0);
+   row.forEach((value,j)=>{
+    if(typeof value!=='number'||!Number.isFinite(value)){missing.push(j);return;}
+    if(invalid)return;
+    bands.push({layer:j,value,lower:total,upper:total+value});total+=value;
+   });
+   return {index:i,date:dates[i],center:xs[i],x,width:end-x,bands,missing,total,
+    status:invalid?'invalid':!bands.length?'unavailable':missing.length?'partial':total===0?'zero':'available'};
+  });
+ }
+ root.ReviewCore={matches,normalize,scale,dateLabel,stackColumns};
  if(typeof module!=='undefined')module.exports=root.ReviewCore;
 })(typeof window==='undefined'?globalThis:window);
 (function(root){

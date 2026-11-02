@@ -103,14 +103,24 @@
     if(!output)return;
     const rs=ranges(fund,nav);
     const metricDraw=(p,label)=>{if(metrics)metrics.innerHTML=renderPerformanceMetricCards('custom',p,false);if(note)note.textContent=`${label} · ${p[0]?.date || '—'} — ${p.at(-1)?.date || '—'} · ${p.length}个净值日`;};
-    const draw=(selected,label)=>{
-      const s=selected[0]?.date,e=selected.at(-1)?.date,chart=points.filter(p=>p.date>=s && p.date<=e);
-      const display=chart.length>=2?chart:selected.map(p=>({...p,benchmark:null}));
+    const draw=(selected,label,chartStart=null)=>{
+      const s=chartStart||selected[0]?.date,e=selected.at(-1)?.date,chart=points.filter(p=>p.date>=s && p.date<=e);
+      const display=chart.length>=2?chart:selected.filter(p=>p.date>=s).map(p=>({...p,benchmark:null}));
       output.innerHTML=renderZoomableNavChart(rebaseNavPoints(display),fund.name,benchmarkName);
       metricDraw(selected,label);
-      if(display.length>=2)bindNavChartZoom(display,fund.name,benchmarkName,output,(start,end)=>metricDraw(selected.filter(p=>p.date>=start && p.date<=end),label));
+      let initial=true;
+      if(display.length>=2)bindNavChartZoom(display,fund.name,benchmarkName,output,(start,end)=>{if(initial){initial=false;return;}metricDraw(selected.filter(p=>p.date>=start && p.date<=end),label);});
     };
-    buttons.forEach(b=>b.addEventListener('click',()=>{buttons.forEach(x=>x.classList.toggle('active',x===b));if(select)select.value='';draw(selectPerformanceRange(nav,b.dataset.genericNavRange),b.textContent);}));
+    const windowInfo=months=>window.FundLifecycle?.windowValidity?.(nav[0]?.date,nav.at(-1)?.date,months,fund.inception_date);
+    const five=windowInfo(60);
+    buttons.filter(b=>b.dataset.genericNavRange==='60').forEach(b=>{if(five&&!five.complete)b.textContent='不足5年';});
+    buttons.forEach(b=>b.addEventListener('click',()=>{
+      buttons.forEach(x=>x.classList.toggle('active',x===b));if(select)select.value='';
+      const range=b.dataset.genericNavRange,months=Number(range),validity=Number.isFinite(months)?windowInfo(months):null;
+      const start=range==='all'?null:range==='ytd'?nav.at(-1).date.slice(0,4)+'-01-01':validity?.requestedStart||FundResearch.monthStart(nav.at(-1).date,months);
+      const label=range==='60'&&validity&&!validity.complete?'不足5年 · 可得历史':b.textContent;
+      draw(selectPerformanceRange(nav,range),label,start);
+    }));
     select?.addEventListener('change',()=>{if(select.value==='')return;const r=rs[Number(select.value)];if(!r)return;buttons.forEach(b=>b.classList.remove('active'));draw(nav.filter(p=>p.date>=r.s && p.date<=r.e),r.label);});
     draw(nav,'可得历史');
   }

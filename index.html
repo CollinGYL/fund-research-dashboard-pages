@@ -8,16 +8,16 @@
     <meta name="referrer" content="no-referrer" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
     <title>财富产品部-基金研究系统看板</title>
-    <link rel="stylesheet" href="styles.css?v=0940f9f6514f" />
+    <link rel="stylesheet" href="styles.css?v=10cc5f042cec" />
     <link rel="stylesheet" href="review.css?v=f1d378a18a93" />
-    <script src="review-core.js?v=eb0f5ca56ecb" defer></script>
+    <script src="review-core.js?v=8f5ba0f103c6" defer></script>
     <link rel="stylesheet" href="fund-lifecycle.css?v=0650bd1ceefa">
-    <script src="fund-lifecycle.js?v=819679d5b414" defer></script>
+    <script src="fund-lifecycle.js?v=4cdaae05171a" defer></script>
     <link rel="stylesheet" href="bond-cb-fusion.css?v=3c4dd111b672">
     <script src="bond-cb-fusion.js?v=977739a20b2b" defer></script>
       <link rel="stylesheet" href="warm-ui-repair.css?v=23ad8276b80d">
       <link rel="stylesheet" href="demo-theme.css?v=c22207d629e7">
-      <link rel="stylesheet" href="desktop-home.css?v=a46070e6943d">
+      <link rel="stylesheet" href="desktop-home.css?v=382c049c4261">
     <link rel="stylesheet" href="ui-integration.css?v=fb308c4e90c3">
     <link rel="stylesheet" href="bond-market-comparison.css?v=89bbb2816ab8">
     <link rel="stylesheet" href="site-integration.css?v=5449faf99e4b">
@@ -79,8 +79,6 @@
         </div>
         <select id="mobile-category" class="mobile-only-control" aria-label="基金分类"><option value="all">基金总览</option><option value="active-equity">主动权益基金</option><option value="pure-bond">纯债基金</option><option value="hybrid-bond">混合债基</option><option value="convertible-bond">转债基金</option></select>
       </section>
-      <section id="applicable-market-overview" hidden aria-label="分类市场概览"></section>
-      <section id="bond-market-overview" class="section-shell section-block" hidden></section>
 
       <section id="samples" class="section-shell section-block">
         <div class="section-heading">
@@ -165,6 +163,12 @@
         </div>
       </section>
 
+      <details id="home-market-research" class="section-shell home-market-research" hidden>
+        <summary><strong id="home-market-summary">市场研究 · 展开图表</strong><span id="home-market-date" class="home-market-date">实际数据日期加载中</span></summary>
+        <section id="applicable-market-overview" hidden aria-label="分类市场概览"></section>
+        <section id="bond-market-overview" class="section-block" hidden></section>
+      </details>
+
       <section id="notes" class="section-shell site-data-notes">
         <details class="home-note-group"><summary>数据说明</summary>
           <div id="data-scope-details"><h3>数据范围与日期</h3>
@@ -189,14 +193,14 @@
     <noscript><p class="section-shell loading-state">请启用 JavaScript 以搜索基金和查看研究数据。</p></noscript>
     <script src="bond-market-comparison.js?v=1988206a24e7" defer></script>
     <script src="research-core.js?v=1af044235c24" defer></script>
-    <script src="bond-advanced-pack.js?v=4b0c9f1430a5" defer></script>
-    <script src="bond-advanced-integration.js?v=97f7ebccabd7" defer></script>
+    <script src="bond-advanced-pack.js?v=a56c83d6e51e" defer></script>
+    <script src="bond-advanced-integration.js?v=755e0269881d" defer></script>
     <script src="industry-bars.js?v=d7e2104c05da" defer></script>
     <script src="desktop-nav.js?v=9bf2f577b735" defer></script>
     <script src="integration-bootstrap.js?v=6d7b58bcb074" defer></script>
-    <script src="app.js?v=159d61bf3b8b" defer></script>
+    <script src="app.js?v=eb39fbfdee7c" defer></script>
     <script src="desktop-home.js?v=d46e675f0c53" defer></script>
-  <script src="site-integration.js?v=566b3e2dd4f3" defer></script>
+  <script src="site-integration.js?v=5e28a93ac905" defer></script>
 <script src="profile-integration.js?v=9de56d3b5560" defer></script>
 </body>
 </html>

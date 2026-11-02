@@ -13,7 +13,11 @@
  function position(){
   if(!list||list.hidden)return;
   const r=anchor.getBoundingClientRect(),h=document.querySelector('.site-header').getBoundingClientRect().height;
-  if(r.bottom<h||r.top>innerHeight){closeSuggestions();return;}
+  if(r.bottom<h||r.top>innerHeight){
+   if(document.activeElement===anchor){list.style.visibility='hidden';return;}
+   closeSuggestions();return;
+  }
+  list.style.visibility='';
   const width=Math.min(Math.max(r.width,340),innerWidth-24);
   Object.assign(list.style,{position:'fixed',zIndex:'1200',left:Math.min(Math.max(12,r.left),innerWidth-width-12)+'px',top:r.bottom+4+'px',width:width+'px',maxHeight:Math.max(90,innerHeight-r.bottom-20)+'px',overflow:'auto'});
   quick.setAttribute('aria-expanded',String(!list.hidden));
@@ -22,7 +26,7 @@
  renderSuggestions=function(){priorSuggestions();position();};
  quick.addEventListener('input',()=>{anchor=quick;original.value=quick.value;original.dispatchEvent(new Event('input',{bubbles:true}));});
  quick.addEventListener('focus',()=>{anchor=quick;renderSuggestions();});
- quick.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSuggestions();quick.setAttribute('aria-expanded','false');}else if(e.key==='Enter'){const item=list?.querySelector('.active')||list?.querySelector('[role=option]');if(item&&!list.hidden){e.preventDefault();item.click();}}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();moveSuggestion(e.key==='ArrowDown'?1:-1);}});
+ quick.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeSuggestions();quick.setAttribute('aria-expanded','false');}else if(e.key==='Enter'){const item=list?.querySelector('.active')||list?.querySelector('[role=option]');if(item&&!list.hidden){e.preventDefault();item.click();}}else if(e.key==='Tab'){closeSuggestions();}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(list?.hidden)renderSuggestions();moveSuggestion(e.key==='ArrowDown'?1:-1);}});
  original.addEventListener('focus',()=>{anchor=original;position();});original.addEventListener('input',()=>{quick.value=original.value;});
  box.querySelector('button').addEventListener('click',()=>{quick.value=original.value='';original.dispatchEvent(new Event('input',{bubbles:true}));quick.focus();});
  original.addEventListener('keydown',e=>{if(e.key==='Enter'&&!list.hidden){const item=list.querySelector('.active')||list.querySelector('[role=option]');if(item){e.preventDefault();item.click();}}});
@@ -41,7 +45,6 @@
   const f=funds.find(x=>x.code===link.dataset.locateCode);if(!f)return;e.preventDefault();store(snapshotKey,snapshot());store(routeKey,{action:'locate',code:f.code});
   const url=new URL(window.location.href);url.pathname=url.pathname.replace(/[^/]*$/,'index.html');url.searchParams.set('category',f.category);url.searchParams.set('page','1');
   for(const k of ['q','size','subtype','profile','age','data'])url.searchParams.delete(k);
-  const cutoff=url.searchParams.get('navDate');if(cutoff&&cutoff!=='latest'&&f.inception_date&&cutoff<f.inception_date)url.searchParams.set('navDate','latest');
   url.hash='samples';window.location.assign(url.pathname+url.search+url.hash);
  });
  back.addEventListener('click',()=>{const saved=read(snapshotKey);if(!saved)return;store(routeKey,{action:'return',saved});window.location.assign('index.html'+saved.query);});
@@ -52,7 +55,16 @@
   if(route?.action==='return'&&!restored){const saved=route.saved;restored=true;changing=true;currentPage=saved.page;renderFunds();changing=false;requestAnimationFrame(()=>{const wrap=document.querySelector('.fund-list-wrap');if(wrap)wrap.scrollLeft=saved.left;window.scrollTo(0,saved.scroll);});sessionStorage.removeItem(routeKey);sessionStorage.removeItem(snapshotKey);route=null;}
   if(highlight){
    const rows=filteredFunds(),i=rows.findIndex(x=>x.code===highlight);
-   if(i<0)return;
+   if(i<0){
+    const fund=funds.find(f=>f.code===highlight),cutoff=chosenNavDate();
+    let notice=document.querySelector('#locate-fund-status');
+    if(!notice){notice=document.createElement('p');notice.id='locate-fund-status';notice.className='method-note';notice.setAttribute('role','status');document.querySelector('.list-status-row')?.insertAdjacentElement('afterend',notice);}
+    notice.textContent=fund?.inception_date&&cutoff<fund.inception_date
+     ? `${FundResearch.portfolioName?.(fund)||fund.name}于${fund.inception_date}成立；截止${cutoff}尚未成立，无该时点净值。已保留截止日。`
+     : '目标基金不在当前截止日及筛选条件的候选列表中；已保留当前条件。';
+    return;
+   }
+   document.querySelector('#locate-fund-status')?.remove();
    const wanted=Math.floor(i/PAGE_SIZE)+1;
    if(currentPage!==wanted){changing=true;currentPage=wanted;renderFunds();changing=false;}
    const link=document.querySelector('#fund-grid a[href*="code='+highlight+'"]'),row=link?.closest('tr');

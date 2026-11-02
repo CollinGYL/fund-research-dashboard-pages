@@ -47,7 +47,22 @@
  }
  function bondPanel(p){const dates=reportDates(p);return section('可转债专题',note('权重变化为Σ绝对披露权重变化，不除2；包含价格、申赎和披露影响，不是实际交易换手。首期无比较基期，缺明细不当清仓。')+`<label class="bc-control">报告期<select data-bc-date>${dates.map(d=>`<option value="${d}">${d}</option>`).join('')}</select></label><div data-bc-output>${dates.length?bondOutput(p,dates[0]):note('尚无可用报告序列。')}</div>`);}
  const windows={'1m':'近1月','2m':'近2月','3m':'近3月','6m':'近6月',ytd:'今年以来','1y':'近1年','3y':'近3年','5y':'近5年',all:'可得历史'};
- function correlationOutput(p,key){const source=p.correlations?.schema_version==='bond_complete_correlation.v1'?p.correlations:p.correlation;const w=source?.windows?.[key];if(!w)return note('该窗口没有足够有效净值。');const grid=(title,rows)=>section(title,table(['基金','相关系数','共同有效日'],(rows||[]).map(x=>[`<a href="fund.html?code=${encodeURIComponent(x.code)}">${esc(x.name)}</a><small>${esc(x.code)}</small>`,num(x.correlation),String(x.observations)])));return note(`区间 ${w.start} 至 ${w.end}；同类池${w.pool_size}个组合，有效比较${w.n_valid_peers}个；每对至少${w.min_observations}个共同有效日。日收益裁切在±10%，缺净值不前填；相关性不代表利率久期或因果关系。`)+grid('相关性最高的同类基金',w.positive)+grid('相关性最低的同类基金',w.negative);}
+ function correlationOutput(p,key){
+  const source=p.correlations?.schema_version==='bond_complete_correlation.v1'?p.correlations:p.correlation,w=source?.windows?.[key];
+  if(!w)return note('该窗口没有足够有效净值。');
+  const unique=new Map();
+  for(const row of [...(w.positive||[]),...(w.negative||[])]){
+   if(!finite(row.correlation)||finite(row.observations)&&row.observations<=3)continue;
+   const code=root.FundLifecycle?.canonicalCode(row.code)||row.code;
+   if(!unique.has(code))unique.set(code,row);
+  }
+  const ordered=[...unique.values()].sort((a,b)=>b.correlation-a.correlation),limit=Math.min(12,Math.max(1,Math.floor(ordered.length/2)));
+  const high=ordered.slice(0,limit),highCodes=new Set(high.map(x=>root.FundLifecycle?.canonicalCode(x.code)||x.code));
+  const low=ordered.slice().reverse().filter(x=>!highCodes.has(root.FundLifecycle?.canonicalCode(x.code)||x.code)).slice(0,limit);
+  const grid=(title,rows)=>section(title,table(['基金','相关系数','共同有效日'],rows.map(x=>[`<a href="${esc(typeof detailRoute==='function'?detailRoute(x.code):'fund.html?code='+encodeURIComponent(x.code))}">${esc(x.name)}</a><small>${esc(x.code)}</small>`,num(x.correlation),finite(x.observations)?String(x.observations):'—'])));
+  return note(`区间 ${w.start} 至 ${w.end}；同类池${w.pool_size}个组合，有效比较${w.n_valid_peers}个；每对至少${w.min_observations}个共同有效日。日收益仍裁切在±10%，缺净值不前填。高低榜不重复列同一产品；小样本不足时保留空位。`)+grid('相关性最高的同类基金',high)+grid('相关性最低的同类基金',low);
+ }
+
  function correlationPanel(p){return section('同类基金相关性',note('一级和二级债同池，转债基金独立池；同组合的不同份额已合并，剔除自身。各基金使用实际净值截止日。')+`<label class="bc-control">区间<select data-bc-window>${Object.entries(windows).map(([k,v])=>`<option value="${k}"${k==='1y'?' selected':''}>${v}</option>`).join('')}</select></label><div data-bc-correlation>${correlationOutput(p,'1y')}</div>`);}
  function fundPanel(p){const rows=p.fund_investment||[],latest=rows.at(-1);return section('基金与ETF投资',latest?note(`资产配置报告期 ${latest.date}，基金投资占净资产 ${pct(latest.fund)}。${latest.fund===0?'该资产表明确为零，不能据此推断整个历史没有投资。':finite(latest.fund)?'资产表有基金投资，具体持有的子基金/ETF明细尚待补齐。':'资产表基金投资字段缺失，不能判断为零。'}`):note('暂无可用基金投资资产表。'))+`<details class="bc-legacy-details"><summary>基金投资历史（${rows.length}期）</summary>${table(['报告期','基金投资/占净值'],rows.slice().reverse().map(x=>[esc(x.date),pct(x.fund)]))}</details>`+note('本板块仅展示本基金自身投资。其他FOF持有本基金的数据属于相反方向，不混入这里。');}
  const portfolioGroups=[['stock','股票','#bc554a'],['fixed','固定收益','#0a7c78'],['fund','基金','#c69a4b'],['cash','现金','#102c45'],['other_total','其他资产','#89989e']];
@@ -66,12 +81,8 @@
   const high=basis==='composition'?1:Math.max(1,...totals,...rows.map(r=>finite(r.leverage)?r.leverage:0));
   const step=high<=1?.25:high<=2?.25:Math.pow(10,Math.floor(Math.log10(high)))/2,max=basis==='composition'?1:Math.ceil(high/step)*step;
   const y=v=>top+(1-v/max)*(plotBottom-top),ticks=[...new Set([0,1,max,...Array.from({length:5},(_,i)=>max*i/4)])].sort((a,b)=>a-b);
-  let lower=rows.map(()=>0);
-  const areas=portfolioGroups.map(([key,label,color],j)=>{
-   const upper=rows.map((r,i)=>lower[i]+(r.values[j]??0));const parts=[];let part=[];
-   rows.forEach((r,i)=>{if(finite(r.values[j]))part.push(i);else if(part.length){parts.push(part);part=[];}});if(part.length)parts.push(part);
-   const html=parts.map(ids=>ids.length===1?`<line x1="${x(ids[0])}" x2="${x(ids[0])}" y1="${y(lower[ids[0]])}" y2="${y(upper[ids[0]])}" stroke="${color}" stroke-width="3"/>`:`<polygon fill="${color}" points="${[...ids.map(i=>`${x(i)},${y(upper[i])}`),...ids.slice().reverse().map(i=>`${x(i)},${y(lower[i])}`)].join(' ')}"/>`).join('');lower=upper;return html;
-  }).join('');
+  const columns=root.ReviewCore.stackColumns(rows.map(r=>r.date),rows.map(r=>r.values),{left,right:width-right});
+  const areas=columns.map(c=>c.bands.map(b=>`<rect data-stack-date="${c.date}" data-stack-layer="${portfolioGroups[b.layer][0]}" x="${c.x}" y="${y(b.upper)}" width="${c.width}" height="${Math.max(0,y(b.lower)-y(b.upper))}" fill="${portfolioGroups[b.layer][2]}"><title>${c.date} · ${esc(portfolioGroups[b.layer][1])} ${pct(b.value)}</title></rect>`).join('')+(c.status==='unavailable'||c.status==='invalid'?`<rect data-stack-unavailable="${c.date}" x="${c.x}" y="${top}" width="${c.width}" height="${plotBottom-top}" fill="none" stroke="#bfa77e" stroke-dasharray="2 3"><title>${c.date} · 暂无有效比例，见原始明细</title></rect>`:'')+`<circle data-stack-status="${c.status}" cx="${c.center}" cy="${plotBottom+7}" r="2" fill="${c.status==='partial'?'#b58a3c':c.status==='available'?'#91a39f':'#fff'}" stroke="#b58a3c"/>`).join('');
   let lev='',pen=false;rows.forEach((r,i)=>{if(basis!=='nav'||!finite(r.leverage)){pen=false;return;}lev+=(pen?'L':'M')+x(i)+','+y(r.leverage);pen=true;});
   const tickCount=width<600?3:5,dateIndices=[...new Set(Array.from({length:tickCount},(_,i)=>Math.round((rows.length-1)*i/(tickCount-1))))];
   return `<div class="bc-portfolio-legend">${portfolioGroups.map(([,label,color])=>`<span style="--portfolio-color:${color}">${label}</span>`).join('')}${basis==='nav'?'<span class="bc-leverage-legend" style="--portfolio-color:#ba3934">杠杆（总资产／净资产）</span>':''}</div><div class="bc-portfolio-chart" data-bc-basis="${basis}"><svg viewBox="0 0 ${width} ${height}" tabindex="0" role="img" aria-label="${basis==='nav'?'资产占净值及杠杆':'已披露资产构成百分比'}；左右方向键选择报告期"><title>缺项保持空缺；100%参考线与纵轴共用刻度</title>${ticks.map(t=>`<line x1="${left}" x2="${width-right}" y1="${y(t)}" y2="${y(t)}" class="chart-grid-line"/><text x="${left-8}" y="${y(t)+4}" text-anchor="end" class="chart-axis-label">${(t*100).toFixed(Math.abs(t*100-Math.round(t*100))<1e-8?0:1)}%</text>`).join('')}${areas}<line x1="${left}" x2="${width-right}" y1="${y(1)}" y2="${y(1)}" class="bc-reference-line"/>${lev?`<path d="${lev}" fill="none" stroke="#ba3934" stroke-width="2.4"/>`:''}${dateIndices.map(i=>`<text x="${x(i)}" y="${height-12}" text-anchor="${i===0?'start':i===rows.length-1?'end':'middle'}" class="chart-axis-label">${esc(rows[i].date.slice(0,4)+' Q'+Math.ceil(Number(rows[i].date.slice(5,7))/3))}</text>`).join('')}<line data-bc-asset-cursor x1="${x(rows.length-1)}" x2="${x(rows.length-1)}" y1="${top}" y2="${plotBottom}" class="bc-asset-cursor"/><rect data-bc-asset-hover x="${left}" y="${top}" width="${plotWidth}" height="${plotBottom-top}" fill="transparent"/></svg><p data-bc-asset-readout class="bc-asset-readout" aria-live="polite"></p></div>`;
@@ -93,10 +104,10 @@
   const periods=p.disclosure?.asset_periods;if(!periods?.length)return;
   const article=host.querySelector('[data-asset-distribution]');if(!article)return;
   article.innerHTML='<div class="subpanel-heading"><h3>资产分布</h3><span>季度披露</span></div><div class="bc-stock-nav" role="group" aria-label="资产分布显示口径"><button type="button" data-asset-basis="composition" aria-pressed="true">资产构成（100%）</button><button type="button" data-asset-basis="nav" aria-pressed="false">占净值（含杠杆）</button></div><div data-portfolio-chart></div><p data-portfolio-basis-note class="method-note"></p><details class="bc-legacy-details"><summary>期末基金资产组合明细</summary><label class="bc-control">报告期<select data-portfolio-report>'+periods.slice().reverse().map(r=>`<option value="${r.date}">${r.date}</option>`).join('')+'</select></label><div data-portfolio-table>'+portfolioTable(periods.at(-1))+'</div></details>';
-  const chart=article.querySelector('[data-portfolio-chart]');let currentBasis='composition',lastWidth=0;
-  const draw=basis=>{currentBasis=basis;lastWidth=Math.max(280,Math.round(chart.clientWidth||920));article.querySelectorAll('[data-asset-basis]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.assetBasis===basis)));chart.innerHTML=portfolioChart(periods,basis,lastWidth);article.querySelector('[data-portfolio-basis-note]').textContent=basis==='nav'?'五类资产金额占基金净值，合计可超过100%。红线为总资产／净资产，130%对应1.30倍。':'按已披露的五类资产金额合计归一至100%；缺项及金额覆盖率见图下读数。';bindPortfolioChart(chart,periods,basis);};
+  const chart=article.querySelector('[data-portfolio-chart]');let currentBasis='nav',lastWidth=0;
+  const draw=basis=>{currentBasis=basis;lastWidth=Math.max(280,Math.round(chart.clientWidth||920));article.querySelectorAll('[data-asset-basis]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.assetBasis===basis)));chart.innerHTML=portfolioChart(periods,basis,lastWidth);article.querySelector('[data-portfolio-basis-note]').textContent=basis==='nav'?'五类资产金额占基金净值，合计可超过100%。红线为总资产／净资产，130%对应1.30倍。各柱对应真实报告期，不跨期插值；金色点表示有分项未取得，空框表示本期无有效比例。':'按已披露的五类资产金额合计归一至100%；缺项及金额覆盖率见图下读数。按真实报告期逐柱展示；金色点表示有分项未取得，空框表示本期无有效比例。';bindPortfolioChart(chart,periods,basis);};
   article.querySelectorAll('[data-asset-basis]').forEach(b=>b.addEventListener('click',()=>draw(b.dataset.assetBasis)));
-  article.querySelector('[data-portfolio-report]').addEventListener('change',e=>{article.querySelector('[data-portfolio-table]').innerHTML=portfolioTable(periods.find(r=>r.date===e.target.value));});draw('composition');
+  article.querySelector('[data-portfolio-report]').addEventListener('change',e=>{article.querySelector('[data-portfolio-table]').innerHTML=portfolioTable(periods.find(r=>r.date===e.target.value));});draw('nav');
   if(typeof root.ResizeObserver==='function'){const observer=new root.ResizeObserver(()=>{const w=Math.max(280,Math.round(chart.clientWidth||920));if(Math.abs(w-lastWidth)>1)draw(currentBasis);});observer.observe(article);}
   host.querySelector('[data-hybrid-leverage]')?.remove();host.querySelector('[data-latest-asset-list]')?.remove();host.querySelector('[data-asset-history-table]')?.remove();
   const concentration=host.querySelector('[data-hybrid-concentration]');
@@ -197,9 +208,12 @@
    if(id==='bonds'){
     if(root.BondVisualDetails&&typeof loadGenericBondHistory==='function'){
      const history=await loadGenericBondHistory(fund.code);
-     root.BondVisualDetails.mountBonds(host,p,history||[],root.FUND_BOND_CHARACTERISTICS?.bonds||{});
+     root.BondVisualDetails.mountBonds(host,p,history||[],root.FUND_BOND_CHARACTERISTICS?.bonds||{},fund.category);
     }
-    host.insertAdjacentHTML('beforeend','<div data-bap-features></div><details class="bc-legacy-details"><summary>转债仓位、集中度与历史资料</summary>'+bondPanel(p)+'</details>');
+    const cbFirst=fund.category==='convertible-bond';
+    const features='<div data-bap-features></div>';
+    host.insertAdjacentHTML(cbFirst?'afterbegin':'beforeend',cbFirst?features:'<details class="bc-legacy-details"><summary>次要配置：转债高级特征（占净资产 '+pct(fund.asset?.convertible_bond_weight)+'）</summary>'+features+'</details>');
+    host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details"><summary>转债仓位、集中度与历史资料</summary>'+bondPanel(p)+'</details>');
     if(root.BondAdvancedUI)await root.BondAdvancedUI.mount(host.querySelector('[data-bap-features]'),'features',fund.code);
     host.insertAdjacentHTML('beforeend','<details class="bc-legacy-details" data-bc-convertibles-fold><summary>转债逐券、正股映射与既有历史资料</summary><div data-panel="convertibles"></div></details>');
     const fold=host.querySelector('[data-bc-convertibles-fold]');fold.addEventListener('toggle',()=>{if(fold.open)void base('convertibles');});if(requestedTab==='convertibles')fold.open=true;bind(host,p);return;

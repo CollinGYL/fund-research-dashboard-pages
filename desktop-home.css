@@ -203,3 +203,41 @@ body.desktop-home .sort-help-content p {margin:8px 0 0;font-size:12px;line-heigh
   body.compact-home.workbench.desktop-home .desktop-pagination-inner {gap:10px;}
   body.compact-home.workbench.desktop-home .pagination-controls {gap:12px;}
 }
+
+/* Home list first; shared detail pages retain their own layout. */
+body.desktop-home .home-market-research {margin-top:20px;margin-bottom:20px;border:1px solid #d7cfc4;border-radius:5px;padding:0 16px;background:#fff;}
+body.desktop-home .home-market-research[hidden] {display:none;}
+body.desktop-home .home-market-research > summary {cursor:pointer;padding:14px 0;color:#253247;font-size:14px;line-height:1.6;}
+body.desktop-home .home-market-date {display:block;margin-top:5px;font-size:13px;font-weight:400;color:#514a42;line-height:1.65;}
+body.desktop-home .joint-filter-controls {position:relative;flex-shrink:0;font-size:13px;}
+body.desktop-home .joint-filter-controls > summary {cursor:pointer;padding:7px 9px;min-height:34px;box-sizing:border-box;border:1px solid #b9afa4;border-radius:3px;background:#fff;color:#253247;white-space:nowrap;}
+body.desktop-home .joint-filter-controls:not([open]) > .joint-filter-panel {display:none;}
+body.desktop-home .joint-filter-controls[open] {z-index:58;}
+body.desktop-home .joint-filter-panel {position:absolute;z-index:58;left:0;top:calc(100% + 8px);display:grid;gap:12px;width:340px;max-width:calc(100vw - 40px);box-sizing:border-box;padding:16px;border:1px solid #d7cfc4;border-radius:5px;background:#fff;box-shadow:0 12px 30px #25324720;}
+body.desktop-home .joint-filter-panel label {display:flex;align-items:center;justify-content:space-between;gap:8px;color:#253247;}
+body.desktop-home .joint-filter-panel :is(input,select) {box-sizing:border-box;min-width:0;width:132px;min-height:34px;padding:6px;border:1px solid #b9afa4;border-radius:3px;background:#fff;color:#253247;font:inherit;}
+body.desktop-home .joint-filter-panel p {margin:0;color:#514a42;font-size:13px;line-height:1.6;white-space:normal;}
+body.desktop-home .fund-profile-chip-grid {gap:3px;}
+body.desktop-home .fund-profile-chip-grid span {padding:3px 5px;font-size:12px;}
+body.desktop-home .fund-profile-chip-grid b {font-size:11px;color:#514a42;}
+body.desktop-home :is(.fund-list-table small,.fund-list-table .method-note,#fund-list-description,#fund-list-methodology) {font-size:12px;color:#514a42;line-height:1.55;}
+body.desktop-home .list-status-row {flex-wrap:wrap;}
+body.desktop-home #search-result-count {white-space:normal;font-size:13px;color:#253247;line-height:1.6;}
+@media (min-width:761px) {
+ body.compact-home.workbench.desktop-home .list-toolbar {flex-wrap:wrap;}
+ body.compact-home.workbench.desktop-home .decision-filters {flex-wrap:wrap;}
+ body.compact-home.workbench.desktop-home .workspace-intro {padding-top:16px;padding-bottom:10px;}
+ body.desktop-home #fund-categories .section-heading {margin-bottom:10px;}
+}
+@media (max-width:760px) {
+ body.desktop-home .joint-filter-controls {width:100%;}
+ body.desktop-home .joint-filter-panel {position:static;width:100%;max-width:100%;margin-top:8px;box-shadow:none;}
+ body.desktop-home .joint-filter-panel label {flex-wrap:wrap;font-size:13px;}
+ body.desktop-home .home-market-research {margin-inline:16px;padding-inline:12px;}
+ body.desktop-home #search-result-count {flex-basis:100%;}
+}
+
+body.desktop-home .metric-sort-controls {gap:5px;}
+body.desktop-home .metric-sort-controls button {font-size:12px;min-height:28px;padding:2px 4px;}
+
+body.desktop-home #locate-fund-status {padding:10px 12px;border:1px solid #d7cfc4;border-radius:4px;background:#fff;color:#253247;font-size:13px;line-height:1.65;}

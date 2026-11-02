@@ -18,10 +18,10 @@ const SCN={gov:"国债及地方政府债",fin:"金融债",corp:"企业债",cb:"�
 const SKEYS=["gov","fin","corp","cb","bill","absv","cds","othbd","other"];
 /* 大类六项,合计=杠杆率×100(实测 100.00% 相等),不是 100 */
 const AC={bond:"var(--c-bond)",cash:"var(--c-cash)",stk:"var(--c-stk)",
-          othasset:"var(--c-othasset)",fund:"var(--c-fund)",mm:"var(--c-mm)"};
+          othasset:"var(--c-othasset)",fund:"var(--c-fund)",mm:"var(--c-mm)",repo:"#aa78a5"};
 const ACN={bond:"固定收益投资",cash:"现金",stk:"股票",
-           othasset:"其他资产",fund:"基金",mm:"货币市场工具"};
-const AKEYS=["bond","cash","stk","othasset","fund","mm"];
+           othasset:"其他资产",fund:"基金",mm:"货币市场工具",repo:"买入返售"};
+const AKEYS=["bond","cash","stk","repo","othasset","fund","mm"];
 const FACN={level:"利率",slope:"斜率",curve:"凸度",credit:"信用",default:"违约"};
 
 /* ===== 悬浮提示(tooltip) ===== */
@@ -77,17 +77,22 @@ function lineChart(series,opt={}){
   if(opt.floor!=null)ymin=Math.max(ymin,opt.floor);
   if(opt.ceil!=null)ymax=Math.min(ymax,opt.ceil);   // ★2026-08-07:分位图要把量程夹在0~100%
   if(opt.integerTicks){ymin=0;ymax=Math.max(4,Math.ceil(ymax/4)*4);}
+  const navAxis=opt.navDisplay?performanceNavAxis(all.map(fund=>({fund}))):null;
+  if(navAxis){ymin=navAxis.min;ymax=navAxis.max;}
+  const leftTicks=navAxis?navAxis.ticks:Array.from({length:5},(_,i)=>ymin+(ymax-ymin)*i/4);
   const allx=clipped.flatMap(s=>s.points.map(p=>+new Date(p[0]))).concat(clippedRight.flatMap(s=>s.points.map(p=>+new Date(p[0]))));
   const x0f=x0!=null?x0:Math.min(...allx),x1f=x1!=null?x1:Math.max(...allx);
   const X=t=>pl+(x1f===x0f?pw/2:(t-x0f)/(x1f-x0f)*pw),Y=v=>pt+ph-(v-ymin)/(ymax-ymin)*ph;
   const rAll=clippedRight.flatMap(s=>s.points.map(p=>p[1]));
-  const rMin=rAll.length?Math.min(0,...rAll,-0.0001):-0.0001;   // 右轴永远以0为天花板,不留padding
+  const rMin=rAll.length?Math.min(0,...rAll,opt.navDisplay?-0.000001:-0.0001):-0.0001;   // 右轴永远以0为天花板,不留padding
   const YR=v=>pt+(Math.abs(v)/Math.abs(rMin))*ph;
   let svg=`<svg viewBox="0 0 ${w} ${h}" id="svg_${id}">`;
-  for(let i=0;i<=4;i++){const v=ymin+(ymax-ymin)*i/4,y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${opt.pctY?P(v,1):NN(v,opt.dp??2)}</text>`;}
+  for(const v of leftTicks){const y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${opt.navDisplay?navPercentLabel(v,navPercentDigits(navAxis.step)):opt.pctY?P(v,1):NN(v,opt.dp??2)}</text>`;}
   if(ymin<0&&ymax>0){const y=Y(0);svg+=`<line x1="${pl}" y1="${y}" x2="${w-pr}" y2="${y}" stroke="#aeb9c2"/>`;}
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="${opt.refLineColor||"#c0392b"}" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
-  xTicks(x0f,x1f).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
+  const navDates=opt.navDisplay?[...new Set(allx)].sort((a,b)=>a-b):[];
+  const dateTicks=opt.navDisplay?[...new Set(Array.from({length:Math.min(7,navDates.length)},(_,i)=>Math.round(i*(navDates.length-1)/Math.max(1,Math.min(7,navDates.length)-1))))].map(i=>{const dt=new Date(navDates[i]).toISOString().slice(0,10);return [dt,dt];}):xTicks(x0f,x1f);
+  dateTicks.forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
   // 区间带画在最底层(网格之上、折线之下),上沿沿hi正向走、下沿沿lo逆向回来,闭合成多边形
   bands.forEach(b=>{
     if(b.lo.length<2||b.hi.length!==b.lo.length)return;
@@ -96,16 +101,18 @@ function lineChart(series,opt={}){
     svg+=`<polygon points="${up.concat(dn).join(" ")}" fill="${b.color}" fill-opacity="${b.opacity!=null?b.opacity:0.16}" stroke="none"/>`;
   });
   if(rightSeries.length){
-    for(let i=0;i<=4;i++){const v=rMin*i/4,y=YR(v);svg+=`<text x="${w-pr+8}" y="${(y+4).toFixed(1)}" font-size="11" fill="#7b8a98">${P(v,0)}</text>`;}
+    for(let i=0;i<=4;i++){const v=rMin*i/4,y=YR(v);svg+=`<text x="${w-pr+8}" y="${(y+4).toFixed(1)}" font-size="11" fill="#7b8a98">${opt.navDisplay?navPercentLabel(v,navPercentDigits(rMin/4)):P(v,0)}</text>`;}
   }
   clippedRight.forEach(s=>{
-    const pts=s.points.map(p=>[X(+new Date(p[0])),YR(p[1])]);
+    const drawPoints=opt.navDisplay?navExtremaSample(s.points,[1]):s.points;
+    const pts=drawPoints.map(p=>[X(+new Date(p[0])),YR(p[1])]);
     if(!pts.length)return;
     const poly=`${pts[0][0].toFixed(1)},${pt} `+pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")+` ${pts[pts.length-1][0].toFixed(1)},${pt}`;
     svg+=`<polygon points="${poly}" fill="${s.color}" fill-opacity="0.18" stroke="${s.color}" stroke-opacity="0.55" stroke-width="1"/>`;
   });
   clipped.forEach(s=>{
-    const pts=s.points.map(p=>[X(+new Date(p[0])),Y(p[1])]);
+    const drawPoints=opt.navDisplay?navExtremaSample(s.points,[1]):s.points;
+    const pts=drawPoints.map(p=>[X(+new Date(p[0])),Y(p[1])]);
     if(!pts.length)return;
     if(s.fill){svg+=`<path d="${"M"+pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" L")} L${pts[pts.length-1][0].toFixed(1)},${Y(Math.max(ymin,0)).toFixed(1)} L${pts[0][0].toFixed(1)},${Y(Math.max(ymin,0)).toFixed(1)} Z" fill="${s.color}" opacity="0.1"/>`;}
     if(s.sw!==0)svg+=`<path d="${"M"+pts.map((p,i)=>(i?"L":"")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")}" fill="none" stroke="${s.color}" stroke-width="${s.sw||2.6}" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -129,7 +136,7 @@ function lineChart(series,opt={}){
   CHART_GEOM[id]={pl,pr,pt,pb,pw,ph,x0:x0f,x1:x1f};
   lineChart.lastId=id;
   setTimeout(()=>{
-    wireLineChart(id,clipped.concat(clippedRight),{pl,pr,pt,pb,pw,ph,x0:x0f,x1:x1f,pctY:opt.pctY,dp:opt.dp});
+    wireLineChart(id,clipped.concat(clippedRight),{pl,pr,pt,pb,pw,ph,x0:x0f,x1:x1f,pctY:opt.pctY,dp:opt.dp,navDisplay:opt.navDisplay});
     if(opt.slider)wireZoomSlider(id,opt.slider.fullX0,opt.slider.fullX1,opt.slider.onChange);
   },0);
   return `<div class="chart-wrap">${svg}</div>${lg}${slider}`;
@@ -144,7 +151,13 @@ function wireLineChart(id,series,g){
   series.forEach(s=>{if(!s._ts)s._ts=s.points.map(p=>+new Date(p[0]));});
   hit.addEventListener("mousemove",ev=>{
     const r=hit.getBoundingClientRect();
-    const f=Math.max(0,Math.min(1,r.width?(ev.clientX-r.left)/r.width:0));
+    let fraction=r.width?(ev.clientX-r.left)/r.width:0;
+    if(g.navDisplay){
+      const svg=hit.ownerSVGElement,matrix=svg.getScreenCTM();if(!matrix)return;
+      const p=svg.createSVGPoint();p.x=ev.clientX;p.y=ev.clientY;
+      try{fraction=(p.matrixTransform(matrix.inverse()).x-g.pl)/g.pw;}catch{return;}
+    }
+    const f=Math.max(0,Math.min(1,fraction));
     const sx=g.pl+f*g.pw,t=g.x0+f*(g.x1-g.x0);
     vl.setAttribute("x1",sx);vl.setAttribute("x2",sx);vl.setAttribute("opacity","1");
     let bestDate="",bestDist=Infinity;const lines=[];
@@ -154,7 +167,7 @@ function wireLineChart(id,series,g){
         const p=s.points[i];if(p[1]==null)continue;
         const dd=Math.abs(s._ts[i]-t);if(dd<bd){bd=dd;b=p;}
       }
-      if(b){if(bd<bestDist){bestDist=bd;bestDate=b[0];}lines.push(`<span style="color:${s.color}">●</span> ${esc(s.name)}: <b>${g.pctY?P(b[1],1):NN(b[1],g.dp||2)}</b>`);}
+      if(b){if(bd<bestDist){bestDist=bd;bestDate=b[0];}lines.push(`<span style="color:${s.color}">●</span> ${esc(s.name)}: <b>${g.navDisplay?navPercentLabel(b[1],4):g.pctY?P(b[1],1):NN(b[1],g.dp||2)}</b>`);}
     });
     showTT(`<div style="opacity:.75">${esc(bestDate)}</div>${lines.join("<br>")}`,ev);
   });
@@ -350,17 +363,16 @@ function stackArea(rows,keys,opt={}){
   for(let i=0;i<=4;i++){const v=ymax*i/4,y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${v.toFixed(0)}%</text>`;}
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
   xTicks(x0,x1).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
-  let base=rows.map(()=>0);const colors=opt.colors||SC;
-  keys.forEach(k=>{
-    const top=rows.map((r,i)=>base[i]+(r[k]||0));
-    const up=rows.map((r,i)=>[X(xs[i]),Y(top[i])]),dn=rows.map((r,i)=>[X(xs[i]),Y(base[i])]).reverse();
-    svg+=`<path d="M${up.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" L")} L${dn.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" L")} Z" fill="${colors[k]}" opacity="0.85"/>`;
-    base=top;
+  const colors=opt.colors||SC,names=opt.names||SCN;
+  const columns=ReviewCore.stackColumns(rows.map(r=>r.dt),rows.map(r=>keys.map(k=>r[k])),{left:pl,right:w-pr});
+  columns.forEach(c=>{
+    c.bands.forEach(b=>{const k=keys[b.layer];svg+=`<rect data-stack-date="${c.date}" data-stack-layer="${k}" x="${c.x}" y="${Y(b.upper)}" width="${c.width}" height="${Math.max(0,Y(b.lower)-Y(b.upper))}" fill="${colors[k]}" opacity="0.85"><title>${c.date} · ${esc(names[k])} ${NN(b.value,2)}%</title></rect>`;});
+    if(c.status==='unavailable'||c.status==='invalid')svg+=`<rect data-stack-unavailable="${c.date}" x="${c.x}" y="${pt}" width="${c.width}" height="${ph}" fill="none" stroke="#bfa77e" stroke-dasharray="2 3"/>`;
+    svg+=`<circle data-stack-status="${c.status}" cx="${c.center}" cy="${pt+ph+6}" r="2" fill="${c.status==='partial'?'#b58a3c':c.status==='available'?'#91a39f':'#fff'}" stroke="#b58a3c"/>`;
   });
   svg+=`<rect class="hit" id="hit_${id}" x="${pl}" y="${pt}" width="${pw}" height="${ph}" fill="transparent"/>`;
   svg+=`<line id="vl_${id}" x1="${pl}" y1="${pt}" x2="${pl}" y2="${pt+ph}" stroke="#8a99a8" stroke-width="1" opacity="0"/>`;
   svg+=`</svg>`;
-  const names=opt.names||SCN;
   CHART_GEOM[id]={pl,pr,pt,pb,pw,ph,x0,x1,xs};
   stackArea.lastId=id;
   setTimeout(()=>wireStackArea(id,rows,keys,{pl,pr,pt,pb,pw,ph,x0,x1,xs,colors,names}),0);
@@ -374,7 +386,7 @@ function stackArea(rows,keys,opt={}){
     return `<span class="${z?"lg-zero":""}"${z?' title="本基金全期该科目均为 0（科目存在，但该基金未持有）"':""}>`
       +`<i class="sw" style="height:10px;width:10px;border-radius:2px;background:${colors[k]}"></i>${names[k]}`
       +`${lgMissing(k)?"（未披露）":latestMissing(k)?"（本期未披露）":z?"（无）":""}</span>`;
-  }).join("")+`</div>`;
+  }).join("")+`</div><p class="method-note">各柱对应真实报告期，不跨期插值；柱下金色点表示有分项未披露，空框表示该期无有效比例。</p>`;
 }
 function wireStackArea(id,rows,keys,g){
   const hit=document.getElementById("hit_"+id),vl=document.getElementById("vl_"+id);
@@ -564,11 +576,14 @@ function navPerfChart(d){
   const navPts=(d.perf.curve.nav||[]).filter(p=>p[1]!=null);
   if(!navPts.length)return `<div class="method-note">无数据</div>`;
   const fullX0=+new Date(navPts[0][0]),fullX1=+new Date(navPts[navPts.length-1][0]);
-  const resetBtn=navZoom?`<button type="button" class="zoom-reset" data-pb-onclick="resetNavZoom()">↺ 重置缩放（当前 ${esc(new Date(navZoom.x0).toISOString().slice(0,10))} ~ ${esc(new Date(navZoom.x1).toISOString().slice(0,10))}）</button>`:"";
-  return navRangeBar(d)+resetBtn+lineChart([
-    {name:"累计收益",color:"var(--teal)",points:navPts,fill:"var(--teal)",sw:3},
-    {name:"动态回撤",color:"#c06a58",points:d.perf.curve.dd,rightAxis:true}
-  ],{h:220,pctY:true,zero:true,forceX:navZoom,slider:{fullX0,fullX1,onChange:zoomNavPerf}});
+  const selected=navWindowReturns(navPts,navZoom);
+  const actual=selected.nav.length?{x0:+new Date(selected.nav[0][0]),x1:+new Date(selected.nav.at(-1)[0])}:navZoom;
+  const resetBtn=navZoom?`<button type="button" class="zoom-reset" data-pb-onclick="resetNavZoom()">↺ 重置缩放</button>`:"";
+  const note=selected.nav.length?`<div class="method-note">实际区间 ${esc(selected.nav[0][0])} — ${esc(selected.nav.at(-1)[0])}；首日收益归一为0%，回撤从该日起算。全日频数据计算量程和回撤，绘图保留极值。</div>`:`<div class="method-note">所选区间无有效净值</div>`;
+  return navRangeBar(d)+resetBtn+note+lineChart([
+    {name:"区间累计收益",color:"var(--teal)",points:selected.nav,fill:"var(--teal)",sw:3},
+    {name:"区间动态回撤",color:"#c06a58",points:selected.dd,rightAxis:true}
+  ],{h:220,pctY:true,navDisplay:true,forceX:actual,slider:{fullX0,fullX1,onChange:zoomNavPerf}});
 }
 function zoomNavPerf(t0,t1){
   navZoom={x0:t0,x1:t1};
@@ -586,19 +601,22 @@ function refreshNavPerf(){
 }
 let idxZoom=null;   // ★2026-07-30新增:指数对比图的当前缩放区间(null=完整区间)
 function idxCompareChart(d,bucketCode){
-  const lib=window.BOND_INDEX_LIB;
+  const lib=window.BOND_INDEX_LIB,contract=bucketCode==='__contract__'?d.contract_benchmark:null;
   const navPts=(d.perf.curve.nav||[]).filter(p=>p[1]!=null);
-  if(!navPts.length||!lib)return `<div class="method-note">无数据</div>`;
-  const fundStart=navPts[0][0];
-  const idxSeries=lib.series[bucketCode];
-  const idxPts=idxSeries?rebaseIndexToFund(idxSeries.points,fundStart):[];
-  const label=lib.labels[bucketCode]||bucketCode;
-  const fullX0=+new Date(navPts[0][0]),fullX1=+new Date(navPts[navPts.length-1][0]);
-  const resetBtn=idxZoom?`<button type="button" class="zoom-reset" data-pb-onclick="resetIdxZoom()">↺ 重置缩放（当前 ${esc(new Date(idxZoom.x0).toISOString().slice(0,10))} ~ ${esc(new Date(idxZoom.x1).toISOString().slice(0,10))}）</button>`:"";
-  return resetBtn+lineChart([
-    {name:"基金累计收益",color:"var(--teal)",points:navPts,fill:"var(--teal)",sw:3},
-    {name:label+"·中债新综合财富指数",color:"var(--gold)",points:idxPts,sw:2}
-  ],{h:220,pctY:true,zero:true,forceX:idxZoom,slider:{fullX0,fullX1,onChange:zoomIdxCompare}});
+  const rawIndex=contract?.series||window.FUND_COMMON_BENCHMARKS?.benchmarks?.[bucketCode]?.series||(lib?.series?.[bucketCode]?.points||[]).map(([date,value])=>[date,1+Number(value)]);
+  const indexMap=new Map(rawIndex.filter(p=>isFiniteValue(p[1])&&Number(p[1])>0).map(([date,v])=>[date,Number(v)]));
+  const common=navPts.filter(p=>indexMap.has(p[0])).map(([date,value])=>({date,fund:1+Number(value),benchmark:indexMap.get(date)}));
+  if(!common.length)return `<div class="method-note">所选指数与基金无共同有效日期</div>`;
+  const selected=rebaseNavPoints(common.filter(p=>!idxZoom||(+new Date(p.date)>=idxZoom.x0&&+new Date(p.date)<=idxZoom.x1)));
+  if(!selected.length)return `<div class="method-note">所选区间无共同有效日期</div><button type="button" class="zoom-reset" data-pb-onclick="resetIdxZoom()">↺ 重置缩放</button>`;
+  const label=contract?.name||`${lib?.labels?.[bucketCode]||bucketCode}·中债新综合财富指数（研究参照）`;
+  const fullX0=+new Date(common[0].date),fullX1=+new Date(common.at(-1).date);
+  const actual={x0:+new Date(selected[0].date),x1:+new Date(selected.at(-1).date)};
+  const resetBtn=idxZoom?`<button type="button" class="zoom-reset" data-pb-onclick="resetIdxZoom()">↺ 重置缩放</button>`:"";
+  return resetBtn+`<div class="method-note">实际共同区间 ${esc(selected[0].date)} — ${esc(selected.at(-1).date)}；首日归一为0%。</div>`+lineChart([
+    {name:"基金区间收益",color:"var(--teal)",points:selected.map(p=>[p.date,p.fund-1]),fill:"var(--teal)",sw:3},
+    {name:label,color:"var(--gold)",points:selected.map(p=>[p.date,p.benchmark-1]),sw:2}
+  ],{h:220,pctY:true,navDisplay:true,forceX:actual,slider:{fullX0,fullX1,onChange:zoomIdxCompare}});
 }
 function zoomIdxCompare(t0,t1){
   idxZoom={x0:t0,x1:t1};
@@ -613,13 +631,14 @@ function refreshIdxCompare(){
   const sel=document.getElementById("idxBucketSel");
   if(wrap&&CURRENT)wrap.innerHTML=idxCompareChart(CURRENT,sel?sel.value:matchIndexBucket((CURRENT.alloc.duration||[]).slice(-1)[0]&&(CURRENT.alloc.duration||[]).slice(-1)[0].dur));
 }
-function idxNoteText(duration,bucketCode){
-  const lib=window.BOND_INDEX_LIB;
-  const matched=matchIndexBucket(duration);
+function idxNoteText(duration,bucketCode,d=CURRENT){
+  const contract=d?.contract_benchmark;
+  if(bucketCode==='__contract__'&&contract)return `当前优先展示${esc(contract.name)}；来源：${esc(contract.source)}。仅展示合同数据有效覆盖期的共同日期。`;
+  const lib=window.BOND_INDEX_LIB,matched=matchIndexBucket(duration);
   const matchedLabel=lib&&matched?(lib.labels[matched]||matched):"总值";
-  const durTxt=duration!=null?NN(duration,1)+"年":"—";
-  const curLabel=lib&&lib.labels[bucketCode]?lib.labels[bucketCode]:bucketCode;
-  return `指数对比：默认按基金最新久期(${durTxt})自动匹配「${matchedLabel}」期限档的中债新综合财富指数，当前显示「${curLabel}」，可手动切换其他期限档。指数累计收益已按基金成立日重新起算基期。`;
+  const curLabel=lib?.labels?.[bucketCode]||bucketCode;
+  const durDate=(d?.alloc?.duration||[]).slice(-1)[0]?.dt||'日期未记录';
+  return `合同基准：${esc(d?.head?.benchmark||'未记录')}。${contract?'可切换至已核验合同基准。':'暂缺可靠合同基准行情。'}当前为研究参照：按最新披露久期${duration!=null?NN(duration,2)+'年':'缺失'}（${esc(durDate)}）匹配「${esc(matchedLabel)}」，当前「${esc(curLabel)}」；这一最新期限匹配不代表全部历史的合同基准。按所选区间首个共同有效日归一。`;
 }
 
 function sub(title,rightNote,body){
@@ -822,21 +841,21 @@ function peerRankBlock(d){
    按用户要求照算但标灰(.stage-extrap)并在表下注明,不做静默隐藏。 */
 function stageTable(rows){
   if(!rows.length)return `<div class="method-note">阶段表现数据未生成（需重跑 build.py）。</div>`;
-  const dim=(s,html)=>s.short?`<span class="stage-extrap">${html}</span>`:html;
+  const dim=(s,html)=>s.short&&!s.incomplete?`<details class="stage-extrap"><summary>辅助</summary>${html}</details>`:html;
   let tbl=`<div class="rt-wrap"><table class="rt stage-tbl"><thead><tr>
       <th>阶段</th><th>区间</th><th>累计收益</th><th>年化收益</th><th>年化波动</th>
       <th>最大回撤</th><th>Sharpe</th><th>Calmar</th></tr></thead><tbody>`;
   rows.forEach(s=>{
     tbl+=`<tr><td>${esc(s.stage)}</td>
       <td>${s.d0?`<span class="pr-range">${esc(s.d0)} ~ ${esc(s.d1)}</span><br><span class="pr-dim">${s.n} 个净值日</span>`:"—"}</td>
-      <td class="${pcls(s.cum)}">${P(s.cum)}</td>
+      <td class="${pcls(s.cum)}"><strong>${P(s.cum)}</strong></td>
       <td>${dim(s,P(s.ann))}</td>
       <td>${P(s.vol)}</td>
       <td class="${s.mdd!=null?"value-negative":""}">${P(s.mdd)}</td>
       <td>${dim(s,NN(s.sharpe))}</td>
       <td>${dim(s,NN(s.calmar))}</td></tr>`;
   });
-  tbl+=`</tbody></table></div>`;
+  tbl+=`</tbody></table></div><p class="method-note">本表Sharpe：Rf=1.5%/年；通用业绩表Rf=0%/年，不能直接横比。不足年限的收益保留在可得历史；短期年化指标仅作辅助。</p>`;
   return tbl;
 }
 
@@ -849,13 +868,13 @@ function renderPerf(d){
   const durLast=(d.alloc.duration||[]).slice(-1)[0]||{};
   const lib=window.BOND_INDEX_LIB;
   let idxHtml=`<div class="method-note">指数库未加载（缺 data/bond_index_lib.js）</div>`;
-  if(lib){
-    const defBucket=matchIndexBucket(durLast.dur)||lib.total;
-    const codes=[lib.total,...lib.buckets];
-    const opts=codes.map(c=>`<option value="${c}"${c===defBucket?" selected":""}>${esc(lib.labels[c]||c)}</option>`).join("");
+  if(lib||d.contract_benchmark){
+    const defBucket=d.contract_benchmark?"__contract__":matchIndexBucket(durLast.dur)||lib.total;
+    const codes=[...(d.contract_benchmark?["__contract__"]:[]),...(lib?[lib.total,...lib.buckets]:[])];
+    const opts=codes.map(c=>`<option value="${c}"${c===defBucket?" selected":""}>${esc(c==="__contract__"?d.contract_benchmark.name:lib.labels[c]||c)}</option>`).join("");
     idxHtml=`<select class="period" id="idxBucketSel" data-pb-onchange="switchIndexBucket(this.value)">${opts}</select>
       <div id="idxCompareWrap" style="margin-top:12px">${idxCompareChart(d,defBucket)}</div>
-      <div class="method-note" id="idxCompareNote">${idxNoteText(durLast.dur,defBucket)}</div>`;
+      <div class="method-note" id="idxCompareNote">${idxNoteText(durLast.dur,defBucket,d)}</div>`;
   }
   return `<p class="tab-lead">净值走势 · 动态回撤 · 年度表现 · 阶段表现 · 月度表现 · 同类排名 · 指数对比</p>`+
     `${/* ★2026-09-01 版式重排(用户拍板"方案B+c"):
@@ -876,7 +895,7 @@ function renderPerf(d){
 function renderAlloc(d,options={}){
   const style=d.alloc.style||[];
   const assetChart=stackArea(style,AKEYS,{h:220,colors:AC,names:ACN,refLine:100});
-  return sub("资产分布","季度披露 · 占基金净资产",assetChart)+
+  return sub("资产分布","实际报告日期 · 占基金净资产（可超过100%）",assetChart)+
     (options.includeDuration===false?"":sub("日频久期估计","年",`<div id="durkfWrap">${durKFBlock(d)}</div>`));
 }
 
@@ -907,25 +926,34 @@ function renderBondStruct(d){
   const bonds=d.bonds||[];const last=bonds.length?bonds[bonds.length-1]:null;
   let holdHtml=`<div class="method-note">无持仓数据</div>`;
   if(last){
-    const opts=bonds.map((b,i)=>`<option value="${i}"${i===bonds.length-1?" selected":""}>${b.dt}（${b.n}只，合计${NN(b.wt_sum,1)}%）</option>`).join("");
+    const opts=bonds.map((b,i)=>`<option value="${i}"${i===bonds.length-1?" selected":""}>${b.dt}（${b.n}只，全部披露合计${NN(b.wt_sum,1)}%）</option>`).join("");
     holdHtml=`<select class="period" id="bondPeriod" data-pb-onchange="switchBondPeriod(this.value)">${opts}</select><div id="bondTbl" style="margin-top:12px">${bondTable(last)}</div>`;
   }
   let concHtml=`<div class="method-note">无数据</div>`,turnHtml=`<div class="method-note">无数据</div>`;
   if(bonds.length){
-    concHtml=lineChart([{name:"前五大合计占净值",color:"var(--teal)",points:bonds.map(b=>[b.dt,b.wt_sum/100]),fill:"var(--teal)",sw:2.6}],{h:190,pctY:true,dp:1})+
-      `<div class="method-note">前五大债券市值合计占基金净值比例，数值越高说明持仓越集中于少数债券。</div>`;
+    concHtml=lineChart([{name:"可得非ABS债券前五/净资产",color:"var(--teal)",points:bonds.map(b=>[b.dt,disclosedBondTotals(b).top5===null?null:disclosedBondTotals(b).top5/100]),fill:"var(--teal)",sw:2.6}],{h:190,pctY:true,dp:1})+
+      `<div class="method-note">从可得披露中按权重取非ABS债券前五，按基金净资产计算；ABS和全部披露合计单列。未匹配券种不猜分类；不是完整组合集中度。</div>`;
     turnHtml=turnoverChart(bonds)+
-      `<div class="method-note">按报告期统计重仓债券（前五大）中新进/加仓/减仓的只数，以及上期在列、本期消失的疑似清仓只数；反映基金经理每期的调仓活跃度（仅覆盖前五大重仓券，非全部持仓）。</div>`;
+      `<div class="method-note">比较相邻可得披露期的名单和净值权重。披露范围可能含ABS且不完整；新出现/不再出现不代表实际买入/清仓，权重变化也含价格、净值变化。</div>`;
   }
-  return `<p class="tab-lead">券种分布 · 重仓债券（前五大）· 持仓集中度 · 换手率</p>`+
+  return `<p class="tab-lead">券种分布 · 披露债券与ABS · 集中度 · 名单变化</p>`+
     `<div class="two-column">
       ${sub("券种分布","已披露券种占固定收益投资市值（季度）",bondChart+structSummary)}
-      ${sub("重仓债券","按报告期切换 · 前五大",holdHtml)}
+      ${sub("重仓债券","按报告期切换 · 全部可得披露",holdHtml)}
     </div>
     <div class="two-column">
-      ${sub("持仓集中度趋势","前五大债券市值占净值比例（季度）",concHtml)}
-      ${sub("换手率统计","新进/加仓/减仓/清仓 只数（季度）",turnHtml)}
+      ${sub("持仓集中度趋势","可得非ABS债券前五/净资产（季度）",concHtml)}
+      ${sub("披露名单变化","新出现/权重增加/权重减少/不再出现",turnHtml)}
     </div>`;
+}
+function disclosedBondTotals(period) {
+  const rows=period.bonds||[], valid=v=>typeof v==='number'&&Number.isFinite(v);
+  const isABS=b=>b.scode==='100003008'||/资产支持|资产证券化|\bABS\b/i.test([b.sectype,b.scode_nm,b.btype].filter(Boolean).join(' '));
+  const knownBond=b=>!isABS(b)&&(b.bcode==='100003000'||/债|票据|存单/.test([b.sectype,b.btype].filter(Boolean).join(' ')));
+  const sum=xs=>xs.length&&xs.every(b=>valid(b.wt))?xs.reduce((n,b)=>n+b.wt,0):null;
+  const ranked=rows.filter(knownBond).slice().sort((a,b)=>(b.wt??-Infinity)-(a.wt??-Infinity));
+  const unknown=rows.filter(b=>!knownBond(b)&&!isABS(b)).length;
+  return {top5:unknown?null:sum(ranked.slice(0,5)),top5_count:Math.min(5,ranked.length),abs:sum(rows.filter(isABS)),all:sum(rows),unknown};
 }
 function turnoverChart(bonds){
   const rows=bonds.filter(b=>b.turnover_available!==false).map(b=>{
@@ -939,10 +967,10 @@ function turnoverChart(bonds){
     return {dt:b.dt,neu,add,cut,clr:(b.cleared||[]).length};
   });
   return lineChart([
-    {name:"新进",color:"var(--f-curve)",points:rows.map(r=>[r.dt,r.neu])},
-    {name:"加仓",color:"var(--f-level)",points:rows.map(r=>[r.dt,r.add])},
-    {name:"减仓",color:"var(--f-slope)",points:rows.map(r=>[r.dt,r.cut])},
-    {name:"清仓",color:"var(--f-default)",points:rows.map(r=>[r.dt,r.clr])}
+    {name:"新出现于披露",color:"var(--f-curve)",points:rows.map(r=>[r.dt,r.neu])},
+    {name:"披露权重增加",color:"var(--f-level)",points:rows.map(r=>[r.dt,r.add])},
+    {name:"披露权重减少",color:"var(--f-slope)",points:rows.map(r=>[r.dt,r.cut])},
+    {name:"不再出现于披露",color:"var(--f-default)",points:rows.map(r=>[r.dt,r.clr])}
   ],{h:190,dp:0,floor:0,integerTicks:true});
 }
 function bondTable(period){
@@ -971,7 +999,7 @@ function bondTable(period){
       `<td style="font-size:11px">${nat(b)}</td>`+
       `<td style="font-size:11px;color:var(--muted)">${esc(b.issuer||"—")}</td>`+
       `<td><b>${NN(b.wt,2)}%</b></td>`+
-      `<td style="color:var(--muted);font-size:11px">${esc(b.chg||"—")}</td></tr>`
+      `<td style="color:var(--muted);font-size:11px">${esc((b.chg||"—").replace(/疑似新进|新进/g,"新出现于披露").replace(/加仓/g,"披露权重增加").replace(/减仓/g,"披露权重减少").replace(/清仓/g,"不再出现于披露"))}</td></tr>`
   );
   const miss=period.attr_miss?`<b>本页有 ${period.attr_miss} 条持仓未匹配到个券属性</b>（属性列显示「—」）；全样本命中率：持仓行 99.82%、按权重 99.85%，未命中集中在 2024 年后新券。`:"";
   const tail=`</tbody></table></div>`;
@@ -980,7 +1008,8 @@ function bondTable(period){
   const table=values=>head+values.join("")+tail;
   const h=rows.length<=previewRows?table(rows):
     `<div class="research-table-preview" data-table-total="${rows.length}" data-table-preview="${previewRows}" style="--research-table-columns:9">${table(rows.slice(0,previewRows))}<details class="research-table-more"><summary><span class="table-more-closed">展开其余 ${rows.length-previewRows} 条持仓（本期共 ${rows.length} 条）</span><span class="table-more-open">收起明细，仅显示前 ${previewRows} 条持仓</span></summary>${table(rows.slice(previewRows))}</details></div>`;
-  return h+(period.source_note?`<div class="method-note">${esc(period.source_note)} 公告日 ${esc(period.announcement_date||"—")}</div>`:"")+(miss?`<div class="method-note">${miss}</div>`:"");
+  const sums=disclosedBondTotals(period),show=v=>v===null?'—（未取得）':NN(v,2)+'%';
+  return `<div class="method-note">报告期 ${esc(period.dt)}；可得非ABS债券前五/净资产 ${show(sums.top5)}；ABS披露合计/净资产 ${show(sums.abs)}；全部披露合计/净资产 ${show(sums.all)}；券种未匹配 ${sums.unknown}只。名单变化对比相邻可得披露期，不代表实际买卖。</div>`+h+(period.source_note?`<div class="method-note">${esc(period.source_note)} 公告日 ${esc(period.announcement_date||"—")}</div>`:"")+(miss?`<div class="method-note">${miss}</div>`:"");
 }
 
 const CWL={"1m":"近1月","2m":"近2月","3m":"近3月","6m":"近6月","ytd":"今年以来","1y":"近1年","3y":"近3年","5y":"近5年","all":"成立以来"};

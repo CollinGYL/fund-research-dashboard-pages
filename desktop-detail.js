@@ -27,26 +27,39 @@
     const detail = details[code] || Object.values(details).find(item =>
       item.fund?.id === query.get('id') || item.code?.split('.')[0] === query.get('id'));
     const category = detail?.fund?.category;
+    const saved = new URLSearchParams(query.get('list') || '');
+    const validNavScope = value => {
+      if (value === 'latest' || value === 'all') return true;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return false;
+      const date = new Date(value + 'T00:00:00Z');
+      return Number.isFinite(+date) && date.toISOString().slice(0,10) === value;
+    };
+    const navDate = validNavScope(saved.get('navDate')) ? saved.get('navDate')
+      : validNavScope(query.get('navDate')) ? query.get('navDate') : 'latest';
     categories.querySelectorAll('[data-category-link]').forEach(link => {
       const active = link.dataset.categoryLink === category;
       link.classList.toggle('active', active);
       if (active) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
+      const destination = new URLSearchParams({category: link.dataset.categoryLink, view: 'portfolio', navDate});
+      const href = `index.html?${destination}#samples`;
+      if (link.getAttribute('href') !== href) link.setAttribute('href', href);
     });
     if (category && category !== lastCategory) {
       lastCategory = category;
       if (!desktop.matches) categories.querySelector('[aria-current="page"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
     }
-    const saved = new URLSearchParams(query.get('list') || '');
     const allowed = new URLSearchParams();
-    for (const key of ['pool','q','category','period','page','size','subtype','profile','sort','metric','dir','industry','level','view','perPage','scroll','columns','age','data','navDate','industryView']) {
+    for (const key of ['pool','q','category','period','page','size','subtype','profile','sort','metric','dir','industry','level','view','perPage','scroll','columns','age','data','navDate','industryView','filterPeriod','minReturn','maxDrawdown','compare']) {
+      if (key === 'navDate' && !validNavScope(saved.get(key))) continue;
       if (saved.has(key)) allowed.set(key, saved.get(key).slice(0, key === 'q' ? 500 : 200));
     }
     if (!allowed.size) {
       allowed.set('category', category || 'all');
       allowed.set('view', 'portfolio');
-      allowed.set('navDate', 'latest');
+
     }
+    if (!allowed.has('navDate')) allowed.set('navDate', navDate);
     const href = `index.html?${allowed}${allowed.has('scroll') ? '' : '#samples'}`;
     const back = document.querySelector('#detail-return-list');
     if (back && back.getAttribute('href') !== href) back.setAttribute('href', href);
