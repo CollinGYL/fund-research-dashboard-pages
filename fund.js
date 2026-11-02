@@ -7202,6 +7202,11 @@ function startInitialFundRequests(code) {
   return detail;
 }
 
+// Capture deferred-script readiness before fast cached detail requests resolve.
+// The bond index and adapter follow fund.js in the document.
+const bondPresentationReady = document.readyState === 'complete' ? Promise.resolve() :
+  new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+
 if (!fundId && !fundCode) {
   window.location.replace("index.html#samples");
 } else {
@@ -7243,6 +7248,7 @@ if (!fundId && !fundCode) {
         return;
       }
       if (!genericDetail) throw new Error("该基金的净值详情尚未生成");
+      if (['hybrid-bond', 'convertible-bond'].includes(catalogFund.category)) await bondPresentationReady;
       renderGenericFund(catalogFund, genericDetail);
       page.insertAdjacentHTML("afterbegin", FundLifecycle.notice(catalogFund, fundCode));
       bindHistoricalControls();
