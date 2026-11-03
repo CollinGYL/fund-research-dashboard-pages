@@ -51,7 +51,27 @@
     status:invalid?'invalid':!bands.length?'unavailable':missing.length?'partial':total===0?'zero':'available'};
   });
  }
- root.ReviewCore={matches,normalize,scale,dateLabel,stackColumns};
+ // A whole stack shares one availability mask. Never carry an upper band across
+ // a change in a missing lower component, or across an unobserved quarter.
+ function stackAreas(dates,values,{left=0,right=1,maxGapDays=110}={}){
+  if(!(right>left)||!(maxGapDays>0))throw Error('堆积面积图坐标或日期间隔无效');
+  const reports=stackColumns(dates,values,{left,right}),segments=[];let current=null;
+  reports.forEach(r=>{
+   const signature=r.bands.map(b=>b.layer).join(',');
+   if(!r.bands.length){current=null;return;}
+   const previous=current?.reports.at(-1);
+   if(!current||current.signature!==signature||(Date.parse(r.date)-Date.parse(previous.date))/86400000>maxGapDays){
+    current={index:segments.length,signature,reports:[],bands:[]};segments.push(current);
+   }
+   current.reports.push(r);
+  });
+  segments.forEach(s=>{
+   s.start=s.reports[0].date;s.end=s.reports.at(-1).date;
+   s.bands=s.reports[0].bands.map((b,j)=>({layer:b.layer,points:s.reports.map(r=>({date:r.date,x:r.center,...r.bands[j]}))}));
+  });
+  return {reports,segments};
+ }
+ root.ReviewCore={matches,normalize,scale,dateLabel,stackColumns,stackAreas};
  if(typeof module!=='undefined')module.exports=root.ReviewCore;
 })(typeof window==='undefined'?globalThis:window);
 (function(root){

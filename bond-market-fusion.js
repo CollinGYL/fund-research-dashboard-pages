@@ -3,13 +3,23 @@
  'use strict';
  const base=root.BondEquityFusion,index=root.BOND_MARKET_INDEX;
  if(!base||!index)throw new Error('全市场披露索引或权益组件未加载');
- root.BOND_CB_FUSION_INDEX.equity_shards=[...new Set([...(root.BOND_CB_FUSION_INDEX.equity_shards||[]),...index.equity_shards])];
+ function extendDisclosureIndex(){
+  const legacy=root.BOND_CB_FUSION_INDEX;
+  if(!legacy)return false;
+  legacy.equity_shards=[...new Set([...(legacy.equity_shards||[]),...index.equity_shards])];
+  return true;
+ }
+ extendDisclosureIndex();
  const cache=new Map(),isMarket=p=>p?.method_version==='C_all_market_disclosure_1';
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const finite=x=>typeof x==='number'&&Number.isFinite(x),pct=x=>finite(x)?(100*x).toFixed(2)+'%':'—';
  const section=(t,b)=>`<article class="subpanel fusion-section"><h3>${esc(t)}</h3>${b}</article>`;
  const table=(h,r)=>renderTable(h,r,'fusion-table-wrap',12);
  async function load(fund,detail){
+  if(!extendDisclosureIndex()){
+   await loadDataScript('data/fund_dashboard/bond_fusion_index.js','债券披露索引',()=>root.BOND_CB_FUSION_INDEX||null);
+   if(!extendDisclosureIndex())throw new Error('债券披露索引尚未就绪，请重试本页数据');
+  }
   if(!index.payload_hashes[fund?.code])return base.load(fund,detail);
   const present=task=>task.then(p=>base.currentView(p,detail,fund.code));
   if(cache.has(fund.code))return present(cache.get(fund.code));
@@ -17,7 +27,7 @@
   const task=(async()=>{
    if(root.BOND_EQUITY_FUSION?.[fund.code]?.source_payload_sha256!==hash){
     if(root.BOND_EQUITY_FUSION)delete root.BOND_EQUITY_FUSION[fund.code];
-    await loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_equity/${encodeURIComponent(fund.code)}.js?v=${hash.slice(0,16)}`,'全市场披露画像',()=>root.BOND_EQUITY_FUSION?.[fund.code]);
+    await loadDataScript(`data/fund_dashboard/bond_equity/${encodeURIComponent(fund.code)}.js?v=${hash.slice(0,16)}`,'全市场披露画像',()=>root.BOND_EQUITY_FUSION?.[fund.code]);
    }
    const p=root.BOND_EQUITY_FUSION?.[fund.code];
    if(p?.code!==fund.code||p.schema_version!=='bond_cb_equity.v1'||p.source_payload_sha256!==hash||!p.direct_equity||!p.allocation)throw new Error('全市场画像内容版本或结构不匹配');

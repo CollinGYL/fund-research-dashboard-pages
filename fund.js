@@ -80,7 +80,7 @@ function loadDashboardAsset(filename) {
   if (!globalName) return Promise.reject(new Error(`不允许加载未知公共对象：${filename}`));
   if (window[globalName]) return Promise.resolve(window[globalName]);
   if (dashboardAssetPromises.has(filename)) return dashboardAssetPromises.get(filename);
-  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${filename}?v=${DASHBOARD_DATA_VERSION}`, filename, () => {
+  const promise = loadDataScript(`data/fund_dashboard/${filename}?v=${DASHBOARD_DATA_VERSION}`, filename, () => {
     if (!window[globalName]) throw new Error(`${filename} 未生成有效内容`);
     return window[globalName];
   }).catch((error) => { dashboardAssetPromises.delete(filename); throw error; });
@@ -94,7 +94,7 @@ function loadPureBondReferenceAsset(relativePath, ready) {
   }
   if (ready()) return Promise.resolve();
   if (pureBondReferenceAssetPromises.has(relativePath)) return pureBondReferenceAssetPromises.get(relativePath);
-  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${relativePath}?v=${DASHBOARD_DATA_VERSION}`, relativePath, () => {
+  const promise = loadDataScript(`data/fund_dashboard/${relativePath}?v=${DASHBOARD_DATA_VERSION}`, relativePath, () => {
     if (!ready()) throw new Error(`${relativePath} 未生成有效内容`);
   }).catch((error) => { pureBondReferenceAssetPromises.delete(relativePath); throw error; });
   pureBondReferenceAssetPromises.set(relativePath, promise);
@@ -270,7 +270,7 @@ function loadProfileDetails(code) {
   if (!/^\d{6}\.(?:OF|SH|SZ)$/.test(code)) return Promise.reject(new Error("画像基金代码无效"));
   if (window.FUND_PROFILE_DETAILS?.[code]) return Promise.resolve(window.FUND_PROFILE_DETAILS[code]);
   if (profileDetailPromises.has(code)) return profileDetailPromises.get(code);
-  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/profile_details/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, "画像", () => {
+  const promise = loadDataScript(`data/fund_dashboard/profile_details/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, "画像", () => {
     if (!window.FUND_PROFILE_DETAILS?.[code]) throw new Error("画像文件未包含该基金的档案，无法展示画像；净值对比仍可查看");
     const value=window.FUND_PROFILE_DETAILS[code];
     if (value.code!==code || typeof value.status!=="string") throw new Error("画像文件格式异常，请重试");
@@ -1764,8 +1764,8 @@ function convertibleWeightDate(item, history = []) {
 }
 
 function normalizedAssetAllocation(item) {
-  const field=key=>isFiniteValue(item[key])?Math.max(0,Number(item[key])):null;
-  const result={report_date:item.report_date,stock:field('stock_to_nav'),bond:field('bond_to_nav'),cash:field('cash_to_nav'),fund:isFiniteValue(item.fund_to_nav??item.fund)?Math.max(0,Number(item.fund_to_nav??item.fund)):null,repo:field('buyback_sale_to_nav'),other:field('other_to_nav'),leverage:field('leverage'),version_count:item.version_count,version_source:item.version_source,selected_version:item.selected_version};
+  const field=key=>isFiniteValue(item[key])?Number(item[key]):null;
+  const result={report_date:item.report_date,stock:field('stock_to_nav'),bond:field('bond_to_nav'),cash:field('cash_to_nav'),fund:isFiniteValue(item.fund_to_nav??item.fund)?Number(item.fund_to_nav??item.fund):null,repo:field('buyback_sale_to_nav'),other:field('other_to_nav'),leverage:field('leverage'),version_count:item.version_count,version_source:item.version_source,selected_version:item.selected_version};
   const known=['stock','bond','cash','fund','repo','other'].map(key=>result[key]).filter(Number.isFinite);
   result.total=known.length?known.reduce((a,b)=>a+b,0):null;
   result.undisclosed=null;
@@ -1791,17 +1791,19 @@ function renderAssetAllocationAreaChart(history = []) {
     { key: "repo", label: "买入返售", className: "asset-area-repo", color: "#aa78a5" },
     { key: "other", label: "其他资产（资产层级）", className: "asset-area-other" },
   ];
-  const columns = ReviewCore.stackColumns(data.map(r=>r.report_date),data.map(r=>layers.map(layer=>r[layer.key])),{left:margin.left,right:width-margin.right});
-  const areas = columns.map(c=>c.bands.map(b=>{
-    const layer=layers[b.layer];
-    return `<rect data-stack-date="${c.date}" data-stack-layer="${layer.key}" x="${c.x}" y="${y(b.upper)}" width="${c.width}" height="${Math.max(0,y(b.lower)-y(b.upper))}" class="asset-allocation-area ${layer.className}" style="stroke:none;${layer.color?'fill:'+layer.color:''}"><title>${c.date} · ${escapeHTML(layer.label)} ${pct(b.value)}</title></rect>`;
-  }).join('')+(c.status==='unavailable'||c.status==='invalid'?`<rect data-stack-unavailable="${c.date}" x="${c.x}" y="${margin.top}" width="${c.width}" height="${plotBottom-margin.top}" fill="none" stroke="#bfa77e" stroke-dasharray="2 3"/>`:'')+`<circle data-stack-status="${c.status}" cx="${c.center}" cy="${plotBottom+7}" r="2" fill="${c.status==='partial'?'#b58a3c':c.status==='available'?'#91a39f':'#fff'}" stroke="#b58a3c"/>`).join('');
+  const geometry = ReviewCore.stackAreas(data.map(r=>r.report_date),data.map(r=>layers.map(layer=>r[layer.key])),{left:margin.left,right:width-margin.right});
+  const areas = geometry.segments.map(s=>s.bands.map(b=>{
+    const layer=layers[b.layer],tag=`data-stack-layer="${layer.key}" data-stack-start="${s.start}" data-stack-end="${s.end}" data-stack-mask="${s.signature}"`;
+    if(b.points.length===1){const p=b.points[0];return `<circle data-stack-point ${tag} cx="${p.x}" cy="${y(p.upper)}" r="2.5" class="${layer.className}"${layer.color?` fill="${layer.color}"`:''}><title>${p.date} · ${escapeHTML(layer.label)} ${pct(p.value)}</title></circle>`;}
+    const points=[...b.points.map(p=>`${p.x},${y(p.upper)}`),...b.points.slice().reverse().map(p=>`${p.x},${y(p.lower)}`)].join(' ');
+    return `<polygon ${tag} points="${points}" class="asset-allocation-area ${layer.className}" style="stroke:none;${layer.color?'fill:'+layer.color:''}"><title>${s.start} — ${s.end} · ${escapeHTML(layer.label)}</title></polygon>`;
+  }).join('')).join('');
   const ticks = [...axis.ticks].reverse();
   const dateIndexes = chartTickIndexes(data.length, 7);
   return `
     <div class="asset-allocation-legend">${layers.map((layer) => `<span class="${layer.className}"${layer.color?` style="color:${layer.color}"`:""}>${layer.label}</span>`).join("")}</div>
     <div class="asset-allocation-chart-wrap">
-      <svg class="asset-allocation-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="季度资产配置堆积柱图，占基金净值">
+      <svg class="asset-allocation-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="季度资产配置堆叠面积图，占基金净值">
         ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 10}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${pct(tick, 0)}</text>`).join("")}
         ${areas}
         ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 15}" class="chart-axis-label chart-axis-date" text-anchor="${index === 0 ? "start" : index === data.length - 1 ? "end" : "middle"}">${escapeHTML(data[index].report_date.slice(0,4)+' Q'+Math.ceil(Number(data[index].report_date.slice(5,7))/3))}</text>`).join("")}
@@ -1810,7 +1812,7 @@ function renderAssetAllocationAreaChart(history = []) {
       </svg>
       <div class="asset-allocation-hover-card" hidden></div>
     </div>
-    <p class="method-note">横轴按真实报告日期逐柱展示，不跨期插值或补季度；柱下金色点表示有分项未取得，空框表示该期无有效比例。港股属于股票资产的组成部分，不重复堆叠；基金投资使用披露字段，不用差额反推。各分项保留原披露比例；杠杆使合计可能超过100%。缺失分项在悬停明细中记为—。</p>`;
+    <p class="method-note">色带仅连接相同已取得分项的相邻报告期；分项变化或缺季处分段，孤立报告期仅标点。港股属于股票资产的组成部分，不重复堆叠；基金投资使用披露字段，不用差额反推。各分项保留原披露比例；杠杆使合计可能超过100%。缺失分项在悬停明细中记为—。</p>`;
 }
 
 function bindAssetAllocationChart(history = []) {
@@ -3090,7 +3092,7 @@ function researchSummary(fund, detail) {
 function loadResearchSummary(code) {
   const shard = (Number(code.split(".")[0]) % 64).toString(16);
   if (window.FUND_RESEARCH_SUMMARIES?.[shard] || window.FUND_RESEARCH_SUMMARY?.funds?.[code]) return FundLifecycle.loadRanks();
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/research_summaries/${shard}.js?v=${DASHBOARD_DATA_VERSION}`, "基金概览", () => {
+  return loadDataScript(`data/fund_dashboard/research_summaries/${shard}.js?v=${DASHBOARD_DATA_VERSION}`, "基金概览", () => {
     if (!window.FUND_RESEARCH_SUMMARIES?.[shard]?.[code]) throw new Error("该基金概览尚未生成，请稍后重试");
   }).then(() => FundLifecycle.loadRanks());
 }
@@ -3358,7 +3360,7 @@ function loadEquityModelAsset(directory, globalName, code, label, validate = nul
     catch (_) { delete window[globalName][code]; }
   }
   if (equityModelAssetPromises.has(key)) return equityModelAssetPromises.get(key);
-  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${directory}/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, label, read).catch(error => {
+  const promise = loadDataScript(`data/fund_dashboard/${directory}/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, label, read).catch(error => {
     if (window[globalName]) delete window[globalName][code];
     throw error;
   }).finally(() => { equityModelAssetPromises.delete(key); });
@@ -5871,7 +5873,7 @@ function loadHistoricalSizeStyle() {
     return value;
   };
   if (window.FUND_HISTORICAL_SIZE_STYLE) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/historical_size_index_style.js?v=${DASHBOARD_DATA_VERSION}`, '历史大小盘成分', read);
+  return loadDataScript(`data/fund_dashboard/historical_size_index_style.js?v=${DASHBOARD_DATA_VERSION}`, '历史大小盘成分', read);
 }
 
 function holdingTransitionRows(holdingHistory) {
@@ -6051,7 +6053,7 @@ function loadCorrelationMetrics(code) {
   }
   const shardName = `shard-${String(hash % CORRELATION_SHARD_COUNT).padStart(3, "0")}`;
   if (correlationMetricsPromises.has(shardName)) return correlationMetricsPromises.get(shardName);
-  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/correlations/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, "相关性数据", () => {
+  const promise = loadDataScript(`data/fund_dashboard/correlations/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, "相关性数据", () => {
     if (!window.FUND_CORRELATION_METRICS?.funds?.[code]) throw new Error("相关性数据脚本未生成有效内容");
     return window.FUND_CORRELATION_METRICS;
   }).catch((error) => {
@@ -6449,7 +6451,7 @@ function createGenericTabLoader(fund, detail) {
   const pureBondResearch = () => once("pure-bond-research", async () => {
     const [research, result] = await Promise.all([
       loadPureBondResearch(fund.code),
-      loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_share_comparison.js?v=${DASHBOARD_DATA_VERSION}`, "A/C共同日期对比", () => window.FUND_PURE_BOND_SHARE_COMPARISON || null).then(data => ({data})).catch(error => ({error:error.message})),
+      loadDataScript(`data/fund_dashboard/pure_bond_share_comparison.js?v=${DASHBOARD_DATA_VERSION}`, "A/C共同日期对比", () => window.FUND_PURE_BOND_SHARE_COMPARISON || null).then(data => ({data})).catch(error => ({error:error.message})),
     ]);
     if (!research) return null;
     const aligned = result.data?.funds?.[fund.code] || null;
@@ -6467,7 +6469,12 @@ function createGenericTabLoader(fund, detail) {
     const target = document.querySelector(`[data-panel="${id}"]`);
     if (!target) return;
     if (id === "selection" && fund.category === "hybrid-bond") {
-      return await window.FundSelection.mount(target, { currentCode: fund.code, version: DASHBOARD_DATA_VERSION, loader: loadDataScript });
+      if (!window.FundFixedPlus) return await window.FundSelection.mount(target, { currentCode: fund.code, version: DASHBOARD_DATA_VERSION, loader: loadDataScript });
+      target.innerHTML='<div data-fixed-plus-host></div><div data-six-category-selection></div>';
+      const fixedHost=target.querySelector('[data-fixed-plus-host]'),selectionHost=target.querySelector('[data-six-category-selection]');
+      const common={currentCode:fund.code,version:DASHBOARD_DATA_VERSION,loader:loadDataScript};
+      await Promise.all([window.FundFixedPlus.mount(fixedHost,common),window.FundSelection.mount(selectionHost,common)]);
+      return true;
     }
     if (id === "original") {
       target.innerHTML = bondOriginalResearchPanel(fund);
@@ -6675,6 +6682,109 @@ function createGenericTabLoader(fund, detail) {
   };
 }
 
+/* Isolated candidate helper. Saved nonzero cells are reused only at compatible report anchors. */
+function mergePureBondSourceStyle(assets, savedStyle) {
+  const ok = v => typeof v === 'number' && Number.isFinite(v);
+  const pct = v => ok(v) ? v * 100 : null;
+  const saved = new Map((savedStyle || []).map(r => [r.dt, r]));
+  return (assets || []).map(item => {
+    const prior = saved.get(item.date);
+    const compatible = Boolean(prior && ok(prior.bond) && ok(item.bond)
+      && Math.abs(prior.bond - item.bond * 100) <= .011
+      && ok(prior.na) && ok(item.net_asset)
+      && Math.abs(prior.na * 1e8 - item.net_asset) <= 51000);
+    const notes = [];
+    const supplement = (key, direct) => {
+      const newer = pct(direct), older = prior?.[key];
+      // Legacy zero cells did not retain original zero evidence. Never promote them.
+      if (ok(newer)) {
+        if (compatible && ok(older) && older > 0 && Math.abs(newer - older) > .011) {
+          notes.push({key, status:'conflict', saved:older, current:newer});
+          return null;
+        }
+        return newer;
+      }
+      if (compatible && ok(older) && older > 0) {
+        notes.push({key, status:'saved_same_report_nonzero', value:older});
+        return older;
+      }
+      return null;
+    };
+    const explicitScope = item.corporate_bond_basis;
+    const declaredChoice = (item.source || '').startsWith('choice');
+    const currentCorporate = pct(item.corporate_bond);
+    const savedCreditAgrees = compatible && ok(prior.corp) && prior.corp > 0
+      && ok(currentCorporate) && Math.abs(prior.corp - currentCorporate) <= .011;
+    let credit = null, enterprise = null, unscopedCorporate = null;
+    if (explicitScope === 'enterprise_exclusive' || (!explicitScope && declaredChoice)) {
+      enterprise = currentCorporate;
+      if (ok(enterprise)) notes.push({key:'corp',status:'credit_parent_unavailable',
+        enterprise_exclusive:enterprise,source_field:'Choice PRTCORPORATEBONDTONAV'});
+    } else if (explicitScope === 'credit_parent_including_cp_mtn' || (!explicitScope && savedCreditAgrees)) {
+      if (compatible && ok(prior.corp) && prior.corp > 0 && ok(currentCorporate)
+          && Math.abs(prior.corp - currentCorporate) > .011) {
+        notes.push({key:'corp',status:'conflict',saved:prior.corp,current:currentCorporate});
+      } else credit = currentCorporate;
+    } else {
+      unscopedCorporate = currentCorporate;
+      if (ok(currentCorporate)) notes.push({key:'corporate_bond',status:'field_scope_unverified',value:currentCorporate});
+    }
+    return {dt:item.date, gov:pct(item.government_bond), fin:pct(item.financial_bond),
+      corp:credit, enterprise, unscoped_corporate:unscopedCorporate, cb:pct(item.convertible_bond),
+      bill:supplement('bill',item.central_bank_bond), absv:pct(item.abs),
+      cds:supplement('cds',item.deposit_certificate),
+      othbd:supplement('othbd',item.other_bond), other:null, bond:pct(item.bond),
+      cash:pct(item.cash),stk:pct(item.stock),fund:pct(item.fund),
+      othasset:pct(item.other),repo:pct(item.buyback_sale),mm:null,
+      na:ok(item.net_asset)?item.net_asset/1e8:null,
+      lev:ok(item.leverage)?item.leverage:null,
+      component_source_notes:notes};
+  });
+}
+
+/* Add explicit report-anchored denominator types; the frozen V1 mapper remains unchanged. */
+function mergePureBondTypedStyle(assets, savedStyle) {
+  const rows = mergePureBondSourceStyle(assets, savedStyle);
+  const finite = v => typeof v === 'number' && Number.isFinite(v);
+  return rows.map((row, i) => {
+    const item = assets[i], totals = item.bond_denominators;
+    row.enterprise_detail = finite(item.enterprise_bond) ? item.enterprise_bond*100 : null;
+    row.commercial_paper = finite(item.commercial_paper) ? item.commercial_paper*100 : null;
+    row.medium_term_note = finite(item.medium_term_note) ? item.medium_term_note*100 : null;
+    if (finite(item.credit_bond) && item.credit_bond_basis === 'enterprise_plus_cp_plus_mtn') {
+      row.corp = item.credit_bond * 100;
+      row.enterprise = null;
+      row.unscoped_corporate = null;
+      row.component_source_notes.push({key:'corp', status:'explicit_enterprise_cp_mtn_sum',
+        source:item.bond_component_provenance?.source || null});
+    }
+    if (!totals || totals.report_date !== item.date || !finite(item.net_asset)
+        || totals.NAV_CNY !== item.net_asset) return row;
+    const percent = value => finite(value) && value >= 0 ? value * 100 : null;
+    row.bond_total_excluding_abs = percent(totals.bonds_excluding_abs?.NAV_fraction);
+    row.fixed_income_total_including_abs = percent(totals.fixed_income_including_abs?.NAV_fraction);
+    row.bond_denominators = totals;
+    row.bond_denominators_status = 'same_report_typed';
+    return row;
+  });
+}
+
+function pureBondStructureRows(style, basis, keys) {
+  if (!['fixed_income','bonds','nav'].includes(basis)) throw Error('Unknown bond composition basis');
+  const finite = v => typeof v === 'number' && Number.isFinite(v);
+  return style.map(r => {
+    const typed = r.bond_denominators_status === 'same_report_typed';
+    let denominator = basis === 'nav' ? 100 : basis === 'fixed_income'
+      ? (typed ? r.fixed_income_total_including_abs : r.bond)
+      : (typed ? r.bond_total_excluding_abs : finite(r.bond) && finite(r.absv) ? r.bond-r.absv : null);
+    const valid = finite(denominator) && denominator > 0;
+    const out = {dt:r.dt, denominator, denominator_basis:basis, enterprise_detail:r.enterprise_detail, denominator_missing:!valid,
+      known_numerators:keys.filter(k=>finite(r[k])), denominator_status:typed ? 'same_report_typed' : 'legacy_fixed_income'};
+    keys.forEach(k => {out[k] = valid && finite(r[k]) ? r[k]/denominator*100 : null;});
+    return out;
+  });
+}
+
 function refreshPureBondReferenceData(reference, fund, detail, currentDuration) {
   reference.contract_benchmark = verifiedContractBenchmark(detail);
   reference.head.benchmark = fund.benchmark || reference.head.benchmark;
@@ -6770,31 +6880,7 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
     };
   }
 
-  const assetHistory = displayAssetHistory(detail?.asset_history || []).map((item) => {
-    const percent = (value) => isFiniteValue(value) ? Number(value) * 100 : null;
-    const bond = percent(item.bond);
-    return {
-      dt: item.date,
-      gov: percent(item.government_bond),
-      fin: percent(item.financial_bond),
-      corp: percent(item.corporate_bond),
-      cb: percent(item.convertible_bond),
-      bill: null,
-      absv: percent(item.abs),
-      cds: null,
-      othbd: percent(item.other_bond),
-      other: null,
-      bond,
-      cash: percent(item.cash),
-      stk: percent(item.stock),
-      fund: percent(item.fund),
-      othasset: percent(item.other),
-      repo: percent(item.buyback_sale),
-      mm: null,
-      na: isFiniteValue(item.net_asset) ? Number(item.net_asset) / 1e8 : null,
-      lev: isFiniteValue(item.leverage) ? Number(item.leverage) : null,
-    };
-  });
+  const assetHistory = mergePureBondTypedStyle(displayAssetHistory(detail?.asset_history || []), reference.alloc.style || []);
   if (assetHistory.length) {
     reference.alloc.style = assetHistory;
     reference.head.scale = assetHistory.at(-1).na;
@@ -7010,6 +7096,7 @@ function bindPureBondReferenceInteractions() {
     const value = control.value;
     const simple = {
       "switchBondPeriod(this.value)": window.switchBondPeriod,
+      "switchPureBondBasis(this.value)": window.switchPureBondBasis,
       "switchCorrWin(this.value)": window.switchCorrWin,
       "switchFacWin(this.value)": window.switchFacWin,
       "switchIndexBucket(this.value)": window.switchIndexBucket,
@@ -7196,7 +7283,7 @@ function applyDetailNavScope(detail) {
 function loadGenericDetail(code) {
   if (window.FUND_DETAIL_DATA?.[code]) return Promise.resolve().then(() => applyDetailNavScope(window.FUND_DETAIL_DATA[code]));
   if (genericDetailPromises.has(code)) return genericDetailPromises.get(code);
-  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/funds/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 净值详情`, () => {
+  const promise = loadDataScript(`data/fund_dashboard/funds/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 净值详情`, () => {
     if (!window.FUND_DETAIL_DATA?.[code]) throw new Error(`${code} 净值详情未生成有效内容，请重试`);
     return applyDetailNavScope(window.FUND_DETAIL_DATA[code]);
   }).catch((error) => { genericDetailPromises.delete(code); throw error; });
@@ -7208,7 +7295,7 @@ function loadHoldingCharacteristicDates(dates) {
   const unique=[...new Set(dates.filter(Boolean))];
   return Promise.allSettled(unique.map(date=>{
     if(window.FUND_HOLDING_CHARACTERISTICS?.[date])return Promise.resolve();
-    return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`,`${date} 持仓特征`,()=>{
+    return loadDataScript(`data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`,`${date} 持仓特征`,()=>{
       if(!window.FUND_HOLDING_CHARACTERISTICS?.[date])throw new Error(`${date} 持仓特征内容缺失`);
     },'',{maxAttempts:1,timeoutMs:6000});
   })).then(results=>results.map((r,i)=>({date:unique[i],status:r.status,error:r.status==='rejected'?r.reason.message:null})));
@@ -7245,7 +7332,7 @@ function loadGenericHoldingHistory(code) {
     });
   };
   if (window.FUND_HOLDING_HISTORY?.[code]) return loadCharacteristics(window.FUND_HOLDING_HISTORY[code]);
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holdings/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 持仓历史`, () => window.FUND_HOLDING_HISTORY?.[code] || null).then(loadCharacteristics);
+  return loadDataScript(`data/fund_dashboard/holdings/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 持仓历史`, () => window.FUND_HOLDING_HISTORY?.[code] || null).then(loadCharacteristics);
 }
 
 function loadGenericStockPrice(code) {
@@ -7256,7 +7343,7 @@ function loadGenericStockPrice(code) {
     if (window.FUND_STOCK_PRICE_SERIES?.[code]) {
       return Promise.resolve(normalize(window.FUND_STOCK_PRICE_SERIES[code]));
     }
-    return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 股票行情`, () => normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
+    return loadDataScript(`data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 股票行情`, () => normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
   };
   let hash = 2166136261;
   for (let index = 0; index < code.length; index += 1) {
@@ -7272,7 +7359,7 @@ function loadGenericStockPrice(code) {
       normalize({ prices: payload?.prices?.[code] || [] })
     ));
   } else {
-    const shardPromise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_price_updates/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, `股票行情增量 ${shardName}`, () => window.FUND_STOCK_PRICE_UPDATES?.[shardName] || null).catch((error) => {
+    const shardPromise = loadDataScript(`data/fund_dashboard/stock_price_updates/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, `股票行情增量 ${shardName}`, () => window.FUND_STOCK_PRICE_UPDATES?.[shardName] || null).catch((error) => {
       stockPriceUpdatePromises.delete(shardName);
       throw error;
     });
@@ -7302,7 +7389,7 @@ function loadGenericHeavyStockTrends(code, detail) {
     return { ...value, stocks };
   };
   if (window.FUND_HEAVY_STOCK_TRENDS?.[code]) return normalize(window.FUND_HEAVY_STOCK_TRENDS[code]);
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/heavy_stock/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 重仓股走势`, () => window.FUND_HEAVY_STOCK_TRENDS?.[code] || null).then(normalize);
+  return loadDataScript(`data/fund_dashboard/heavy_stock/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 重仓股走势`, () => window.FUND_HEAVY_STOCK_TRENDS?.[code] || null).then(normalize);
 }
 
 function enrichDeepHoldingCharacteristics(analysis) {
@@ -7367,13 +7454,13 @@ function normalizeGenericBondHistory(raw) {
 function loadGenericBondHistory(code) {
   const read = () => { const value = window.FUND_BOND_HISTORY?.[code]; if (!value || !Array.isArray(value.p)) throw new Error(`${code} 债券持仓资料尚未同步就绪，请重试`); return normalizeGenericBondHistory(value); };
   if (window.FUND_BOND_HISTORY?.[code]) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_history/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 债券持仓`, read);
+  return loadDataScript(`data/fund_dashboard/bond_history/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 债券持仓`, read);
 }
 
 function loadPureBondKalmanDuration(code) {
   const read = () => { const value = window.FUND_PURE_BOND_DURATION?.[code]; return value || null; };
   if (window.FUND_PURE_BOND_DURATION?.[code]) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_duration/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 日频久期`, read);
+  return loadDataScript(`data/fund_dashboard/pure_bond_duration/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 日频久期`, read);
 }
 
 function loadPureBondResearch(code) {
@@ -7385,7 +7472,7 @@ function loadPureBondResearch(code) {
   if (pureBondResearchPromises.has(shard)) {
     return pureBondResearchPromises.get(shard).then(() => window.FUND_PURE_BOND_RESEARCH?.[shard]?.[code] || null);
   }
-  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js?v=${DASHBOARD_DATA_VERSION}`, `纯债研究 ${shard}`, () => window.FUND_PURE_BOND_RESEARCH?.[shard] || null).catch((error) => {
+  const promise = loadDataScript(`data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js?v=${DASHBOARD_DATA_VERSION}`, `纯债研究 ${shard}`, () => window.FUND_PURE_BOND_RESEARCH?.[shard] || null).catch((error) => {
     pureBondResearchPromises.delete(shard);
     throw error;
   });
@@ -7396,13 +7483,13 @@ function loadPureBondResearch(code) {
 function loadGenericDocuments(code) {
   const read = () => { const value = window.FUND_DOCUMENTS?.[code]; return value || null; };
   if (window.FUND_DOCUMENTS?.[code]) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/documents/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 公告`, read);
+  return loadDataScript(`data/fund_dashboard/documents/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 公告`, read);
 }
 
 function loadGenericCampisi(code) {
   const read = () => { const value = window.FUND_CAMPISI?.[code]; return value || null; };
   if (window.FUND_CAMPISI?.[code]) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 业绩归因`, read);
+  return loadDataScript(`data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 业绩归因`, read);
 }
 
 function normalizeGenericBrinson(raw) {
@@ -7424,13 +7511,13 @@ function normalizeGenericBrinson(raw) {
 function loadGenericBrinson(code) {
   const read = () => { const value = window.FUND_BRINSON?.[code]; return normalizeGenericBrinson(value); };
   if (window.FUND_BRINSON?.[code]) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/brinson/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} Brinson归因`, read, `${code} Brinson归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
+  return loadDataScript(`data/fund_dashboard/brinson/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} Brinson归因`, read, `${code} Brinson归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
 }
 
 function loadGenericMultiAssetAttribution(code) {
   const read = () => { const value = window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]; return value || null; };
   if (window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]) return Promise.resolve(read());
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}-three-methods-v1`, `${code} 多资产归因`, read, `${code} 多资产归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
+  return loadDataScript(`data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}-three-methods-v1`, `${code} 多资产归因`, read, `${code} 多资产归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
 }
 
 function bindGenericBrinson(brinson) {
@@ -7457,7 +7544,7 @@ async function ensureFundLifecycleData() {
     if (!valid(window.FUND_LIFECYCLE_DATA)) throw new Error("基金状态资料格式不正确，请刷新重试。");
     return window.FUND_LIFECYCLE_DATA;
   }
-  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_lifecycle_overlay.js?v=${DASHBOARD_DATA_VERSION}`, "基金状态资料", () => {
+  return loadDataScript(`data/fund_dashboard/fund_lifecycle_overlay.js?v=${DASHBOARD_DATA_VERSION}`, "基金状态资料", () => {
     if (!valid(window.FUND_LIFECYCLE_DATA)) throw new Error("基金状态资料未能生成有效内容，请重试。");
     return window.FUND_LIFECYCLE_DATA;
   });
