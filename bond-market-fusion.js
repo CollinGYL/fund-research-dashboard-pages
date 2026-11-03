@@ -17,7 +17,7 @@
  const table=(h,r)=>renderTable(h,r,'fusion-table-wrap',12);
  async function load(fund,detail){
   if(!extendDisclosureIndex()){
-   await loadDataScript('data/fund_dashboard/bond_fusion_index.js','债券披露索引',()=>root.BOND_CB_FUSION_INDEX||null);
+   await loadDataScript('https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_fusion_index.js','债券披露索引',()=>root.BOND_CB_FUSION_INDEX||null);
    if(!extendDisclosureIndex())throw new Error('债券披露索引尚未就绪，请重试本页数据');
   }
   if(!index.payload_hashes[fund?.code])return base.load(fund,detail);
@@ -27,7 +27,7 @@
   const task=(async()=>{
    if(root.BOND_EQUITY_FUSION?.[fund.code]?.source_payload_sha256!==hash){
     if(root.BOND_EQUITY_FUSION)delete root.BOND_EQUITY_FUSION[fund.code];
-    await loadDataScript(`data/fund_dashboard/bond_equity/${encodeURIComponent(fund.code)}.js?v=${hash.slice(0,16)}`,'全市场披露画像',()=>root.BOND_EQUITY_FUSION?.[fund.code]);
+    await loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_equity/${encodeURIComponent(fund.code)}.js?v=${hash.slice(0,16)}`,'全市场披露画像',()=>root.BOND_EQUITY_FUSION?.[fund.code]);
    }
    const p=root.BOND_EQUITY_FUSION?.[fund.code];
    if(p?.code!==fund.code||p.schema_version!=='bond_cb_equity.v1'||p.source_payload_sha256!==hash||!p.direct_equity||!p.allocation)throw new Error('全市场画像内容版本或结构不匹配');

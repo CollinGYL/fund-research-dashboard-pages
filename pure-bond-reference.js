@@ -744,7 +744,7 @@ function pbShardFailure(kind,code,label){
   return `<div class="method-note" role="alert"><b>${esc(label)}未能加载。</b>暂时不能据此判断是否有研究结果，未加载不表示数值为零。<br>${esc(error?.message||"请稍后重试。")} <button type="button" class="text-button" data-pb-retry="${kind}" data-pb-code="${esc(code)}">重新加载${esc(label)}</button></div>`;
 }
 function ensureCorrShard(code,cb){
-  loadPBShard("corr",code,"data/fund_dashboard/pb_corr/"+code+".js",()=>{
+  loadPBShard("corr",code,"https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_corr/"+code+".js",()=>{
     const value=window.CORR_SNAP?.[code];return value&&value.windows&&typeof value.windows==="object"?value:null;
   },(value,error)=>cb(!!value,error));
 }
@@ -759,7 +759,7 @@ function durKFData(code){
 }
 function ensureDurKF(code,cb){
   if(!window.DURKF_STORE?.[code]&&window.DURKF_MISS?.[code]){cb(false,null);return;}
-  loadPBShard("durkf",code,"data/fund_dashboard/pb_durkf/"+code+".js",()=>durKFData(code),(value,error)=>cb(!!value,error));
+  loadPBShard("durkf",code,"https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_durkf/"+code+".js",()=>durKFData(code),(value,error)=>cb(!!value,error));
 }
 /* 披露对照只允许同日或最多早四个自然日，与后端评分一致。 */
 function durKFPair(K){
@@ -1427,7 +1427,7 @@ function compareFunds(){
   })):[];
 }
 function ensureCompareFunds(cb){
-  loadPBShard("comparelist","catalog","data/fund_dashboard/fund_catalog.js",()=>{
+  loadPBShard("comparelist","catalog","https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_catalog.js",()=>{
     const funds=compareFunds();return funds.length?funds:null;
   },cb);
 }
@@ -1663,7 +1663,7 @@ function renderCompare(){
     chart;
 }
 function loadCompareFund(code,cb){
-  loadPBShard("fund",code,"data/fund_dashboard/pb_funds/"+code+".js",()=>{
+  loadPBShard("fund",code,"https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_funds/"+code+".js",()=>{
     const value=fundData(code);return value&&value.code===code&&value.head&&value.campisi?value:null;
   },cb);
 }
@@ -1740,7 +1740,7 @@ function loadFund(code){
   let sc=document.querySelector(`script[data-fund="${code}"]`);
   if(!sc){
     sc=document.createElement("script");
-    sc.src="data/fund_dashboard/pb_funds/"+code+".js?v="+Date.now();
+    sc.src="https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pb_funds/"+code+".js?v="+Date.now();
     sc.dataset.fund=code;
     sc.onerror=()=>{sc.dataset.failed="1";};
     document.head.appendChild(sc);

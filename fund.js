@@ -80,7 +80,7 @@ function loadDashboardAsset(filename) {
   if (!globalName) return Promise.reject(new Error(`不允许加载未知公共对象：${filename}`));
   if (window[globalName]) return Promise.resolve(window[globalName]);
   if (dashboardAssetPromises.has(filename)) return dashboardAssetPromises.get(filename);
-  const promise = loadDataScript(`data/fund_dashboard/${filename}?v=${DASHBOARD_DATA_VERSION}`, filename, () => {
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${filename}?v=${DASHBOARD_DATA_VERSION}`, filename, () => {
     if (!window[globalName]) throw new Error(`${filename} 未生成有效内容`);
     return window[globalName];
   }).catch((error) => { dashboardAssetPromises.delete(filename); throw error; });
@@ -94,7 +94,7 @@ function loadPureBondReferenceAsset(relativePath, ready) {
   }
   if (ready()) return Promise.resolve();
   if (pureBondReferenceAssetPromises.has(relativePath)) return pureBondReferenceAssetPromises.get(relativePath);
-  const promise = loadDataScript(`data/fund_dashboard/${relativePath}?v=${DASHBOARD_DATA_VERSION}`, relativePath, () => {
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${relativePath}?v=${DASHBOARD_DATA_VERSION}`, relativePath, () => {
     if (!ready()) throw new Error(`${relativePath} 未生成有效内容`);
   }).catch((error) => { pureBondReferenceAssetPromises.delete(relativePath); throw error; });
   pureBondReferenceAssetPromises.set(relativePath, promise);
@@ -270,7 +270,7 @@ function loadProfileDetails(code) {
   if (!/^\d{6}\.(?:OF|SH|SZ)$/.test(code)) return Promise.reject(new Error("画像基金代码无效"));
   if (window.FUND_PROFILE_DETAILS?.[code]) return Promise.resolve(window.FUND_PROFILE_DETAILS[code]);
   if (profileDetailPromises.has(code)) return profileDetailPromises.get(code);
-  const promise = loadDataScript(`data/fund_dashboard/profile_details/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, "画像", () => {
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/profile_details/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, "画像", () => {
     if (!window.FUND_PROFILE_DETAILS?.[code]) throw new Error("画像文件未包含该基金的档案，无法展示画像；净值对比仍可查看");
     const value=window.FUND_PROFILE_DETAILS[code];
     if (value.code!==code || typeof value.status!=="string") throw new Error("画像文件格式异常，请重试");
@@ -3092,7 +3092,7 @@ function researchSummary(fund, detail) {
 function loadResearchSummary(code) {
   const shard = (Number(code.split(".")[0]) % 64).toString(16);
   if (window.FUND_RESEARCH_SUMMARIES?.[shard] || window.FUND_RESEARCH_SUMMARY?.funds?.[code]) return FundLifecycle.loadRanks();
-  return loadDataScript(`data/fund_dashboard/research_summaries/${shard}.js?v=${DASHBOARD_DATA_VERSION}`, "基金概览", () => {
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/research_summaries/${shard}.js?v=${DASHBOARD_DATA_VERSION}`, "基金概览", () => {
     if (!window.FUND_RESEARCH_SUMMARIES?.[shard]?.[code]) throw new Error("该基金概览尚未生成，请稍后重试");
   }).then(() => FundLifecycle.loadRanks());
 }
@@ -3360,7 +3360,7 @@ function loadEquityModelAsset(directory, globalName, code, label, validate = nul
     catch (_) { delete window[globalName][code]; }
   }
   if (equityModelAssetPromises.has(key)) return equityModelAssetPromises.get(key);
-  const promise = loadDataScript(`data/fund_dashboard/${directory}/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, label, read).catch(error => {
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/${directory}/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, label, read).catch(error => {
     if (window[globalName]) delete window[globalName][code];
     throw error;
   }).finally(() => { equityModelAssetPromises.delete(key); });
@@ -5873,7 +5873,7 @@ function loadHistoricalSizeStyle() {
     return value;
   };
   if (window.FUND_HISTORICAL_SIZE_STYLE) return Promise.resolve(read());
-  return loadDataScript(`data/fund_dashboard/historical_size_index_style.js?v=${DASHBOARD_DATA_VERSION}`, '历史大小盘成分', read);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/historical_size_index_style.js?v=${DASHBOARD_DATA_VERSION}`, '历史大小盘成分', read);
 }
 
 function holdingTransitionRows(holdingHistory) {
@@ -6053,7 +6053,7 @@ function loadCorrelationMetrics(code) {
   }
   const shardName = `shard-${String(hash % CORRELATION_SHARD_COUNT).padStart(3, "0")}`;
   if (correlationMetricsPromises.has(shardName)) return correlationMetricsPromises.get(shardName);
-  const promise = loadDataScript(`data/fund_dashboard/correlations/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, "相关性数据", () => {
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/correlations/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, "相关性数据", () => {
     if (!window.FUND_CORRELATION_METRICS?.funds?.[code]) throw new Error("相关性数据脚本未生成有效内容");
     return window.FUND_CORRELATION_METRICS;
   }).catch((error) => {
@@ -6451,7 +6451,7 @@ function createGenericTabLoader(fund, detail) {
   const pureBondResearch = () => once("pure-bond-research", async () => {
     const [research, result] = await Promise.all([
       loadPureBondResearch(fund.code),
-      loadDataScript(`data/fund_dashboard/pure_bond_share_comparison.js?v=${DASHBOARD_DATA_VERSION}`, "A/C共同日期对比", () => window.FUND_PURE_BOND_SHARE_COMPARISON || null).then(data => ({data})).catch(error => ({error:error.message})),
+      loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_share_comparison.js?v=${DASHBOARD_DATA_VERSION}`, "A/C共同日期对比", () => window.FUND_PURE_BOND_SHARE_COMPARISON || null).then(data => ({data})).catch(error => ({error:error.message})),
     ]);
     if (!research) return null;
     const aligned = result.data?.funds?.[fund.code] || null;
@@ -7283,7 +7283,7 @@ function applyDetailNavScope(detail) {
 function loadGenericDetail(code) {
   if (window.FUND_DETAIL_DATA?.[code]) return Promise.resolve().then(() => applyDetailNavScope(window.FUND_DETAIL_DATA[code]));
   if (genericDetailPromises.has(code)) return genericDetailPromises.get(code);
-  const promise = loadDataScript(`data/fund_dashboard/funds/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 净值详情`, () => {
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/funds/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 净值详情`, () => {
     if (!window.FUND_DETAIL_DATA?.[code]) throw new Error(`${code} 净值详情未生成有效内容，请重试`);
     return applyDetailNavScope(window.FUND_DETAIL_DATA[code]);
   }).catch((error) => { genericDetailPromises.delete(code); throw error; });
@@ -7295,7 +7295,7 @@ function loadHoldingCharacteristicDates(dates) {
   const unique=[...new Set(dates.filter(Boolean))];
   return Promise.allSettled(unique.map(date=>{
     if(window.FUND_HOLDING_CHARACTERISTICS?.[date])return Promise.resolve();
-    return loadDataScript(`data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`,`${date} 持仓特征`,()=>{
+    return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holding_characteristics/${encodeURIComponent(date)}.js?v=${DASHBOARD_DATA_VERSION}`,`${date} 持仓特征`,()=>{
       if(!window.FUND_HOLDING_CHARACTERISTICS?.[date])throw new Error(`${date} 持仓特征内容缺失`);
     },'',{maxAttempts:1,timeoutMs:6000});
   })).then(results=>results.map((r,i)=>({date:unique[i],status:r.status,error:r.status==='rejected'?r.reason.message:null})));
@@ -7332,7 +7332,7 @@ function loadGenericHoldingHistory(code) {
     });
   };
   if (window.FUND_HOLDING_HISTORY?.[code]) return loadCharacteristics(window.FUND_HOLDING_HISTORY[code]);
-  return loadDataScript(`data/fund_dashboard/holdings/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 持仓历史`, () => window.FUND_HOLDING_HISTORY?.[code] || null).then(loadCharacteristics);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/holdings/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 持仓历史`, () => window.FUND_HOLDING_HISTORY?.[code] || null).then(loadCharacteristics);
 }
 
 function loadGenericStockPrice(code) {
@@ -7343,7 +7343,7 @@ function loadGenericStockPrice(code) {
     if (window.FUND_STOCK_PRICE_SERIES?.[code]) {
       return Promise.resolve(normalize(window.FUND_STOCK_PRICE_SERIES[code]));
     }
-    return loadDataScript(`data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 股票行情`, () => normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
+    return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_prices/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 股票行情`, () => normalize(window.FUND_STOCK_PRICE_SERIES?.[code]));
   };
   let hash = 2166136261;
   for (let index = 0; index < code.length; index += 1) {
@@ -7359,7 +7359,7 @@ function loadGenericStockPrice(code) {
       normalize({ prices: payload?.prices?.[code] || [] })
     ));
   } else {
-    const shardPromise = loadDataScript(`data/fund_dashboard/stock_price_updates/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, `股票行情增量 ${shardName}`, () => window.FUND_STOCK_PRICE_UPDATES?.[shardName] || null).catch((error) => {
+    const shardPromise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/stock_price_updates/${shardName}.js?v=${DASHBOARD_DATA_VERSION}`, `股票行情增量 ${shardName}`, () => window.FUND_STOCK_PRICE_UPDATES?.[shardName] || null).catch((error) => {
       stockPriceUpdatePromises.delete(shardName);
       throw error;
     });
@@ -7389,7 +7389,7 @@ function loadGenericHeavyStockTrends(code, detail) {
     return { ...value, stocks };
   };
   if (window.FUND_HEAVY_STOCK_TRENDS?.[code]) return normalize(window.FUND_HEAVY_STOCK_TRENDS[code]);
-  return loadDataScript(`data/fund_dashboard/heavy_stock/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 重仓股走势`, () => window.FUND_HEAVY_STOCK_TRENDS?.[code] || null).then(normalize);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/heavy_stock/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 重仓股走势`, () => window.FUND_HEAVY_STOCK_TRENDS?.[code] || null).then(normalize);
 }
 
 function enrichDeepHoldingCharacteristics(analysis) {
@@ -7454,13 +7454,13 @@ function normalizeGenericBondHistory(raw) {
 function loadGenericBondHistory(code) {
   const read = () => { const value = window.FUND_BOND_HISTORY?.[code]; if (!value || !Array.isArray(value.p)) throw new Error(`${code} 债券持仓资料尚未同步就绪，请重试`); return normalizeGenericBondHistory(value); };
   if (window.FUND_BOND_HISTORY?.[code]) return Promise.resolve(read());
-  return loadDataScript(`data/fund_dashboard/bond_history/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 债券持仓`, read);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/bond_history/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 债券持仓`, read);
 }
 
 function loadPureBondKalmanDuration(code) {
   const read = () => { const value = window.FUND_PURE_BOND_DURATION?.[code]; return value || null; };
   if (window.FUND_PURE_BOND_DURATION?.[code]) return Promise.resolve(read());
-  return loadDataScript(`data/fund_dashboard/pure_bond_duration/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 日频久期`, read);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_duration/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 日频久期`, read);
 }
 
 function loadPureBondResearch(code) {
@@ -7472,7 +7472,7 @@ function loadPureBondResearch(code) {
   if (pureBondResearchPromises.has(shard)) {
     return pureBondResearchPromises.get(shard).then(() => window.FUND_PURE_BOND_RESEARCH?.[shard]?.[code] || null);
   }
-  const promise = loadDataScript(`data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js?v=${DASHBOARD_DATA_VERSION}`, `纯债研究 ${shard}`, () => window.FUND_PURE_BOND_RESEARCH?.[shard] || null).catch((error) => {
+  const promise = loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/pure_bond_research/${encodeURIComponent(shard)}.js?v=${DASHBOARD_DATA_VERSION}`, `纯债研究 ${shard}`, () => window.FUND_PURE_BOND_RESEARCH?.[shard] || null).catch((error) => {
     pureBondResearchPromises.delete(shard);
     throw error;
   });
@@ -7483,13 +7483,13 @@ function loadPureBondResearch(code) {
 function loadGenericDocuments(code) {
   const read = () => { const value = window.FUND_DOCUMENTS?.[code]; return value || null; };
   if (window.FUND_DOCUMENTS?.[code]) return Promise.resolve(read());
-  return loadDataScript(`data/fund_dashboard/documents/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 公告`, read);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/documents/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 公告`, read);
 }
 
 function loadGenericCampisi(code) {
   const read = () => { const value = window.FUND_CAMPISI?.[code]; return value || null; };
   if (window.FUND_CAMPISI?.[code]) return Promise.resolve(read());
-  return loadDataScript(`data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 业绩归因`, read);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/campisi/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} 业绩归因`, read);
 }
 
 function normalizeGenericBrinson(raw) {
@@ -7511,13 +7511,13 @@ function normalizeGenericBrinson(raw) {
 function loadGenericBrinson(code) {
   const read = () => { const value = window.FUND_BRINSON?.[code]; return normalizeGenericBrinson(value); };
   if (window.FUND_BRINSON?.[code]) return Promise.resolve(read());
-  return loadDataScript(`data/fund_dashboard/brinson/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} Brinson归因`, read, `${code} Brinson归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/brinson/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}`, `${code} Brinson归因`, read, `${code} Brinson归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
 }
 
 function loadGenericMultiAssetAttribution(code) {
   const read = () => { const value = window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]; return value || null; };
   if (window.FUND_MULTI_ASSET_ATTRIBUTION?.[code]) return Promise.resolve(read());
-  return loadDataScript(`data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}-three-methods-v1`, `${code} 多资产归因`, read, `${code} 多资产归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/multi_asset_attribution/${encodeURIComponent(code)}.js?v=${DASHBOARD_DATA_VERSION}-three-methods-v1`, `${code} 多资产归因`, read, `${code} 多资产归因未能取得结果，可能尚未生成或网络连接失败，请稍后重试`);
 }
 
 function bindGenericBrinson(brinson) {
@@ -7544,7 +7544,7 @@ async function ensureFundLifecycleData() {
     if (!valid(window.FUND_LIFECYCLE_DATA)) throw new Error("基金状态资料格式不正确，请刷新重试。");
     return window.FUND_LIFECYCLE_DATA;
   }
-  return loadDataScript(`data/fund_dashboard/fund_lifecycle_overlay.js?v=${DASHBOARD_DATA_VERSION}`, "基金状态资料", () => {
+  return loadDataScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_lifecycle_overlay.js?v=${DASHBOARD_DATA_VERSION}`, "基金状态资料", () => {
     if (!valid(window.FUND_LIFECYCLE_DATA)) throw new Error("基金状态资料未能生成有效内容，请重试。");
     return window.FUND_LIFECYCLE_DATA;
   });

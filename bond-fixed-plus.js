@@ -217,9 +217,9 @@ async function load(options={}){
  if(options.payload)return options.payload;
  const loader=options.loader||(typeof loadDataScript==='function'?loadDataScript:null);if(!loader)throw Error('固收+数据加载器未准备好');
  const version=encodeURIComponent(String(options.version||'source20261028'));
- if(!libraryPromise)libraryPromise=loader('data/fund_dashboard/fixed_plus_index.js?v='+version,'固收+样本目录',()=>{const i=root.FUND_FIXED_PLUS_INDEX;if(i?.schema_version!=='fund_fixed_plus_index.v1')throw Error('固收+目录格式不完整');return i;}).catch(e=>{libraryPromise=null;throw e;});
+ if(!libraryPromise)libraryPromise=loader('https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fixed_plus_index.js?v='+version,'固收+样本目录',()=>{const i=root.FUND_FIXED_PLUS_INDEX;if(i?.schema_version!=='fund_fixed_plus_index.v1')throw Error('固收+目录格式不完整');return i;}).catch(e=>{libraryPromise=null;throw e;});
  const index=await libraryPromise,source=resolve(index,options.currentCode);if(!source)return null;
- const proof=index.funds[source];return await loader('data/fund_dashboard/fixed_plus/'+encodeURIComponent(source)+'.js?v='+proof.sha256.slice(0,16),'固收+定位来源快照',()=>{const p=root.FUND_FIXED_PLUS_DATA?.[source];if(p?.code!==source||p.asof!==proof.asof||p.daily?.length!==proof.daily_points||p.quarterly?.length!==proof.quarterly_reports)throw Error('固收+来源快照版本不匹配');return p;});
+ const proof=index.funds[source];return await loader('https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fixed_plus/'+encodeURIComponent(source)+'.js?v='+proof.sha256.slice(0,16),'固收+定位来源快照',()=>{const p=root.FUND_FIXED_PLUS_DATA?.[source];if(p?.code!==source||p.asof!==proof.asof||p.daily?.length!==proof.daily_points||p.quarterly?.length!==proof.quarterly_reports)throw Error('固收+来源快照版本不匹配');return p;});
 }
 async function mount(host,options={}){
  if(!host)return false;mounts.get(host)?.instance?.destroy();const token={};mounts.set(host,{token});

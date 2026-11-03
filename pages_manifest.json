@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-02T22:33:51+08:00",
+  "generatedAt": "2026-11-03T13:53:22+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -21,12 +21,12 @@
       "sha256": "a14f144caee77ff6d579b9e74f0b2789cf37862a61f57652af6359b673dd56c1"
     },
     "bond-complete.js": {
-      "size": 33717,
-      "sha256": "8e992d648ed081f95d8f06973af5a616552e89c522ec6f471f197529288a3f71"
+      "size": 33584,
+      "sha256": "fd271796c4c26e0bffd7fbff8e0268162e65ef95dfe35c8a718074a38a9afa2c"
     },
     "bond-visual-details.js": {
-      "size": 15892,
-      "sha256": "9422360e3ff400b733d6e55a8a085bc79b813512e400d048d45605b551d89a6a"
+      "size": 15697,
+      "sha256": "afe154e13548d26fb984bcb02908b6eb2ba693d97faaaf8d626f0fd75ce47867"
     },
     "bond-visual-abs-evidence.js": {
       "size": 3012,
@@ -77,8 +77,8 @@
       "sha256": "1988206a24e71f6b1b065a8d2d38471fa0ea9dc277d85a46a990b48e26910d2b"
     },
     "bond-market-fusion.js": {
-      "size": 5911,
-      "sha256": "4b7b7478dc1e57fd2f2766f3227d02ef246c7163c77c41ec34d493458bae9b65"
+      "size": 6359,
+      "sha256": "606247a761a06f0b2f3b5ea1e50503992d728b779b300de230b5580663ca9655"
     },
     "bond-methodology.html": {
       "size": 39804,
@@ -90,7 +90,7 @@
     },
     "bond-original-single.html": {
       "size": 729730,
-      "sha256": "f4d3a2d42db7ffd31695829300e09a78e758ab1d500ee2acdaeb34a72ef9e2ae"
+      "sha256": "c23c83bbb2d4f44612e24616e41722080c69e1f1d2a152eee7391237bcdd2103"
     },
     "bond-research.html": {
       "size": 6193,
@@ -102,7 +102,7 @@
     },
     "compare.html": {
       "size": 4798,
-      "sha256": "6c34941c60be79e373b193115c2dba15f89fa214c3740f8e229a040b68e849e7"
+      "sha256": "aae4339928d57a765c13e43ddc29d1033974a71b4846f6e153ba1b3d15b96423"
     },
     "compare.js": {
       "size": 9279,
@@ -141,16 +141,16 @@
       "sha256": "4cdaae05171a55014a4fa18e8f22eb07ac0674a152060cef0ff7eb713350c03c"
     },
     "fund.html": {
-      "size": 5677,
-      "sha256": "ed636786d69967c3e5a0b71866f1e294257c472557bc065e5594d49d3a9c2927"
+      "size": 5815,
+      "sha256": "49602fb9a935c465a851934d19078d64556d6c302f88213d2ba0d0adeebbc16e"
     },
     "fund.js": {
-      "size": 654470,
-      "sha256": "eb6cc185af5f555ec3aaa7b939eb1f06057965a2bc418fef5f57be9cbe4c5e6f"
+      "size": 659970,
+      "sha256": "d615cdf284d2c61f68d5923e54e4105cb4ba0bb88087b58a85b1ee063e413332"
     },
     "index.html": {
       "size": 14161,
-      "sha256": "9f3b02ebd2780f33221fd33c33a9bcae29557a51aa9806f0d053eff07a84b91f"
+      "sha256": "7137452e7e5d254c59479dafc38cda653a991c0db80335d37316d95ac6c99006"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -169,16 +169,16 @@
       "sha256": "c88ab8454792d1365e868e4aafbc101d7114ac495360a8bb24816809e96813a3"
     },
     "pure-bond-reference.js": {
-      "size": 120682,
-      "sha256": "3cf98f4c0892df349b6ea6e172a4aa00bcb1a3d7f84d5d57a0cb0c643864a2ad"
+      "size": 123899,
+      "sha256": "5b86e8dee63b642c1222c156c80835d422da315a913e32fdd2cafb226add33fc"
     },
     "research-core.js": {
       "size": 25703,
       "sha256": "1af044235c2422572bd6b3baac03ae5e397aa2990e7c0f7a7f5d974673979583"
     },
     "review-core.js": {
-      "size": 5224,
-      "sha256": "8f5ba0f103c60066a830309b86604c3d4bf3754039b1c85ad275100b7995eb98"
+      "size": 6301,
+      "sha256": "e2cc25dfcdfec7f56ca63917602067c1b4651fd401608abba8d57e9428cf555a"
     },
     "review.css": {
       "size": 30181,
@@ -227,6 +227,14 @@
     "fund-benchmarks.js": {
       "size": 2938,
       "sha256": "66c4412571e67ae40a483b4ac8e80d983a547e831dda70957dc47e97d251df0e"
+    },
+    "bond-fixed-plus.js": {
+      "size": 30144,
+      "sha256": "7f82db5fa514bd397a77f67dbf11e1cb31e9f3d0d538ca2d55d65ec6d3dde8e6"
+    },
+    "bond-fixed-plus.css": {
+      "size": 3049,
+      "sha256": "15255a9c1e93517be3965fff14c9e1297152c03c9a903673cded20a37983e1cc"
     }
   },
   "pathReplacements": {
@@ -244,7 +252,7 @@
     "bond-lab-pit.html": 0,
     "bond-lab-threshold.html": 0,
     "bond-market-comparison.js": 1,
-    "bond-market-fusion.js": 1,
+    "bond-market-fusion.js": 2,
     "bond-methodology.html": 0,
     "bond-original-hybrid.html": 0,
     "bond-original-single.html": 0,
@@ -269,6 +277,7 @@
     "warm-performance.js": 1,
     "bond-advanced-pack.js": 0,
     "bond-advanced-integration.js": 1,
-    "fund-benchmarks.js": 1
+    "fund-benchmarks.js": 1,
+    "bond-fixed-plus.js": 2
   }
 }
