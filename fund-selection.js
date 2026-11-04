@@ -4,7 +4,7 @@
 const mounts=new WeakMap();
 let mountSeq=0;
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const P=(v,d=2)=>Number.isFinite(v)?(v*100).toFixed(d)+'%':'—';
+const P=(v,d=2)=>root.FundResearch.percent(v,d);
 function representative(library,code,siteAliases={}){
   // Prefer the exact supplied share's product mapping; site aliases are display only.
   let seen=new Set();
@@ -53,15 +53,18 @@ function selectionScatter(rows){
  if(!rows.length)return '<p class="method-note">当前类别／搜索条件下没有满足区间数据要求的基金。</p>';
  const p=library.windows[selectionWindow],id=__chartSeq++,w=920,h=460,pl=65,pr=22,pt=20,pb=48,pw=w-pl-pr,ph=h-pt-pb;
  const xs=rows.map(r=>r.ann),ys=rows.map(r=>r.vol);
- let xmin=Math.min(0,...xs),xmax=Math.max(0,...xs),ymin=0,ymax=Math.max(...ys);
- let pad=(xmax-xmin)*.06||.01;xmin-=pad;xmax+=pad;ymax=ymax*1.08||.01;
+ const xAxis=root.FundResearch.displayAxis(xs,{includeZero:true,steps:5}),yAxis=root.FundResearch.displayAxis(ys,{includeZero:true,floor:0,steps:5});
+ const {min:xmin,max:xmax}=xAxis,{min:ymin,max:ymax}=yAxis;
+ const xDigits=root.FundResearch.percentDigits(xAxis.step),yDigits=root.FundResearch.percentDigits(yAxis.step);
+ const tickLabel=(v,d)=>{const n=Number((v*100).toFixed(d));return (n===0?0:n).toFixed(d)+'%';};
  const X=v=>pl+(v-xmin)/(xmax-xmin)*pw,Y=v=>pt+ph-(v-ymin)/(ymax-ymin)*ph;
  const lib=library,current=lib.aliases[CURRENT?.code]||CURRENT?.code;
  let svg='<svg id="selectionSvg_'+id+'" viewBox="0 0 '+w+' '+h+'" role="group" aria-label="基金年化收益率与年化波动率散点图" data-selection-scatter="true" data-count="'+rows.length+'" data-x-min="'+xmin+'" data-x-max="'+xmax+'" data-y-max="'+ymax+'">';
- for(let i=0;i<=5;i++){
-  const xv=xmin+(xmax-xmin)*i/5,yv=ymax*i/5,x=X(xv),y=Y(yv);
-  svg+='<line x1="'+pl+'" y1="'+y+'" x2="'+(w-pr)+'" y2="'+y+'" stroke="#e1e8ec"/><text x="'+(pl-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="12" fill="#7b8a98">'+P(yv,1)+'</text>';
-  if(Math.abs(x-X(0))>42)svg+='<text x="'+x+'" y="'+(h-25)+'" text-anchor="middle" font-size="12" fill="#7b8a98">'+P(xv,1)+'</text>';
+ for(const yv of yAxis.ticks){const y=Y(yv);
+  svg+='<line x1="'+pl+'" y1="'+y+'" x2="'+(w-pr)+'" y2="'+y+'" stroke="#e1e8ec"/><text data-selection-y-tick x="'+(pl-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="12" fill="#7b8a98">'+tickLabel(yv,yDigits)+'</text>';
+ }
+ for(const xv of xAxis.ticks){const x=X(xv);
+  if(xv!==0&&Math.abs(x-X(0))>42)svg+='<text data-selection-x-tick x="'+x+'" y="'+(h-25)+'" text-anchor="middle" font-size="12" fill="#7b8a98">'+tickLabel(xv,xDigits)+'</text>';
  }
  const zero=X(0);svg+='<line data-selection-zero="true" x1="'+zero+'" y1="'+pt+'" x2="'+zero+'" y2="'+(pt+ph)+'" stroke="var(--navy)" stroke-width="1.5" stroke-dasharray="5 4"/><line x1="'+zero+'" y1="'+(pt+ph)+'" x2="'+zero+'" y2="'+(pt+ph+6)+'" stroke="var(--navy)"/><circle data-selection-zero-dot="true" cx="'+zero+'" cy="'+(pt+ph)+'" r="3.7" fill="var(--navy)"/><text data-selection-zero-label="true" x="'+zero+'" y="'+(h-25)+'" text-anchor="middle" font-size="12" font-weight="700" fill="var(--navy)">0%</text>';
  svg+='<text x="'+(pl+pw/2)+'" y="'+(h-4)+'" text-anchor="middle" font-size="13" fill="var(--navy)">年化收益率（%）</text><text transform="translate(16 '+(pt+ph/2)+') rotate(-90)" text-anchor="middle" font-size="13" fill="var(--navy)">年化波动率（%）</text>';

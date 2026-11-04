@@ -812,17 +812,24 @@ function industryHeatmap(periods,topN=12){
   periods.forEach(p=>p.rows.forEach(r=>{if(!maxByName.has(r.name)||r.wt>maxByName.get(r.name))maxByName.set(r.name,r.wt);}));
   const top=[...maxByName.entries()].sort((a,b)=>b[1]-a[1]).slice(0,topN).map(x=>x[0]);
   const cap=Math.max(...top.map(nm=>maxByName.get(nm)),0.01);
+  const label=wt=>{
+    if(wt===null)return "—";
+    if(wt===0)return "0.0%";
+    let digits=1;while(digits<12&&Number(wt.toFixed(digits))===0)digits++;
+    return Number(wt.toFixed(digits))===0?`${wt<0?"−":""}<0.000000000001%`:`${wt.toFixed(digits)}%`;
+  };
   let h=`<div style="overflow-x:auto"><table class="hm"><thead><tr><th style="text-align:left">行业</th>`+
     periods.map(p=>`<th>${esc(p.dt.slice(2,7))}</th>`).join("")+`</tr></thead><tbody>`;
   top.forEach(nm=>{
     h+=`<tr><td class="y" style="text-align:left;white-space:nowrap">${esc(nm)}</td>`;
     periods.forEach(p=>{
-      const wt=(p.rows.find(r=>r.name===nm)||{}).wt||0;
-      h+=`<td style="background:${weightHeatColor(wt,cap)}" title="${esc(nm)} ${p.dt} ${wt.toFixed(2)}%">${wt>=0.05?wt.toFixed(1):""}</td>`;
+      const row=p.rows.find(r=>r.name===nm);
+      const wt=typeof row?.wt==="number"&&Number.isFinite(row.wt)?row.wt:null;
+      h+=`<td style="background:${weightHeatColor(wt,cap)}" title="${esc(nm)} ${p.dt} ${esc(wt===null?"该口径没有披露值":label(wt))}">${esc(label(wt))}</td>`;
     });
     h+=`</tr>`;
   });
-  h+=`</tbody></table></div><div class="method-note">按各行业历史最大权重取前${topN}名；色深=权重（自适应上限约${cap.toFixed(1)}%）；空白=该期权重&lt;0.05%或未持有。横向可滚动查看全部披露期。</div>`;
+  h+=`</tbody></table></div><div class="method-note">在当前所选披露口径内，按各行业历史最大权重取前${topN}名；数值=持仓市值占基金净资产比例（%NAV），列=报告期；色深=权重（自适应上限约${cap.toFixed(1)}%）。0.0%为已披露的零值，—为该口径没有披露值；微小非零值增加小数位显示。横向可滚动查看全部披露期。</div>`;
   return h;
 }
 /* 行业集中度HHI: 用当期已识别行业结构的相对占比算赫芬达尔指数,不受股票仓位整体大小影响 */

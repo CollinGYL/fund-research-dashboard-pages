@@ -34,6 +34,80 @@
     }
     return [...periods.values()].sort((a, b) => (a.report_date || a.d).localeCompare(b.report_date || b.d));
   };
+  // Exchange-qualified comparison keys. HKEX numeric tickers use five digits;
+  // exchange suffixes are retained, so an A share never merges into its H share.
+  const securityKey = value => {
+    const code=String(value || '').trim().toUpperCase(),hk=code.match(/^(\d{1,5})\.HK$/);
+    return hk ? `${hk[1].padStart(5,'0')}.HK` : code;
+  };
+  const securityAliases = value => {
+    const raw=String(value || '').trim().toUpperCase(),key=securityKey(raw),hk=key.match(/^(\d{5})\.HK$/);
+    return [...new Set([raw,key,...(hk?[`${String(Number(hk[1])).padStart(4,'0')}.HK`]:[])])];
+  };
+  const securityValue = (values,code) => securityAliases(code).map(k=>values?.[k]).find(v=>v!==undefined);
+  const normalizeHoldingPeriods = rows => {
+    const names=new Map();
+    for(const p of rows || [])for(const h of p.holdings || [])if(h.name && securityKey(h.name)!==securityKey(h.code) && !/\.(SH|SZ|BJ|HK)$/i.test(h.name))names.set(securityKey(h.code),h.name);
+    let previous=null,previousScope=null;
+    return selectReportVersions(rows).map(p=>{
+      const groups=new Map();
+      for(const h of p.holdings || []){
+        const key=securityKey(h.code),row={...h,source_code:h.source_code || h.code,code:key,name:names.get(key) || h.name};
+        if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);
+      }
+      const conflicts=[],holdings=[];
+      for(const [key,sourceRows] of groups){
+        const first=sourceRows[0],same=sourceRows.every(h=>['weight','quantity','position_market_value_cny','float_share_percent'].every(k=>(h[k]??null)===(first[k]??null)));
+        if(!same){conflicts.push({key,source_codes:sourceRows.map(h=>h.source_code)});holdings.push(...sourceRows.map(h=>({...h,security_key:key,security_conflict:true})));}
+        else holdings.push({...first,source_codes:[...new Set(sourceRows.flatMap(h=>h.source_codes || [h.source_code]))]});
+      }
+      const sourceState=p.source_comparison_state || {comparison_status:p.comparison_status || null,comparable:typeof p.comparable==='boolean'?p.comparable:null};
+      const sourceBlocked=sourceState.comparable===false || Boolean(sourceState.comparison_status && !['comparable','available'].includes(sourceState.comparison_status));
+      const validWeights=holdings.length>0 && holdings.every(h=>typeof h.weight==='number' && Number.isFinite(h.weight) && h.weight>=0);
+      const explicitZero=holdings.length===0 && (p.zero_stock_verified===true || p.equity_meta?.status==='not_applicable_zero_stock' || p.equity_meta?.stock_weight_nav===0);
+      const totalStatus=conflicts.length?'security_conflict':validWeights?'available':explicitZero?'confirmed_zero':holdings.length?'missing_or_invalid_weights':'unverified_empty';
+      const totalWeight=conflicts.length?null:validWeights?holdings.reduce((sum,h)=>sum+h.weight,0):explicitZero?0:null;
+      const usable=!conflicts.length && (validWeights || explicitZero) && !sourceBlocked;
+      const scope=p.scope || p.disclosure_scope || 'same_input_series';
+      const comparable=Boolean(previous && usable && previousScope===scope),current=new Map(holdings.map(h=>[securityKey(h.code),h]));
+      const entered=comparable?[...current].filter(([k])=>!previous.has(k)).map(([,h])=>({code:h.code,name:h.name})):[];
+      const exited=comparable?[...previous].filter(([k])=>!current.has(k)).map(([,h])=>({code:h.code,name:h.name})):[];
+      const status=conflicts.length?'not_computed_security_conflict':sourceBlocked?(sourceState.comparison_status || 'not_computed_incomparable_disclosure'):!usable?'not_computed_'+totalStatus:previous && previousScope!==scope?'not_computed_scope_changed':comparable?'comparable':'not_computed_no_previous';
+      const result={...p,holdings,holding_count:groups.size,total_weight:totalWeight,total_weight_status:totalStatus,holdings_usable:usable,security_conflicts:conflicts,entered,exited,source_comparison_state:{...sourceState},comparison_status:status,comparable,change_counts:{entered:comparable?entered.length:null,exited:comparable?exited.length:null}};
+      previous=usable?current:null;previousScope=usable?scope:null;return result;
+    });
+  };
+  // Same selection tuple as scripts/report_semantics.py. Keep original ledgers.
+  const selectReportVersions = (rows=[],knownOn=null) => {
+    const groups=new Map(),cutoff=knownOn?knownOn+'T23:59:59.999999':null;
+    for(const row of rows){
+      const date=row.date || row.report_date || row.d;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date || ''))continue;
+      const parsed=Date.parse(date+'T00:00:00Z');if(!Number.isFinite(parsed)||new Date(parsed).toISOString().slice(0,10)!==date)continue;
+      const available=row.available_at || row.announcement_date || row.a || date;
+      if(knownOn && (date>knownOn || available>cutoff))continue;
+      if(!groups.has(date))groups.set(date,[]);groups.get(date).push(row);
+    }
+    const key=row=>{const available=row.available_at || row.announcement_date || row.a || row.date || row.report_date || row.d;return [available,row.acquired_at || available,row.content_sha256 || row.selected_version || ''].join('|');};
+    return [...groups].sort(([a],[b])=>a.localeCompare(b)).map(([date,versions])=>{
+      const ordered=[...versions].sort((a,b)=>key(a).localeCompare(key(b)));
+      const stable=v=>Array.isArray(v)?v.map(stable):v&&typeof v==='object'?Object.fromEntries(Object.keys(v).sort().map(k=>[k,stable(v[k])])):v;
+      for(let i=1;i<ordered.length;i++)if(key(ordered[i])===key(ordered[i-1])&&JSON.stringify(stable(ordered[i]))!==JSON.stringify(stable(ordered[i-1])))throw new Error('同一报告版本凭据存在冲突，待核：'+date);
+      const row=ordered.at(-1);
+      return {...row,report_date:date,version_count:Math.max(row.version_count || 1,versions.length),selected_version:row.content_sha256 || row.selected_version || null,version_source:row.source || row.version_source || '既有历史缓存（未附版本凭据）'};
+    });
+  };
+  const durationInfo = fund => {
+    const d=fund?.duration || {},verified=d.verified===true;
+    return {value:finite(d.value)?Number(d.value):null,report_date:d.report_date || null,source:d.source || null,verified,verification:verified?'已核净资产分母 · 原报告利率敏感性':'现有披露字段 · 分母待逐只核验',comparable:verified};
+  };
+  const bondChangeCounts = period => {
+    const comparable=period?.comparison_status==='comparable';
+    return {comparable,entered:comparable?(period.holdings || []).filter(h=>h.change==='新进').length:null,added:comparable?(period.holdings || []).filter(h=>h.change==='加仓').length:null,reduced:comparable?(period.holdings || []).filter(h=>h.change==='减仓').length:null,exited:comparable?(period.exited || []).length:null};
+  };
+  // Transformation date is verified; each predecessor-period amount is not.
+  const predecessorInfo = fund => fund?.code==='025154.OF'?{code:'970072.OF',name:'华安证券合赢添利债券型集合资产管理计划',transition_date:'2025-10-21',status:'transition_verified_amounts_pending',source_url:'https://pdf.dfcfw.com/pdf/H2_AN202608311828782846_1.pdf',source_label:'2026年中报第17–18页（6.4.1）',source_sha256:'4eb4246dda763e5fd6b86dcfe83f4c72dd41dd1e3490b9a1f4157c357d505ca2'}:null;
+  const assetPhase = (fund,date) => {const p=predecessorInfo(fund);return p?(date<p.transition_date?'前身阶段 · '+p.code:'当前合同阶段 · '+fund.code):null;};
   const quarterLag = (date, reference) => {
     if (!date || !reference) return null;
     const q = s => Number(s.slice(0, 4)) * 4 + Math.floor((Number(s.slice(5, 7)) - 1) / 3);
@@ -62,7 +136,32 @@
     if (comparisons>=2) return {label:'现任经理画像资料待核实',reason:'已有至少2段完整持仓比较记录，画像所需的其余数据仍待核实。'};
     return {label:'行为画像数据待积累',reason:'当前经理组合的数据还不够，暂时不能生成稳定的行为画像。',sample:`现任经理组合已有${reports}次完整持仓披露、${comparisons}段可比较的持仓变化。`,detail:'行为画像需要同一经理组合至少2段有效的完整持仓比较记录。完整持仓来自半年报和年报，季度前十大不计入完整持仓。'};
   };
-  const api = { finite, monthStart, range, weekly, uniquePeriods, quarterLag, peerWindow, shareInfo, portfolioName, representativeShare, shareSearchText, profileAvailability };
+  // Display-only helpers shared by list, details, comparison and side charts.
+  const percentDigits = step => Math.min(12, Math.max(2, Math.ceil(-Math.log10(Math.abs(step || 1) * 100)) + 1));
+  function percent(value, digits = 2, signed = false, { preserveSmall = false } = {}) {
+    if (!finite(value)) return '—';
+    const number = Number(value) * 100;
+    if (number === 0) return '0%';
+    let precision = Math.min(12, Math.max(0, digits));
+    if (preserveSmall) while (precision < 12 && Number(number.toFixed(precision)) === 0) precision++;
+    if (Number(number.toFixed(precision)) === 0) return preserveSmall ? `${number < 0 ? '−' : signed ? '+' : ''}<0.000000000001%` : '0%';
+    return `${signed && number > 0 ? '+' : ''}${number.toFixed(precision)}%`;
+  }
+  function displayAxis(values, { includeZero = false, floor = null, steps = 4 } = {}) {
+    const data = values.filter(finite).map(Number);
+    if (!data.length) return { min: 0, max: 1, ticks: [], step: 1, digits: 2 };
+    const low = Math.min(...data, ...(includeZero ? [0] : [])), high = Math.max(...data, ...(includeZero ? [0] : [])), center = (low + high) / 2;
+    const span = high > low ? Math.max(high - low, Math.abs(center) * 1e-8, 1e-10) : Math.max(Math.abs(center) * 0.002, 0.0001);
+    const min = floor === null ? center - span * 0.6 : Math.max(floor, center - span * 0.6);
+    const max = Math.max(center + span * 0.6, min + span * 0.1);
+    const rough = (max - min) / steps, power = 10 ** Math.floor(Math.log10(rough));
+    const multiple = [1, 2, 2.5, 5, 10].find(value => value * power >= rough), step = multiple * power;
+    const digits = Math.min(12, Math.max(2, -Math.floor(Math.log10(step)) + (multiple === 2.5 ? 1 : 0)));
+    const ticks = [];
+    for (let i = Math.ceil(min / step); i * step <= max + step * 1e-9; i++) ticks.push(Number((i * step).toPrecision(12)));
+    return { min, max, ticks, step, digits };
+  }
+  const api = { percent, percentDigits, displayAxis, finite, monthStart, range, weekly, uniquePeriods, quarterLag, peerWindow, shareInfo, portfolioName, representativeShare, shareSearchText, profileAvailability, securityKey, securityAliases, securityValue, normalizeHoldingPeriods, selectReportVersions, durationInfo, bondChangeCounts, predecessorInfo, assetPhase };
   root.FundResearch = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -132,16 +231,19 @@
     const scales=(dual?[0,1]:[0]).map(axis=>{
       const v=series.filter(s=>s.axis===axis).flatMap(s=>s.points).map(p=>p[1]).filter(Number.isFinite);const a=root.ReviewCore.scale(v);return [a.min,a.max];
     });
+    const tickDigits=scales.map(([min,max])=>Math.min(12,Math.max(2,Math.ceil(-Math.log10(Math.abs((max-min)/4)||1))+1)));
+    const tickLabel=(value,axis)=>{const rounded=Number(value.toFixed(tickDigits[axis]));return (rounded===0?0:rounded).toFixed(tickDigits[axis]);};
     const Y=(v,i)=>T+(1-(v-scales[i][0])/(scales[i][1]-scales[i][0]))*(H-T-B);
     let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(series.map(s=>s.label).join('与'))}" tabindex="0">`;
     for(let i=0;i<=4;i++){
       const y=T+(H-T-B)*i/4;
-      svg+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#e3eaf1"/><text x="${L-8}" y="${y+4}" text-anchor="end">${fmt(scales[0][1]-(scales[0][1]-scales[0][0])*i/4)}</text>`;
-      if(dual)svg+=`<text x="${W-R+8}" y="${y+4}">${fmt(scales[1][1]-(scales[1][1]-scales[1][0])*i/4)}</text>`;
+      svg+=`<line x1="${L}" x2="${W-R}" y1="${y}" y2="${y}" stroke="#e3eaf1"/><text x="${L-8}" y="${y+4}" text-anchor="end">${tickLabel(scales[0][1]-(scales[0][1]-scales[0][0])*i/4,0)}</text>`;
+      if(dual)svg+=`<text x="${W-R+8}" y="${y+4}">${tickLabel(scales[1][1]-(scales[1][1]-scales[1][0])*i/4,1)}</text>`;
     }
     svg+=`<text x="${L}" y="14">${esc(series[0].unit)}</text>${dual?`<text x="${W-R}" y="14" text-anchor="end">${esc(rightUnit||series.find(s=>s.axis===1).unit)}</text>`:''}`;
-    const dateTicks=W<600?2:4;
-    for(let i=0;i<=dateTicks;i++){const n=Math.round((days.length-1)*i/dateTicks),d=days[n];svg+=`<text x="${X(d)}" y="${H-9}" text-anchor="${i===0?'start':i===dateTicks?'end':'middle'}">${esc(d)}</text>`;}
+    const dateTicks=Math.min(days.length,W<600?3:5);
+    const dateIndexes=[...new Set(Array.from({length:dateTicks},(_,i)=>Math.round((days.length-1)*i/Math.max(1,dateTicks-1))))];
+    dateIndexes.forEach((n,i)=>{const d=days[n];svg+=`<text x="${X(d)}" y="${H-9}" text-anchor="${i===0?'start':i===dateIndexes.length-1?'end':'middle'}">${esc(d)}</text>`;});
     series.forEach((s,i)=>{let path='',last=null;s.points.forEach(([d,v])=>{
       if(!Number.isFinite(v)){last=null;return;}const gap=last&&(Date.parse(d)-Date.parse(last)>12*86400000);
       path+=`${last&&!gap?'L':'M'}${X(d).toFixed(2)},${Y(v,s.axis).toFixed(2)} `;last=d;

@@ -58,8 +58,8 @@
  function riskPanel(fund,detail,d){
   const a=assets(fund),h=d.holdings,cb=d.convertibles||[];
   const rows=[['直接股票',pct(a.stock),'不含转债正股映射'],['可转债',pct(a.convertible),'已包含在债券仓位内'],['普通债券',pct(a.ordinary),'债券合计扣除转债'],['现金',pct(a.cash),'占基金净资产'],['杠杆',finite(a.leverage)?num(a.leverage,4)+'倍':'—','基金总资产／净资产']];
-  const duration=fund.duration||{};
-  const basis=duration.verified?'已核净资产分母 · 原报告利率敏感性':'现有披露字段 · 分母待逐只核验';
+  const duration={...fund.duration,...root.FundResearch.durationInfo(fund)};
+  const basis=duration.verification;
   const durationBody=`<p class="fusion-duration"><strong>${num(duration.value,5)} 年</strong><span>${esc(duration.report_date||'无可用报告期')} · ${esc(basis)}</span></p>${duration.source_url?`<a href="${esc(duration.source_url)}" target="_blank" rel="noopener noreferrer">原报告敏感性表</a>`:''}<p class="method-note">${duration.verified?'利率情景损益÷基金净资产÷利率冲击。':'保留现有来源字段及其报告期，分母待核。'}剩余期限与Delta分别展示。</p>`;
   const securities=(h?.top_holdings||[]).map(r=>{const b=d.bond_features?.[r.code]||{};return [esc(r.name),esc(r.code),pct(r.weight),esc(b.bond_rating||b.issuer_rating||'未覆盖'),num(b.remaining_years)+' 年',num(b.modified_duration)+' 年',esc(b.as_of||'未覆盖')];});
   return `<div class="fusion-date-strip"><span>净值 ${esc(fund.performance?.latest_date)}</span><span>配置汇总 ${esc(a.date)}</span><span>逐券持仓 ${esc(h?.report_date||'未覆盖')}</span><span>转债特征 ${esc(cb[0]?.as_of||'未覆盖')}</span></div><div class="research-grid two-column-grid">${section('股票、转债与普通债',a.date||'无配置报告期',table(['资产','占净值／倍数','口径'],rows))}${section('利率敏感性折算',duration.report_date||'无可用报告期',durationBody)}</div>${section('普通债与转债逐券信息',`披露 ${h?.report_date||'未覆盖'} · 特征使用各自行日期`,securities.length?table(['债券','代码','占净值','评级','剩余期限','修正久期','特征日期'],securities):empty('未取得逐券持仓，保留上方配置汇总。'))}`;

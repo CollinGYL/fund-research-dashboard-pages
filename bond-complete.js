@@ -24,9 +24,23 @@
  function fieldTable(features,date){
   return table(['指标','该期加权均值','占披露转债的有效覆盖','占资产表转债总仓的有效覆盖'],Object.entries(features||{}).map(([key,item])=>{const row=featurePoint(item,date),whole=item.points_total_cb_coverage?.find(x=>x[0]===date)?.[1];return [esc(item.label)+(fieldUnits[key]?`<small>${esc(fieldUnits[key])}</small>`:''),formatField(key,row[1]),pct(row[2]),pct(whole)];}));
  }
+ function withAssetVersions(p,detail){
+  const fund=detail?.fund || {code:p.code},phaseRows=rows=>root.FundResearch.selectReportVersions(rows).map(row=>({...row,history_phase:root.FundResearch.assetPhase(fund,row.date || row.report_date)}));
+  p={...p,disclosure:p.disclosure?{...p.disclosure,asset_periods:phaseRows(p.disclosure.asset_periods || [])}:p.disclosure};
+  const source=detail?.asset_history;
+  if(!source?.length)return {...p,metrics:{...p.metrics,position:root.FundResearch.selectReportVersions(p.metrics.position || [])},fund_investment:root.FundResearch.selectReportVersions(p.fund_investment || [])};
+  const assets=root.FundResearch.selectReportVersions(source),quarter=d=>Number(d.slice(0,4))*4+Math.floor((Number(d.slice(5,7))-1)/3);
+  const positions=assets.map(a=>({...a,report_date:a.date || a.report_date,stock_weight_nav:a.stock??null,all_bond_weight_nav:a.bond??null,convertible_weight_nav:a.convertible_bond??null,ordinary_bond_weight_nav:finite(a.bond)&&finite(a.convertible_bond)?a.bond-a.convertible_bond:null,gross_assets_to_nav:a.leverage??null}));
+  positions.forEach((p,i)=>{
+   const win=positions.slice(Math.max(0,i-3),i+1),values=win.map(r=>r.convertible_weight_nav),continuous=win.length===4&&win.every((r,j)=>!j||quarter(r.report_date)-quarter(win[j-1].report_date)===1),mean=continuous&&values.every(finite)?values.reduce((a,b)=>a+b,0)/4:null;
+   p.cb_position_cv_4q=mean>0?Math.sqrt(values.reduce((s,v)=>s+(v-mean)**2,0)/3)/mean:null;
+   p.cv_status=p.cb_position_cv_4q!==null?'available':mean===0?'zero_mean_not_applicable':'missing_four_consecutive_quarters';
+  });
+  return {...p,metrics:{...p.metrics,position:positions},fund_investment:assets.map(a=>({...a,date:a.date || a.report_date,fund:a.fund??null}))};
+ }
  function assetPanel(p){
-  const rows=p.metrics.position||[];
-  return section('转债仓位与四季度波动',`<div class="bc-position-pair"><div><h4>转债占净资产（%）</h4>${line(rows.map(x=>[x.report_date,finite(x.convertible_weight_nav)?x.convertible_weight_nav*100:null]),'转债占净资产（%）')}</div><div><h4>仓位波动（四季度变异系数）</h4>${line(rows.map(x=>[x.report_date,x.cb_position_cv_4q]),'仓位变异系数')}</div></div>`+note('使用已保存的四个连续季度结果；缺失不作零。报告序列不是每日持仓估计。')+`<details><summary>历史仓位与变异系数（${rows.length}期）</summary>${table(['报告期','股票/NAV','普通债/NAV','转债/NAV','总资产/NAV','转债仓位CV（4季度）'],rows.slice().reverse().map(x=>[esc(x.report_date),pct(x.stock_weight_nav),pct(x.ordinary_bond_weight_nav),pct(x.convertible_weight_nav),finite(x.gross_assets_to_nav)?num(x.gross_assets_to_nav,3)+'倍':'—',num(x.cb_position_cv_4q)]))}</details>`);
+  const rows=root.FundResearch.selectReportVersions(p.metrics.position||[]);
+  return section('转债仓位与四季度波动',`<div class="bc-position-pair"><div><h4>转债占净资产（%）</h4>${line(rows.map(x=>[x.report_date,finite(x.convertible_weight_nav)?x.convertible_weight_nav*100:null]),'转债占净资产（%）')}</div><div><h4>仓位波动（四季度变异系数）</h4>${line(rows.map(x=>[x.report_date,x.cb_position_cv_4q]),'仓位变异系数')}</div></div>`+note('按同一资产版本的四个连续季度计算；缺失不作零。报告序列不是每日持仓估计。')+`<details><summary>历史仓位与变异系数（${rows.length}期）</summary>${table(['报告期','股票/NAV','普通债/NAV','转债/NAV','总资产/NAV','转债仓位CV（4季度）'],rows.slice().reverse().map(x=>[esc(x.report_date),pct(x.stock_weight_nav),pct(x.ordinary_bond_weight_nav),pct(x.convertible_weight_nav),finite(x.gross_assets_to_nav)?num(x.gross_assets_to_nav,3)+'倍':'—',num(x.cb_position_cv_4q)]))}</details>`);
  }
  function featurePair(features,date,key,control){
   const entries=Object.entries(features||{});if(!features?.[key])key=entries[0]?.[0];
@@ -37,7 +51,7 @@
  function reportDates(p){return [...new Set([...(p.metrics.position||[]).map(x=>x.report_date),...(p.metrics.concentration_turnover||[]).map(x=>x.report_date),...(p.advanced.clause?.rows||[]).map(x=>x.dt)])].filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort().reverse();}
  function distribution(title,rows){return section(title,table(['分组','占基金净资产','占已披露转债'],(rows||[]).map(x=>[esc(x.k),pct(finite(x.w)?x.w/100:null),finite(x.share)?num(x.share,1)+'%':'—'])));}
  function bondOutput(p,date,key='BondZGYJL',stockKey='S_DQ_MV'){
-  const m=p.metrics.concentration_turnover.find(x=>x.report_date===date),position=p.metrics.position.find(x=>x.report_date===date),c=p.advanced.clause?.rows?.find(x=>x.dt===date),q=p.advanced.quote_coverage?.find(x=>x.report_date===date),f=p.advanced.features||{};
+  const m=p.metrics.concentration_turnover.find(x=>x.report_date===date),position=root.FundResearch.selectReportVersions(p.metrics.position).find(x=>x.report_date===date),c=p.advanced.clause?.rows?.find(x=>x.dt===date),q=p.advanced.quote_coverage?.find(x=>x.report_date===date),f=p.advanced.features||{};
   const cards=`<div class="research-metric-grid metric-four">${metric('披露转债只数',m?String(m.holding_count):'—')}${metric('披露转债内部HHI',num(m?.hhi_disclosed_cb))}${metric('单期权重变化合计',pp(m?.turnover_single_nav))}${metric('四期累计权重变化',pp(m?.turnover_roll4q_nav))}</div>`;
   const source=note(`报告期 ${date}。披露转债占净值 ${pct(m?.disclosed_cb_weight_nav)}；资产表全部转债 ${pct(position?.convertible_weight_nav)}；同日报价权重 ${pct(q?.same_date_quote_weight_nav)}；后向匹配旧报价权重 ${pct(q?.stale_quote_weight_nav)}${q?.max_quote_lag_days?`，最大滞后${q.max_quote_lag_days}天`:''}。转债HHI及各均值限于已披露部分，不能冒充全组合。`);
   const features=section('转债估值与交易特征',featurePair(f,date,key,'data-bc-feature')+note('市值加权；价格为全价，缺字段为—。覆盖分母分别为已披露转债与资产表全部转债。'));
@@ -64,7 +78,7 @@
  }
 
  function correlationPanel(p){return section('同类基金相关性',note('一级和二级债同池，转债基金独立池；同组合的不同份额已合并，剔除自身。各基金使用实际净值截止日。')+`<label class="bc-control">区间<select data-bc-window>${Object.entries(windows).map(([k,v])=>`<option value="${k}"${k==='1y'?' selected':''}>${v}</option>`).join('')}</select></label><div data-bc-correlation>${correlationOutput(p,'1y')}</div>`);}
- function fundPanel(p){const rows=p.fund_investment||[],latest=rows.at(-1);return section('基金与ETF投资',latest?note(`资产配置报告期 ${latest.date}，基金投资占净资产 ${pct(latest.fund)}。${latest.fund===0?'该资产表明确为零，不能据此推断整个历史没有投资。':finite(latest.fund)?'资产表有基金投资，具体持有的子基金/ETF明细尚待补齐。':'资产表基金投资字段缺失，不能判断为零。'}`):note('暂无可用基金投资资产表。'))+`<details class="bc-legacy-details"><summary>基金投资历史（${rows.length}期）</summary>${table(['报告期','基金投资/占净值'],rows.slice().reverse().map(x=>[esc(x.date),pct(x.fund)]))}</details>`+note('本板块仅展示本基金自身投资。其他FOF持有本基金的数据属于相反方向，不混入这里。');}
+ function fundPanel(p){const rows=root.FundResearch.selectReportVersions(p.fund_investment||[]),latest=rows.at(-1);return section('基金与ETF投资',latest?note(`资产配置报告期 ${latest.date}，基金投资占净资产 ${pct(latest.fund)}。${latest.fund===0?'该资产表明确为零，不能据此推断整个历史没有投资。':finite(latest.fund)?'资产表有基金投资，具体持有的子基金/ETF明细尚待补齐。':'资产表基金投资字段缺失，不能判断为零。'}`):note('暂无可用基金投资资产表。'))+`<details class="bc-legacy-details"><summary>基金投资历史（${rows.length}期）</summary>${table(['报告期','基金投资/占净值'],rows.slice().reverse().map(x=>[esc(x.date),pct(x.fund)]))}</details>`+note('本板块仅展示本基金自身投资。其他FOF持有本基金的数据属于相反方向，不混入这里。');}
  const portfolioGroups=[['stock','股票','#bc554a'],['fixed','固定收益','#0a7c78'],['fund','基金','#c69a4b'],['cash','现金','#102c45'],['other_total','其他资产','#89989e']];
  function portfolioRows(periods,basis='composition'){
   return periods.map(p=>{
@@ -96,12 +110,12 @@
  function portfolioTable(p){
   if(!p)return note('该报告期资产明细未接入。');
   const rows=[['股票投资','stock'],['基金投资','fund'],['固定收益投资','fixed'],['其中：债券','bond'],['其中：资产支持证券','abs'],['贵金属投资','metal'],['金融衍生品投资','derivatives'],['买入返售金融资产','repo'],['银行存款和结算备付金','cash'],['其他各项资产','other'],['总资产','total']].map(([label,key])=>[label,amount(p[key]),finite(p[key])&&finite(p.total)&&p.total>0?pct(p[key]/p.total):'—']);
-  return table(['项目','金额（元）','占总资产'],rows)+portfolioGroups.filter(([key])=>finite(p[key])&&p[key]<0).map(([key,label])=>note(`${label}原始金额 ${amount(p[key])}元；该期堆积图留空。`)).join('')+note(`报告期 ${p.date}；“其中”项不重复加总。${p.amount_basis==='reported_NAV_ratio_times_same_report_NAV'?'金额按当期披露比例与净资产换算。':''}缺项显示“—”。`);
+  return table(['项目','金额（元）','占总资产'],rows)+portfolioGroups.filter(([key])=>finite(p[key])&&p[key]<0).map(([key,label])=>note(`${label}原始金额 ${amount(p[key])}元；该期堆积图留空。`)).join('')+note(`报告期 ${p.date}${p.history_phase?" · "+p.history_phase:""}；“其中”项不重复加总。${p.amount_basis==='reported_NAV_ratio_times_same_report_NAV'?'金额按当期披露比例与净资产换算。':''}缺项显示“—”。`);
  }
  function bindPortfolioChart(host,periods,basis){
   const svg=host.querySelector('.bc-portfolio-chart svg'),target=host.querySelector('[data-bc-asset-hover]'),cursor=host.querySelector('[data-bc-asset-cursor]'),out=host.querySelector('[data-bc-asset-readout]');if(!svg||!periods.length)return;
   const width=Number(svg.getAttribute('viewBox').split(' ')[2]),rows=portfolioRows(periods,basis),times=rows.map(r=>Date.parse(r.date)),span=times.at(-1)-times[0],xs=times.map(t=>58+(span?(t-times[0])/span:.5)*(width-82));let current=rows.length-1;
-  const show=i=>{current=Math.max(0,Math.min(rows.length-1,i));const r=rows[current];cursor.setAttribute('x1',xs[current]);cursor.setAttribute('x2',xs[current]);out.innerHTML=`<strong>${esc(r.date)}</strong>${portfolioGroups.map(([,label],j)=>`<span>${label} ${pct(r.values[j])}</span>`).join('')}<span>已披露金额占总资产 ${pct(r.known_share_of_total)}</span>${finite(r.leverage)?`<span>杠杆 ${num(r.leverage,3)}倍</span>`:''}${r.invalid?'<span>本期存在负值，图中留空；见披露明细</span>':r.missing_groups?.length||r.fixed_partial||r.other_partial?'<span>部分分项未接齐</span>':''}`;};
+  const show=i=>{current=Math.max(0,Math.min(rows.length-1,i));const r=rows[current];cursor.setAttribute('x1',xs[current]);cursor.setAttribute('x2',xs[current]);out.innerHTML=`<strong>${esc(r.date)}${r.history_phase?" · "+esc(r.history_phase):""}</strong>${portfolioGroups.map(([,label],j)=>`<span>${label} ${pct(r.values[j])}</span>`).join('')}<span>已披露金额占总资产 ${pct(r.known_share_of_total)}</span>${finite(r.leverage)?`<span>杠杆 ${num(r.leverage,3)}倍</span>`:''}${r.invalid?'<span>本期存在负值，图中留空；见披露明细</span>':r.missing_groups?.length||r.fixed_partial||r.other_partial?'<span>部分分项未接齐</span>':''}`;};
   const move=e=>{const b=svg.getBoundingClientRect(),point=(e.clientX-b.left)/b.width*width;show(xs.reduce((best,x,i)=>Math.abs(x-point)<Math.abs(xs[best]-point)?i:best,0));};
   target.addEventListener('pointermove',move);target.addEventListener('pointerdown',move);svg.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();show(e.key==='Home'?0:e.key==='End'?rows.length-1:current+(e.key==='ArrowLeft'?-1:1));});show(current);
  }
@@ -136,7 +150,7 @@
   host.querySelector('[data-bc-date]')?.addEventListener('change',draw);host.querySelector('[data-bc-feature]')?.addEventListener('change',draw);host.querySelector('[data-bc-underlying]')?.addEventListener('change',draw);
   host.querySelector('[data-bc-window]')?.addEventListener('change',e=>{host.querySelector('[data-bc-correlation]').innerHTML=correlationOutput(p,e.target.value);});
  }
- const api={portfolioRows,portfolioChart,portfolioTable,enhancePortfolioAssets,load,assetPanel,bondPanel,bondOutput,correlationPanel,correlationOutput,fundPanel,reportDates,fieldTable,featurePair,formatField,line,pct,bind};root.BondComplete=api;
+ const api={withAssetVersions,portfolioRows,portfolioChart,portfolioTable,enhancePortfolioAssets,load,assetPanel,bondPanel,bondOutput,correlationPanel,correlationOutput,fundPanel,reportDates,fieldTable,featurePair,formatField,line,pct,bind};root.BondComplete=api;
  if(typeof module!=='undefined')module.exports=api;
  if(typeof createGenericTabLoader==='undefined'||typeof GENERIC_TABS==='undefined')return;
  for(const key of ['profilePanel','holdingsPanel']){
@@ -175,9 +189,9 @@
     if(id==='funds'){host.innerHTML=frozenNote();return;}
     await base(id);host.insertAdjacentHTML('afterbegin',frozenNote());return;
    }
-   const p=await load(fund);
+   const p=withAssetVersions(await load(fund),detail);
    if(id==='funds'){
-    const current=Array.isArray(detail?.asset_history)&&detail.asset_history.length?{...p,fund_investment:detail.asset_history.map(x=>({date:x.date,fund:x.fund??null}))}:p;
+    const current=p;
     host.innerHTML=fundPanel(current)+'<div data-bap-own-funds></div>';if(root.BondAdvancedUI)await root.BondAdvancedUI.mount(host.querySelector('[data-bap-own-funds]'),'ownFunds',fund.code);return;
    }
    if(id==='correlation'){

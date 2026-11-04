@@ -74,9 +74,10 @@
     const values=years.map(x=>x.value).filter(finite),lo=Math.min(0,...values),hi=Math.max(.01,...values),pad=(hi-lo)*.16,min=lo-pad,max=hi+pad;
     const y=v=>m.t+(max-v)/(max-min)*(h-m.t-m.b),step=(w-m.l-m.r)/years.length;
     const ticks=[0,hi,...(lo<0?[lo]:[])];
-    return `<div class="warm-annual-scroll"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="年度收益率柱状图" style="min-width:${Math.min(w,1050)}px">${ticks.map(v=>`<line x1="${m.l}" x2="${w-m.r}" y1="${y(v)}" y2="${y(v)}" class="chart-grid-line"/><text x="${m.l-7}" y="${y(v)+4}" text-anchor="end" class="chart-axis-label">${(v*100).toFixed(0)}%</text>`).join('')}${years.map((a,i)=>{
+    const barLabel=value=>FundResearch.percent(value,2,true);
+    return `<div class="warm-annual-scroll"><svg viewBox="0 0 ${w} ${h}" role="img" aria-label="年度收益率柱状图" style="min-width:${Math.min(w,1050)}px">${ticks.map(v=>`<line x1="${m.l}" x2="${w-m.r}" y1="${y(v)}" y2="${y(v)}" class="chart-grid-line"/><text x="${m.l-7}" y="${y(v)+4}" text-anchor="end" class="chart-axis-label">${FundResearch.percent(v,0,false,{preserveSmall:true})}</text>`).join('')}${years.map((a,i)=>{
       const x=m.l+step*(i+.5),v=a.value;if (!finite(v)) return '';
-      return `<g tabindex="0" aria-label="${a.year}年 ${pct(v)}，${a.start}至${a.end}"><title>${a.year}：${pct(v)}\n${a.start} — ${a.end}</title><rect x="${x-step*.28}" y="${Math.min(y(v),y(0))}" width="${step*.56}" height="${Math.max(1,Math.abs(y(v)-y(0)))}" fill="${v>=0?'#B01625':'#347466'}"/><text x="${x}" y="${v>=0?y(v)-7:y(v)+15}" text-anchor="middle" class="warm-bar-label">${pct(v)}</text><text x="${x}" y="${h-12}" text-anchor="middle" class="chart-axis-label">${a.year}${a.partial?'*':''}</text></g>`;
+      return `<g tabindex="0" aria-label="${a.year}年 ${barLabel(v)}，${a.start}至${a.end}"><title>${a.year}：${barLabel(v)}\n${a.start} — ${a.end}</title><rect x="${x-step*.28}" y="${Math.min(y(v),y(0))}" width="${step*.56}" height="${Math.max(1,Math.abs(y(v)-y(0)))}" fill="${v>=0?'#B01625':'#347466'}"/><text x="${x}" y="${v>=0?y(v)-7:y(v)+15}" text-anchor="middle" class="warm-bar-label">${barLabel(v)}</text><text x="${x}" y="${h-12}" text-anchor="middle" class="chart-axis-label">${a.year}${a.partial?'*':''}</text></g>`;
     }).join('')}</svg></div><p class="method-note">* 首年按可得净值统计；最新年度截至 ${esc(nav.at(-1)?.date)}。</p>`;
   }
   function peer(fund, nav) {
@@ -103,23 +104,21 @@
     if(!output)return;
     const rs=ranges(fund,nav);
     const metricDraw=(p,label)=>{if(metrics)metrics.innerHTML=renderPerformanceMetricCards('custom',p,false);if(note)note.textContent=`${label} · ${p[0]?.date || '—'} — ${p.at(-1)?.date || '—'} · ${p.length}个净值日`;};
-    const draw=(selected,label,chartStart=null)=>{
-      const s=chartStart||selected[0]?.date,e=selected.at(-1)?.date,chart=points.filter(p=>p.date>=s && p.date<=e);
-      const display=chart.length>=2?chart:selected.filter(p=>p.date>=s).map(p=>({...p,benchmark:null}));
-      output.innerHTML=renderZoomableNavChart(rebaseNavPoints(display),fund.name,benchmarkName);
+    const draw=(selected,label)=>{
+      const chartMap=new Map(points.map(p=>[p.date,p]));
+      const display=selected.map(p=>({...p,benchmark:chartMap.get(p.date)?.benchmark ?? null}));
+      output.innerHTML=renderZoomableNavChart(display,fund.name,benchmarkName);
       metricDraw(selected,label);
       let initial=true;
       if(display.length>=2)bindNavChartZoom(display,fund.name,benchmarkName,output,(start,end)=>{if(initial){initial=false;return;}metricDraw(selected.filter(p=>p.date>=start && p.date<=end),label);});
     };
     const windowInfo=months=>window.FundLifecycle?.windowValidity?.(nav[0]?.date,nav.at(-1)?.date,months,fund.inception_date);
-    const five=windowInfo(60);
-    buttons.filter(b=>b.dataset.genericNavRange==='60').forEach(b=>{if(five&&!five.complete)b.textContent='不足5年';});
+    buttons.forEach(b=>{const months=Number(b.dataset.genericNavRange);if(!Number.isFinite(months)||months<=0)return;const validity=windowInfo(months);if(validity)b.textContent=validity.label;});
     buttons.forEach(b=>b.addEventListener('click',()=>{
       buttons.forEach(x=>x.classList.toggle('active',x===b));if(select)select.value='';
       const range=b.dataset.genericNavRange,months=Number(range),validity=Number.isFinite(months)?windowInfo(months):null;
-      const start=range==='all'?null:range==='ytd'?nav.at(-1).date.slice(0,4)+'-01-01':validity?.requestedStart||FundResearch.monthStart(nav.at(-1).date,months);
-      const label=range==='60'&&validity&&!validity.complete?'不足5年 · 可得历史':b.textContent;
-      draw(selectPerformanceRange(nav,range),label,start);
+      const label=validity&&!validity.complete?`${validity.label} · 可得历史`:b.textContent;
+      draw(selectPerformanceRange(nav,range),label);
     }));
     select?.addEventListener('change',()=>{if(select.value==='')return;const r=rs[Number(select.value)];if(!r)return;buttons.forEach(b=>b.classList.remove('active'));draw(nav.filter(p=>p.date>=r.s && p.date<=r.e),r.label);});
     draw(nav,'可得历史');

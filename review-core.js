@@ -75,25 +75,74 @@
  if(typeof module!=='undefined')module.exports=root.ReviewCore;
 })(typeof window==='undefined'?globalThis:window);
 (function(root){
+ const MIN_CORRELATION_RETURNS=12;
+ function navSeries(points=[]){
+  const values=new Map();
+  for(const row of points){
+   const date=Array.isArray(row)?row[0]:row?.date,value=Array.isArray(row)?row[1]:row?.fund;
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date||'')||!Number.isFinite(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date||typeof value!=='number'||!Number.isFinite(value)||value<=0)continue;
+   if(values.has(date)&&values.get(date)!==value)throw Error(`${date}存在冲突净值，暂不计算`);
+   values.set(date,value);
+  }
+  return [...values].sort(([a],[b])=>a.localeCompare(b));
+ }
+ function monthlyReturns(points=[]){
+  const nav=navSeries(points),ends=[];
+  for(const point of nav){
+   const month=point[0].slice(0,7);
+   if(ends.at(-1)?.month===month)ends[ends.length-1]={month,point};
+   else ends.push({month,point});
+  }
+  return ends.map((item,i)=>{
+   const base=i?ends[i-1].point:nav[0],end=item.point;
+   const value=end[0]>base[0]?end[1]/base[1]-1:null;
+   const monthIndex=date=>Number(date.slice(0,4))*12+Number(date.slice(5,7));
+   return {year:Number(item.month.slice(0,4)),month:Number(item.month.slice(5,7)),
+    return:Number.isFinite(value)?value:null,start:base[0],end:end[0],partial:!i,
+    crossMonth:Boolean(i&&monthIndex(end[0])-monthIndex(base[0])>1)};
+  });
+ }
  function stats(values){
   if(values.length<2)return null;
   let peak=values[0],dd=0;for(const v of values){peak=Math.max(peak,v);dd=Math.min(dd,v/peak-1);}
   return {return:values.at(-1)/values[0]-1,drawdown:dd};
  }
- function correlation(a,b){
-  if(a.length!==b.length||a.length<3)return null;
-  const x=a.reduce((s,v)=>s+v,0)/a.length,y=b.reduce((s,v)=>s+v,0)/b.length;
-  let xx=0,yy=0,xy=0;for(let i=0;i<a.length;i++){xx+=(a[i]-x)**2;yy+=(b[i]-y)**2;xy+=(a[i]-x)*(b[i]-y);}
-  return xx>0&&yy>0?Math.max(-1,Math.min(1,xy/Math.sqrt(xx*yy))):null;
+ function correlationSummary(a,b){
+   if(a.length!==b.length)return {correlation:null,observations:0,invalidObservations:0,status:'unaligned',reason:'收益序列未按相同区间配对'};
+   const pairs=a.flatMap((x,i)=>Number.isFinite(x)&&Number.isFinite(b[i])?[[x,b[i]]]:[]),n=pairs.length,invalid=a.length-n;
+   const result={correlation:null,observations:n,invalidObservations:invalid,status:'available',reason:''};
+   if(!n)return {...result,status:invalid?'nonfinite':'empty',reason:invalid?'共同收益区间均为非有限值':'没有有效共同收益区间'};
+   if(n<MIN_CORRELATION_RETURNS)return {...result,status:'insufficient',reason:`仅${n}个有效共同收益区间，至少需要${MIN_CORRELATION_RETURNS}个${invalid?`；另排除${invalid}个非有限区间`:''}`};
+   if(pairs.every(v=>v[0]===pairs[0][0])||pairs.every(v=>v[1]===pairs[0][1]))return {...result,status:'zero_variance',reason:'至少一只基金的区间收益无变化，相关性无定义'};
+   const x=pairs.reduce((s,v)=>s+v[0]/n,0),y=pairs.reduce((s,v)=>s+v[1]/n,0);
+   const dx=pairs.map(v=>v[0]-x),dy=pairs.map(v=>v[1]-y),sx=Math.max(...dx.map(Math.abs)),sy=Math.max(...dy.map(Math.abs));
+   if(!sx||!sy)return {...result,status:'zero_variance',reason:'至少一只基金的区间收益无变化，相关性无定义'};
+   let xx=0,yy=0,xy=0;for(let i=0;i<n;i++){const u=dx[i]/sx,v=dy[i]/sy;xx+=u*u;yy+=v*v;xy+=u*v;}
+   const value=xy/Math.sqrt(xx*yy);
+   if(!Number.isFinite(value))return {...result,status:'nonfinite',reason:'相关性计算得到非有限值'};
+   return {...result,correlation:Math.max(-1,Math.min(1,value))};
+ }
+ function correlation(a,b){return correlationSummary(a,b).correlation;}
+ function pairedNavCorrelation(left,right,start='0000-01-01',end='9999-12-31'){
+   // Keep each fund's original consecutive intervals; intersect BOTH endpoints.
+   // Intersecting NAV dates first would turn one-day and multi-day returns into a false pair.
+   const intervals=points=>{
+    const nav=navSeries(points),out=new Map();
+    for(let i=1;i<nav.length;i++)if(nav[i-1][0]>=start&&nav[i][0]<=end)out.set(`${nav[i-1][0]}|${nav[i][0]}`,nav[i][1]/nav[i-1][1]-1);
+    return out;
+   };
+   const a=intervals(left),b=intervals(right),keys=[...a.keys()].filter(k=>b.has(k));
+   return {...correlationSummary(keys.map(k=>a.get(k)),keys.map(k=>b.get(k))),matchedIntervals:keys.length};
  }
  function compare(details,start='0000-01-01',end='9999-12-31'){
-  const maps=details.map(d=>new Map((d.nav||[]).filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r[0])&&r[1]!=null&&Number.isFinite(Number(r[1]))&&Number(r[1])>0).map(r=>[r[0],Number(r[1])])));
+   const navs=details.map(d=>navSeries(d.nav)),maps=navs.map(nav=>new Map(nav));
   if(!maps.length)return {dates:[],series:[],correlations:[]};
   const common=[...maps[0].keys()].filter(day=>day<=end&&maps.every(m=>m.has(day))).sort();
   const i=common.findIndex(day=>day>=start);const dates=i<0?[]:common.slice(Math.max(0,i-1));
   if(dates.length<2)return {dates,series:[],correlations:[]};
-  const series=maps.map((m,i)=>{const values=dates.map(d=>m.get(d));return {code:details[i].fund?.code,name:details[i].fund?.name,stats:stats(values),points:dates.map((d,j)=>[d,values[j]/values[0]-1]),returns:values.slice(1).map((v,j)=>v/values[j]-1)};});
-  return {dates,series,correlations:series.map(a=>series.map(b=>correlation(a.returns,b.returns)))};
+   const series=maps.map((m,i)=>{const values=dates.map(d=>m.get(d));return {code:details[i].fund?.code,name:details[i].fund?.name,nav:navs[i],stats:stats(values),points:dates.map((d,j)=>[d,values[j]/values[0]-1]),returns:values.slice(1).map((v,j)=>v/values[j]-1)};});
+   const correlationResults=series.map(a=>series.map(b=>pairedNavCorrelation(a.nav,b.nav,dates[0],dates.at(-1))));
+   return {dates,series,correlationResults,correlations:correlationResults.map(row=>row.map(r=>r.correlation))};
  }
- Object.assign(root.ReviewCore,{compare,stats,correlation});
+ Object.assign(root.ReviewCore,{compare,stats,correlation,correlationSummary,pairedNavCorrelation,MIN_CORRELATION_RETURNS,navSeries,monthlyReturns});
 })(typeof window==='undefined'?globalThis:window);

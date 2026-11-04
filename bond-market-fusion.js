@@ -35,7 +35,7 @@
   })().catch(e=>{cache.delete(fund.code);throw e;});cache.set(fund.code,task);return present(task);
  }
  function scope(p){return isMarket(p)?`<p class="method-note">全市场披露方法 · 净值截至 ${esc(p.nav_end_date||'待补')}。结构化缓存与原报告逐项核验状态分开；空缺不表示零持仓。<a href="bond-methodology.html" target="_blank">统一方法论与实现状态</a></p>`:'';}
- function cleanSource(html,p){return isMarket(p)?html.replace(' 中期报告',' 结构化披露记录').replace('最新完整披露：','所选完整报告期：'):html;}
+ function cleanSource(html,p){return isMarket(p)?html.replace(' 中期报告',' 结构化披露记录'):html;}
  function profilePanel(p){return scope(p)+cleanSource(base.profilePanel(p),p);}
  function holdingsPanel(p,h){return scope(p)+cleanSource(base.holdingsPanel(p,h),p);}
  function disclosureIntro(p){return scope(p)+cleanSource(base.disclosureIntro(p),p);}

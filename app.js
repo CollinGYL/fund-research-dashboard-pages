@@ -189,17 +189,13 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function formatPercent(value, digits = 1, signed = false) {
-  if (value === null || value === undefined || value === '') return '—';
-  const number = Number(value);
-  if (!Number.isFinite(number)) return "—";
-  const rounded=Number((number*100).toFixed(digits));
-  return rounded===0?"0%":`${signed && rounded > 0 ? "+" : ""}${rounded.toFixed(digits)}%`;
+function formatPercent(value, digits = 1, signed = false, options = {}) {
+  return FundResearch.percent(value, digits, signed, options);
 }
 
-function returnClass(value, digits=1) {
+function returnClass(value, digits=1, {preserveSmall=false}={}) {
   if(value===null||value===undefined||value===''||!Number.isFinite(Number(value)))return 'value-missing';
-  const rounded=Number((Number(value)*100).toFixed(digits));
+  const rounded=preserveSmall?Number(value):Number((Number(value)*100).toFixed(digits));
   return rounded===0?'value-zero':rounded<0?'negative':'positive';
 }
 
@@ -460,14 +456,8 @@ function fundHref(fund) {
 function hasFullReturnPeriod(fund, key) {
   const months = {"1m":1,"3m":3,"6m":6,"1y":12,"3y":36,"5y":60}[key];
   if (!months) return true;
-  const end = new Date(performanceFor(fund)?.latest_date);
-  const start = new Date(fund.inception_date);
-  if (!fund.inception_date || !performanceFor(fund)?.latest_date || !Number.isFinite(+start) || !Number.isFinite(+end)) return false;
-  const day = end.getUTCDate();
-  end.setUTCDate(1);
-  end.setUTCMonth(end.getUTCMonth() - months);
-  end.setUTCDate(Math.min(day, new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() + 1, 0)).getUTCDate()));
-  return start <= end;
+  const latest = performanceFor(fund)?.latest_date;
+  return FundLifecycle.windowValidity(fund.inception_date, latest, months, fund.inception_date).complete;
 }
 
 function performanceMetric(fund, key, metric) {
@@ -483,8 +473,8 @@ function relativeMetrics(fund) {
 
 function periodCell(fund, key, relative = false) {
   if (isHistoricalDate() && !historicalMetric(fund)) return '<td class="period-cell pending-cell"><strong>—</strong><small>正在读取历史净值</small></td>';
-  if(key === "tenure"){const t=viewMetric(fund)?.tenure;return `<td class="period-cell"><strong class="${returnClass(t?.return)}">${formatPercent(t?.return,1,true)}</strong><small class="${returnClass(t?.drawdown)}">回撤 ${formatPercent(t?.drawdown)}</small><small>${escapeHtml(t?.start? t.start+"起" : t?.reason || "任职日期待加载")}</small>${t?.reason?`<small>${escapeHtml(t.reason)}</small>`:""}</td>`;}
-  if (!hasFullReturnPeriod(fund, key)) return `<td class="period-cell pending-cell"><strong>—</strong><small>${key === '5y' ? '不足5年' : isHistoricalDate() ? '区间数据不足' : '成立未满该区间'}</small></td>`;
+  if(key === "tenure"){const t=viewMetric(fund)?.tenure;return `<td class="period-cell"><strong class="${returnClass(t?.return)}">${formatPercent(t?.return,1,true)}</strong><small class="${returnClass(t?.drawdown, 2, {preserveSmall:true})}">回撤 ${formatPercent(t?.drawdown, 2, false, {preserveSmall:true})}</small><small>${escapeHtml(t?.start? t.start+"起" : t?.reason || "任职日期待加载")}</small>${t?.reason?`<small>${escapeHtml(t.reason)}</small>`:""}</td>`;}
+  if (!hasFullReturnPeriod(fund, key)) return `<td class="period-cell pending-cell"><strong>—</strong><small>${FundLifecycle.windowValidity(fund.inception_date, performanceFor(fund)?.latest_date, {"1m":1,"3m":3,"6m":6,"1y":12,"3y":36,"5y":60}[key], fund.inception_date).label}</small></td>`;
   if (relative) {
     const relativeData = relativeMetrics(fund);
     const value = relativeData?.excess_returns?.[key];
@@ -492,11 +482,11 @@ function periodCell(fund, key, relative = false) {
     if (!FundResearch.finite(value)) {
       return '<td class="period-cell pending-cell"><strong>待计算</strong><small>基准行情缺失</small></td>';
     }
-    return `<td class="period-cell"><strong class="${returnClass(value)}">${formatPercent(value, 1, true)}</strong><small class="${returnClass(drawdown)}">超额回撤 ${formatPercent(drawdown)}</small></td>`;
+    return `<td class="period-cell"><strong class="${returnClass(value)}">${formatPercent(value, 1, true)}</strong><small class="${returnClass(drawdown, 2, {preserveSmall:true})}">超额回撤 ${formatPercent(drawdown, 2, false, {preserveSmall:true})}</small></td>`;
   }
   const value = performanceMetric(fund, key, "return");
   const drawdown = performanceMetric(fund, key, "drawdown");
-  return `<td class="period-cell"><strong class="${returnClass(value)}">${formatPercent(value, 1, true)}</strong><small class="${returnClass(drawdown)}">回撤 ${formatPercent(drawdown)}</small></td>`;
+  return `<td class="period-cell"><strong class="${returnClass(value)}">${formatPercent(value, 1, true)}</strong><small class="${returnClass(drawdown, 2, {preserveSmall:true})}">回撤 ${formatPercent(drawdown, 2, false, {preserveSmall:true})}</small></td>`;
 }
 
 function bondStructureCell(asset) {
@@ -628,7 +618,7 @@ function fundRow(fund) {
     return `<tr data-fund-code="${escapeHtml(fund.code)}">${allFundOverviewCell(fund)}
       <td><strong>${formatMoney(fund.asset?.net_asset)}</strong><small>${escapeHtml(fund.asset?.report_date || "无配置披露")}</small></td>
       ${periods.map(([key]) => periodCell(fund, key)).join("")}
-      <td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small class="${returnClass(annual?.drawdown)}">年度回撤 ${formatPercent(annual?.drawdown)}</small></td>
+      <td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small class="${returnClass(annual?.drawdown, 2, {preserveSmall:true})}">年度回撤 ${formatPercent(annual?.drawdown, 2, false, {preserveSmall:true})}</small></td>
       <td><strong>${escapeHtml(displayCategoryLabel(fund))}</strong><small>${escapeHtml(fund.subtype)}</small></td>
       <td class="all-fund-core-cell"><div class="all-fund-core-grid">${allFundCoreCell(fund)}</div></td>
       <td class="benchmark-cell">${escapeHtml(fund.benchmark || "—")}</td>
@@ -680,8 +670,8 @@ function fundRow(fund) {
   } else {
     extras = `<td><strong>${escapeHtml(displayCategoryLabel(fund))}</strong><small>${escapeHtml(fund.subtype)}</small></td><td><strong>${performanceFor(fund)?.latest_date || "—"}</strong></td>`;
   }
-  if(activeCategory==='active-equity'){const m=viewMetric(fund);extras=`<td><strong>${formatPercent(m?.current_drawdown)}</strong><small>近1年收益同类${Number.isFinite(m?.return_top_pct)?"前"+Math.ceil(m.return_top_pct*100)+"%":"样本不足"}</small></td>`+extras;}
-  return `<tr data-fund-code="${escapeHtml(fund.code)}">${activeCategory === 'active-equity' ? activeEquityOverviewCells(fund) : commonCells(fund)}${periods.map(([key]) => periodCell(fund, key, relative)).join("")}<td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small class="${returnClass(annual?.drawdown)}">年度回撤 ${formatPercent(annual?.drawdown)}</small></td>${extras}</tr>`;
+  if(activeCategory==='active-equity'){const m=viewMetric(fund);extras=`<td><strong>${formatPercent(m?.current_drawdown, 2, false, {preserveSmall:true})}</strong><small>近1年收益同类${Number.isFinite(m?.return_top_pct)?"前"+Math.ceil(m.return_top_pct*100)+"%":"样本不足"}</small></td>`+extras;}
+  return `<tr data-fund-code="${escapeHtml(fund.code)}">${activeCategory === 'active-equity' ? activeEquityOverviewCells(fund) : commonCells(fund)}${periods.map(([key]) => periodCell(fund, key, relative)).join("")}<td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small class="${returnClass(annual?.drawdown, 2, {preserveSmall:true})}">年度回撤 ${formatPercent(annual?.drawdown, 2, false, {preserveSmall:true})}</small></td>${extras}</tr>`;
 }
 
 function extraHeaders() {
@@ -1463,8 +1453,8 @@ function decisionFundRow(fund) {
   const industry = a.stock_weight === 0 ? '无股票持仓 / 不适用' : s?.industry ? `${s.industry} ${formatPercent(s.industry_weight)}` : '无可用行业披露';
   const fields = {
     '1y': cell(signed(performanceMetric(fund, '1y', 'return')), rank),
-    current_drawdown: cell(formatPercent(s?.current_drawdown), FundResearch.finite(s?.current_drawdown) ? (s.current_drawdown < -1e-8 ? `未修复 · 距高点${s.underwater_days}天` : '已修复 / 新高') : '—'),
-    risk1y: cell(formatPercent(performanceMetric(fund, '1y', 'drawdown')), FundResearch.finite(s?.drawdown_top_pct) ? `损失较小前${Math.max(1, Math.ceil(s.drawdown_top_pct * 100))}%` : isHistoricalDate() ? '历史同类排名 —' : '排名待计算'),
+    current_drawdown: cell(formatPercent(s?.current_drawdown, 2, false, {preserveSmall:true}), FundResearch.finite(s?.current_drawdown) ? (s.current_drawdown < -1e-8 ? `未修复 · 距高点${s.underwater_days}天` : '已修复 / 新高') : '—'),
+    risk1y: cell(formatPercent(performanceMetric(fund, '1y', 'drawdown'), 2, false, {preserveSmall:true}), FundResearch.finite(s?.drawdown_top_pct) ? `损失较小前${Math.max(1, Math.ceil(s.drawdown_top_pct * 100))}%` : isHistoricalDate() ? '历史同类排名 —' : '排名待计算'),
     size: cell(formatMoney(a.net_asset), a.report_date || '暂无披露'),
     exposure: cell(fund.category==='active-equity'?formatPercent(a.stock_weight):`${formatPercent(a.stock_weight)} / ${formatPercent(a.convertible_bond_weight)}`, `${a.report_date || '—'} · 占净值`),
     industry: IndustryBars.placeholder(fund),

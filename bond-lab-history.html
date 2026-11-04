@@ -398,7 +398,7 @@ footer{display:flex;justify-content:space-between;gap:10px;padding:24px 5vw;colo
     <b>样本池按本分支专属的更严格规模门槛筛选</b>（要求基金历史规模从未低于10亿，而非生产版的逐期PIT判定），
     覆盖 202 只基金，比生产版的 1,049 只少得多。</p>
   </div>
-  <p class="note legacy-scope"><b>阅读口径。</b>本页误差评价采用全历史规模门槛：全部已披露报告期净资产最小值≥10亿元，固定基金池；筛选包含评价时点之后的信息，不能视为可实时投资的PIT回测。 首屏前三张卡为近6期，第四张卡为全历史15期；市场生态、科目覆盖和全市场聚合模块另有自己的统计池。<b>仅观测净值</b>指滤波观测只使用基金净值收益，仍以债券指数因子和约束建模；持仓及披露久期用于筛选、分组或事后评价，不是额外滤波观测。交接页记录的递推口径为扩张历史、120个交易日预热，区别于单基金OLS页的60日滚动窗口；本页保留历史模型结果，不代表当前生产参数。</p><div class="hero-panel">
+  <p class="note legacy-scope"><b>阅读口径。</b>本页误差评价采用全历史规模门槛：全部已披露报告期净资产最小值≥10亿元，固定基金池；筛选包含评价时点之后的信息，不能视为可实时投资的PIT回测。 首屏前三张卡为近6期，第四张卡为全历史15期；市场生态、科目覆盖和全市场聚合模块另有自己的统计池。<b>仅观测净值</b>指滤波观测只使用基金净值收益，仍以债券指数因子和约束建模；持仓及披露久期用于筛选、分组或事后评价，不是额外滤波观测。本页保留历史模型结果。交接说明写作“120个交易日预热”；已核日频递推副本按净值与因子对齐后的有效观测行计数，原模型常量、交易日历与运行尚未复现。它不同于单基金OLS页的60日滚动窗口，不代表当前生产参数。</p><div class="hero-panel">
     <div class="panel-topline"><span>卡尔曼滤波 · 仅观测净值</span><span class="live-dot">2023H1 ~ 2025H2</span></div>
     <div class="mgrid">
       <div class="mcard"><span>B · 短期池<small style="opacity:.7"> Wind 302</small></span><strong>0.43</strong><small>MAFE · 年</small></div>
@@ -1523,7 +1523,7 @@ table.mini tr.oth td.value-positive,table.mini tr.oth td.value-negative{opacity:
 
   <div class="panel">
     <h3>这 14 条因子在 Wind 科目体系里的位置，以及我们丢掉了什么</h3>
-    <p class="note" style="margin-top:0">上表是"我们用了哪 14 条因子"，这里回答"<b>Wind 原本把债券分成什么科目、我们选了其中哪些</b>"。四层科目树如下，只画与债相关的枝——股票项下的普通股、存托凭证，以及挂在其他资产下的权证，本池占比均为 0，不展开。覆盖率沿用交接包科目覆盖统计（11,494 个基金×报告期），不等于本页模型评价样本数；尚未按本分支重新核算。根节点为占比的分母，不作占比读数。</p>
+    <p class="note" style="margin-top:0">上表是"我们用了哪 14 条因子"，这里回答"<b>Wind 原本把债券分成什么科目、我们选了其中哪些</b>"。四层科目树如下，只画与债相关的枝——股票项下的普通股、存托凭证，以及挂在其他资产下的权证，本池占比均为 0，不展开。覆盖率是交接包历史产物（标注11,494个基金×报告期），不等于本页模型评价样本数。本地可核券种字段映射，但该统计池、去重与公告时点尚未复现，也未按本分支重算。根节点为占比的分母，不作占比读数。</p>
     <div class="subtree"><div class="tr-row tr-root" style="padding-left:8px"><div class="tr-nm">固定收益投资市值<span class="tr-cd">F_PRT_BONDVALUE</span></div><div class="tr-bar" aria-hidden="true"></div><div class="tr-pc">分母</div><div class="tr-tg"><span class="tg tg-all">全部因子在这一支</span></div><div class="tr-nt">券种覆盖统计分母（非滤波观测）</div></div><div class="tr-row " style="padding-left:34px"><div class="tr-nm">└ 国债（Wind 释义含地方政府债）<span class="tr-cd">F_PRT_GOVBOND</span></div><div class="tr-bar"><i style="width:10.4%"></i></div><div class="tr-pc">6.24%</div><div class="tr-tg"><span class="tg tg-ok">β₁~β₅</span></div><div class="tr-nt">与政金债相加 = 利率债组</div></div><div class="tr-row tr-no" style="padding-left:60px"><div class="tr-nm">└ 国债（不含地方债）<span class="tr-cd">F_PRT_GOVNOMTBOND</span></div><div class="tr-bar"><i style="width:9.9%"></i></div><div class="tr-pc">5.95%</div><div class="tr-tg"><span class="tg tg-no">无对应因子</span></div><div class="tr-nt">拆分字段，非空率低，未单独使用</div></div><div class="tr-row tr-no" style="padding-left:60px"><div class="tr-nm">└ 地方政府债<span class="tr-cd">F_PRT_GOVMTBONDVALUE</span></div><div class="tr-bar"><i style="width:0.5%"></i></div><div class="tr-pc">0.30%</div><div class="tr-tg"><span class="tg tg-no">无对应因子</span></div><div class="tr-nt">同上</div></div><div class="tr-row " style="padding-left:34px"><div class="tr-nm">└ 金融债<span class="tr-cd">F_PRT_FINANBOND</span></div><div class="tr-bar"><i style="width:90.0%"></i></div><div class="tr-pc">53.97%</div><div class="tr-tg"><span class="tg tg-ok">β₈~β₁₁ + β₁₄</span></div><div class="tr-nt">⚠ 含政策性金融债，需先减去</div></div><div class="tr-row " style="padding-left:60px"><div class="tr-nm">└ 政策性金融债<span class="tr-cd">F_PRT_POLIFINANBDVALUE</span></div><div class="tr-bar"><i style="width:54.5%"></i></div><div class="tr-pc">32.70%</div><div class="tr-tg"><span class="tg tg-ok">β₁~β₅</span></div><div class="tr-nt">归入利率债组，不留在银行债组</div></div><div class="tr-row " style="padding-left:34px"><div class="tr-nm">└ 企业债（大口径）<span class="tr-cd">F_PRT_CORPBOND</span></div><div class="tr-bar"><i style="width:59.3%"></i></div><div class="tr-pc">35.58%</div><div class="tr-tg"><span class="tg tg-part">部分</span></div><div class="tr-nt">下分三支，只有中票有因子</div></div><div class="tr-row tr-no" style="padding-left:60px"><div class="tr-nm">└ 短期融资券<span class="tr-cd">F_PRT_CPVALUE</span></div><div class="tr-bar"><i style="width:8.9%"></i></div><div class="tr-pc">5.36%</div><div class="tr-tg"><span class="tg tg-no">无对应因子</span></div><div class="tr-nt">无对应因子</div></div><div class="tr-row " style="padding-left:60px"><div class="tr-nm">└ 中期票据<span class="tr-cd">F_PRT_MTNVALUE</span></div><div class="tr-bar"><i style="width:36.1%"></i></div><div class="tr-pc">21.64%</div><div class="tr-tg"><span class="tg tg-ok">β₆~β₇ + β₁₃</span></div><div class="tr-nt">中票组</div></div><div class="tr-row tr-no" style="padding-left:60px"><div class="tr-nm">└ 企业债 + 公司债<span class="tr-cd">F_PRT_CORPBONDVALUE</span></div><div class="tr-bar"><i style="width:14.3%"></i></div><div class="tr-pc">8.58%</div><div class="tr-tg"><span class="tg tg-no">无对应因子</span></div><div class="tr-nt">无对应因子</div></div><div class="tr-row " style="padding-left:34px"><div class="tr-nm">└ 同业存单<span class="tr-cd">F_PRT_CDS</span></div><div class="tr-bar"><i style="width:4.0%"></i></div><div class="tr-pc">2.42%</div><div class="tr-tg"><span class="tg tg-ok">β₁₂</span></div><div class="tr-nt">单独成组</div></div><div class="tr-row tr-no" style="padding-left:34px"><div class="tr-nm">└ 可转债<span class="tr-cd">F_PRT_COVERTBOND</span></div><div class="tr-bar"><i style="width:0.0%"></i></div><div class="tr-pc">0.00%</div><div class="tr-tg"><span class="tg tg-no">无对应因子</span></div><div class="tr-nt">样本池已剔除持有者</div></div><div class="tr-row tr-no" style="padding-left:34px"><div class="tr-nm">└ 央行票据<span class="tr-cd">F_PRT_CTRBANKBILL</span></div><div class="tr-bar"><i style="width:0.0%"></i></div><div class="tr-pc">0.00%</div><div class="tr-tg"><span class="tg tg-no">无对应因子</span></div><div class="tr-nt">本池覆盖为 0，纯债基金已不持有</div></div><div class="tr-row tr-no" style="padding-left:34px"><div class="tr-nm">└ 资产支持证券<span class="tr-cd">F_PRT_ABSVALUE</span></div><div class="tr-bar"><i style="width:0.6%"></i></div><div class="tr-pc">0.36%</div><div class="tr-tg"><span class="tg tg-no">无对应因子</span></div><div class="tr-nt">无对应因子</div></div><div class="tr-row tr-no" style="padding-left:34px"><div class="tr-nm">└ 其他债券<span class="tr-cd">OTH_BDVALUE</span></div><div class="tr-bar"><i style="width:2.4%"></i></div><div class="tr-pc">1.43%</div><div class="tr-tg"><span class="tg tg-no">无对应因子</span></div><div class="tr-nt">倒算项，无对应因子</div></div></div>
     <div class="callout"><span>缺口在哪里</span>
     <p>四个组合计覆盖债券市值的<b>中位 89.58%</b>、均值 84.27%。缺口几乎全部来自<b>企债科目下的另外两项</b>：企业债+公司债、短期融资券——它们有券种、有仓位，但因子集里没有对应指数，所以既进不了先验、也不在久期加权中。</p></div>
@@ -2181,7 +2181,7 @@ table.mini tr.oth td.value-positive,table.mini tr.oth td.value-negative{opacity:
     <b>未进入评价的披露点</b>：① <b>该报告期未被交接数据纳入评价池</b>，如当期 Wind 分类不在纯债板块。
     本页规模按全历史固定基金池判定，不按报告期因规模变化而进出；逐点原因以对应评价明细为准；
     ② <b>该期早于这只基金的第一个估计值</b>——本页评价窗口从 2018H1 起（因子指数共同起点 2018-01-02），
-    再扣 120 个交易日预热，模型最早在 2018 年年中才出得了值。<br>
+    交接说明记载120个交易日预热；本次未复现该日历与模型运行，估计起点以图中保留的历史输出为准。<br>
     图上左端<b>浅灰底纹</b>那一段就是②，只有真值点、没有模型线，无法比对；虚线竖杠是该基金模型估计的起点。
     灰点最早画到 2016H1，与模型自身的报告期口径（ALL_PERIODS）一致，更早的披露不在本页范围内。</p>
   </div>
@@ -2489,8 +2489,8 @@ var FW_DATA = {"funds":[{"code":"000134.OF","name":"中信保诚嘉鸿A","pool":
     <div id="cvFund"></div>
 
     <p class="note" style="margin-top:14px"><b>样本区间 2018-07-06 起。</b>
-    因子指数的共同起点是 2018-01-02，而滤波要先用 <b>120 个交易日预热且不取值</b>，
-    所以各基金的日频敞口序列要到这之后才有——验证样本因此从 2018-07-06 开始。
+    交接说明记载因子共同起点2018-01-02及120个交易日预热；<b>该模型运行与原始日历尚未复现</b>，
+    本页保留的历史验证样本起点为 2018-07-06 开始。
     利率大日子全期 99 天、实际用上 66 天；其中 2018年 5 天因当日该类基金不足 10 只未计入、2019年 8 天因当日该类基金不足 10 只未计入、2020年 20 天因当日该类基金不足 10 只未计入。</p>
   </div>
 
@@ -3133,7 +3133,7 @@ var CV2 = {"branch":"strict","x":2.0,"win":250,"min_n":10,"min_fund_days":20,"st
       <tbody>
 <tr><td>[0.5, 1.5)</td><td colspan="5" style="color:var(--muted)">样本不足</td></tr><tr><td>[1.5, 3.0)</td><td>123</td><td>1.091</td><td>701</td><td>0.605</td><td class="value-negative">+80%</td></tr><tr><td>[3.0, 5.0)</td><td>145</td><td>0.654</td><td>272</td><td>0.616</td><td class="">+6%</td></tr><tr><td>[5.0, ∞)</td><td>100</td><td>0.996</td><td>40</td><td>0.950</td><td class="">+5%</td></tr>      </tbody></table></div>
     <p class="fc-note">同一久期档内直接比 MAFE，减少久期水平差异的影响，但档内仍可能存在差异。
-    最后一列为正表示利率型更难估——短久期档（&lt;3年）利率型明显更难，长久期档（≥5年）反而信用型更难。</p>
+    最后一列为正表示利率型 MAFE 更高。当前≥5年组利率型为 0.996 年、信用型为 0.950 年，利率型约高 4.8%（表中取整为 +5%）。这是本页历史样本的误差比较，不代表差异具有统计显著性。</p>
   </div>
 <!--X2-MB-END-->
 

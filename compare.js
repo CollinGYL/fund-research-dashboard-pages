@@ -7,10 +7,10 @@
  function cutoff(){const q=parameters(),value=q.get('navDate') || new URLSearchParams(q.get('list')||'').get('navDate');return FundLifecycle.validDate(value)?value:null;}
  function save(values){const url=new URL(location.href);for(const [key,value] of Object.entries(values))value?url.searchParams.set(key,value):url.searchParams.delete(key);history.replaceState(null,'',url);}
  function selectionLabel(){return current.map(d=>`${d.fund?.name||d.code}（${d.fund?.code||d.code}）`).join('、');}
- function signedPercent(value){
+ function signedPercent(value, preserveSmall=false){
   if(!Number.isFinite(value))return '—';
-  const n=Number((value*100).toFixed(2)),kind=n===0?'value-zero':n>0?'value-positive':'value-negative';
-  return `<strong class="${kind}">${n===0?'0':(n>0?'+':'')+n.toFixed(2)}%</strong>`;
+  const displayed=preserveSmall?value:Number((value*100).toFixed(2)),kind=displayed===0?'value-zero':displayed>0?'value-positive':'value-negative';
+  return `<strong class="${kind}">${FundResearch.percent(value,2,true,{preserveSmall})}</strong>`;
  }
  function load(code){
   if(cache.has(code))return cache.get(code);
@@ -34,17 +34,17 @@
   const q=parameters(),savedStart=q.get('compareStart'),savedEnd=q.get('compareEnd');
   let left=savedStart?result.dates.findIndex(d=>d>=savedStart):0,right=savedEnd?result.dates.findLastIndex(d=>d<=savedEnd):result.dates.length-1;
   if(left<0||right<0||left>=right){left=0;right=result.dates.length-1;}
-  output.innerHTML=current.filter(d=>FundLifecycle.exitEvent(d.fund||d.code)).map(d=>FundLifecycle.notice(d.fund||d.code)).join('')+`<article class="subpanel"><div class="subpanel-heading"><h3>同区间净值表现</h3><span data-common-dates></span></div><p data-selected-funds></p><div data-compare-chart></div><div class="compare-zoom"><label>起点<input id="comparison-start" aria-label="比较区间起点" type="range" min="0" max="${result.dates.length-2}" value="${left}"></label><label>终点<input id="comparison-end" aria-label="比较区间终点" type="range" min="1" max="${result.dates.length-1}" value="${right}"></label></div></article><article class="subpanel"><h3>区间结果</h3><div class="table-scroll" data-comparison-metrics></div></article><article class="subpanel"><h3>收益相关性</h3><div class="table-scroll" data-comparison-correlation></div><p class="method-note">使用相同区间的共同日期收益；3个及以下收益观测显示“样本不足”，恒定序列显示—。</p></article>`;
+  output.innerHTML=current.filter(d=>FundLifecycle.exitEvent(d.fund||d.code)).map(d=>FundLifecycle.notice(d.fund||d.code)).join('')+`<article class="subpanel"><div class="subpanel-heading"><h3>同区间净值表现</h3><span data-common-dates></span></div><p data-selected-funds></p><div data-compare-chart></div><div class="compare-zoom"><label>起点<input id="comparison-start" aria-label="比较区间起点" type="range" min="0" max="${result.dates.length-2}" value="${left}"></label><label>终点<input id="comparison-end" aria-label="比较区间终点" type="range" min="1" max="${result.dates.length-1}" value="${right}"></label></div></article><article class="subpanel"><h3>区间结果</h3><div class="table-scroll" data-comparison-metrics></div></article><article class="subpanel"><h3>收益相关性</h3><div class="table-scroll" data-comparison-correlation></div><p class="method-note">按两只基金原始净值相邻日期形成收益，仅配对起止日期均相同的区间；至少${ReviewCore.MIN_CORRELATION_RETURNS}个有效配对收益观测。每格n为实际收益样本数，不是共同净值日数；不填缺值，恒定序列相关性无定义。</p></article>`;
   $('[data-selected-funds]').textContent=`已选：${selectionLabel()}`;
   const update=()=>{
    let left=Number($('#comparison-start').value),right=Number($('#comparison-end').value);
    if(left>=right){right=Math.min(result.dates.length-1,left+1);$('#comparison-end').value=right;}
    const dates=result.dates.slice(left,right+1),s=result.series.map(r=>{const raw=r.points.slice(left,right+1).map(p=>p[1]+1),base=raw[0];return {...r,points:dates.map((d,j)=>[d,(raw[j]/base-1)*100]),stats:ReviewCore.stats(raw),returns:raw.slice(1).map((v,j)=>v/raw[j]-1)};});
-   $('[data-common-dates]').textContent=`${dates[0]}—${dates.at(-1)} · ${dates.length}个共同观测${cutoff()?` · 净值截止 ${cutoff()}`:''}`;
+   $('[data-common-dates]').textContent=`${dates[0]}—${dates.at(-1)} · ${dates.length}个共同净值日${cutoff()?` · 净值截止 ${cutoff()}`:''}`;
    FundMarket.chart($('[data-compare-chart]'),s.map((r,i)=>({label:r.name||r.code,unit:'%',color:colors[i],points:r.points})));
    const detailLink=code=>{const p=new URLSearchParams({code});for(const key of ['navDate','list'])if(parameters().get(key))p.set(key,parameters().get(key));if(cutoff())p.set('navDate',cutoff());return `fund.html?${p}`;};
-   $('[data-comparison-metrics]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th><th>区间收益</th><th>最大回撤</th><th>所用净值末日</th></tr></thead><tbody>${s.map((r,i)=>`<tr><td><a href="${esc(detailLink(r.code))}">${esc(r.name)} <small>${esc(r.code)}</small></a></td><td>${signedPercent(r.stats.return)}</td><td>${signedPercent(r.stats.drawdown)}</td><td>${esc(dates.at(-1)||'—')}</td></tr>`).join('')}</tbody></table>`;
-   $('[data-comparison-correlation]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th>${s.map(r=>`<th>${esc(r.name)}</th>`).join('')}</tr></thead><tbody>${s.map(a=>`<tr><th>${esc(a.name)}</th>${s.map(b=>{const c=a.returns.length<=3?null:ReviewCore.correlation(a.returns,b.returns);return `<td>${a.returns.length<=3?'样本不足':c===null?'—':c.toFixed(3)}</td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
+   $('[data-comparison-metrics]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th><th>区间收益</th><th>最大回撤</th><th>所用净值末日</th></tr></thead><tbody>${s.map((r,i)=>`<tr><td><a href="${esc(detailLink(r.code))}">${esc(r.name)} <small>${esc(r.code)}</small></a></td><td>${signedPercent(r.stats.return)}</td><td>${signedPercent(r.stats.drawdown,true)}</td><td>${esc(dates.at(-1)||'—')}</td></tr>`).join('')}</tbody></table>`;
+   $('[data-comparison-correlation]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th>${s.map(r=>`<th>${esc(r.name)}</th>`).join('')}</tr></thead><tbody>${s.map(a=>`<tr><th>${esc(a.name)}</th>${s.map(b=>{const c=ReviewCore.pairedNavCorrelation(a.nav,b.nav,dates[0],dates.at(-1));const label=c.correlation!==null?c.correlation.toFixed(3):c.status==='insufficient'?'样本不足':c.status==='empty'?'无配对收益':c.status==='zero_variance'?'无变化':'暂不可算';return `<td title="${esc(c.reason||'相同起止日期的配对收益相关性')}">${label}<small> n=${c.observations}${c.invalidObservations?` · 排除${c.invalidObservations}个非有限区间`:''}</small></td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
    save({codes:selectedCodes.join(','),mode:selectedMode,comparePeriod:$('#compare-period').value,compareStart:dates[0],compareEnd:dates.at(-1),...(cutoff()?{navDate:cutoff()}:{})});
   };
   $('#comparison-start').addEventListener('input',update);$('#comparison-end').addEventListener('input',update);update();return true;

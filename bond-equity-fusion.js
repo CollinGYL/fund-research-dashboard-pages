@@ -116,14 +116,17 @@
    const changes=s.disclosure_changes?.rows||[];
    return {report_date:s.report_date,announcement_date:s.announcement_date,holding_count:rows.length,total_weight:s.disclosed_stock_weight_nav,holdings:rows,weights:Object.fromEntries(Object.entries(s.industry).map(([k,v])=>[k,Object.fromEntries(v.rows.map(r=>[r.name,r.weight_nav]))])),entered:changes.filter(r=>r.change_type==='entry').map(r=>({code:r.stock_code,name:names.get(r.stock_code)||r.stock_code})),exited:changes.filter(r=>r.change_type==='exit').map(r=>({code:r.stock_code,name:names.get(r.stock_code)||r.stock_code})),equity_meta:s};
   });
-  return {...original,full,quarterly:original?.quarterly||[],default_scope:'full',equity_adapted:true};
+  return {...original,full:root.FundResearch.normalizeHoldingPeriods(full),quarterly:root.FundResearch.normalizeHoldingPeriods(original?.quarterly||[]),default_scope:'full',equity_adapted:true};
+ }
+ function holdingSummary(s){
+  return dates(s)+`<p class="method-note">所选完整报告期：股票占净值 ${percent(s.stock_weight_nav)}，已披露 ${s.holdings.length}只。中信分类覆盖 ${percent(s.industry?.level1?.classification_weight_coverage_of_disclosed_stocks,1)}；港股保留独立桶。</p>`;
  }
  function disclosureIntro(p){
   const e=p.direct_equity;
   return dates(e)+`<p class="method-note">最新完整披露：股票占净值 ${percent(e.stock_weight_nav)}，已披露 ${e.holdings.length}只。中信分类覆盖 ${percent(e.industry.level1.classification_weight_coverage_of_disclosed_stocks,1)}；港股保留独立桶。</p>`;
  }
  function holdingsPanel(p,hh){
-  return `<div class="panel-intro"><h2>直接股票披露明细</h2><p>默认完整持仓；季度前十大单独切换。转债对应正股在“转债穿透”查看。</p></div>${disclosureIntro(p)}<div id="holding-analysis-interactive" class="fusion-section">
+  return `<div class="panel-intro"><h2>直接股票披露明细</h2><p>默认完整持仓；季度前十大单独切换。转债对应正股在“转债穿透”查看。</p></div><div data-equity-holding-summary>${holdingSummary(p.direct_equity)}</div><div id="holding-analysis-interactive" class="fusion-section">
    <div class="industry-analysis-toolbar holding-analysis-toolbar"><div class="industry-toggle-group" aria-label="持仓披露范围"><button data-holding-scope="quarterly">季度前十大</button><button class="active" data-holding-scope="full">完整持仓</button></div><div class="industry-toggle-group" aria-label="行业层级">${[['sector','板块'],['level1','中信一级'],['level2','中信二级'],['level3','中信三级']].map(([k,v])=>`<button data-holding-dimension="${k}"${k==='sector'?' class="active"':''}>${v}</button>`).join('')}</div></div>
    <article class="subpanel fusion-section"><div class="subpanel-heading"><div><h3>持股明细</h3><span id="holding-scope-note"></span></div><label class="fusion-control">报告期<select id="holding-period-select"></select></label></div><div id="holding-changes-output"></div><div id="holding-table-output"></div></article>
    <article class="subpanel fusion-section"><div class="subpanel-heading"><h3>个股连续持仓矩阵</h3><span>点击股票查看历次披露权重</span></div><div id="holding-trajectory-output"></div></article></div><p class="method-note">个股估值沿用对应报告期的已缓存字段；原始财报公告时点未核。季度未列前十与完整披露的零持仓分别处理。</p>${transactions(p)}${evidence(p)}`;
@@ -156,6 +159,6 @@
   host.querySelector('[data-equity-changes-date]')?.addEventListener('change',e=>{host.querySelector('[data-equity-changes-output]').innerHTML=changesSnapshot(p,selected(p,e.target.value));});
   host.querySelector('[data-equity-cb-level]')?.addEventListener('change',e=>{host.querySelector('[data-equity-cb-output]').innerHTML=cbIndustry(p,e.target.value);});
  }
- root.BondEquityFusion={withCurrentNav,currentView,finite,weightLabel,stockQuantity,has,load,snapshotCaption,allocationPanel,profilePanel,profileSnapshot,styleMetrics,historyChart,managerPanel,holdingHistory,disclosureIntro,holdingsPanel,changesPanel,changesSnapshot,convertibleReportPanel,cbIndustry,bind};
+ root.BondEquityFusion={withCurrentNav,currentView,finite,weightLabel,stockQuantity,has,load,snapshotCaption,allocationPanel,profilePanel,profileSnapshot,styleMetrics,historyChart,managerPanel,holdingHistory,holdingSummary,disclosureIntro,holdingsPanel,changesPanel,changesSnapshot,convertibleReportPanel,cbIndustry,bind};
  if(typeof module!=='undefined')module.exports=root.BondEquityFusion;
 })(typeof window!=='undefined'?window:globalThis);

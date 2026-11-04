@@ -2,7 +2,7 @@
 (function(){
 
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const P=(x,d=2)=>(x==null||Number.isNaN(x))?"—":(x*100).toFixed(d)+"%";
+const P=(x,d=2,options={})=>FundResearch.percent(x,d,false,options);
 const NN=(x,d=2)=>(x==null||Number.isNaN(x))?"—":Number(x).toFixed(d);
 const pcls=x=>x==null?"":(x>=0?"value-positive":"value-negative");
 /* ★2026-08-17 券种/大类按「市场生态统计」页模块九的四层科目树重做。
@@ -605,16 +605,19 @@ function idxCompareChart(d,bucketCode){
   const lib=window.BOND_INDEX_LIB,contract=bucketCode==='__contract__'?d.contract_benchmark:null;
   const navPts=(d.perf.curve.nav||[]).filter(p=>p[1]!=null);
   const rawIndex=contract?.series||window.FUND_COMMON_BENCHMARKS?.benchmarks?.[bucketCode]?.series||(lib?.series?.[bucketCode]?.points||[]).map(([date,value])=>[date,1+Number(value)]);
+  const error=!contract&&window.PURE_BOND_COMMON_BENCHMARK_ERROR;
+  const lastIndexDate=rawIndex.filter(p=>isFiniteValue(p[1])&&Number(p[1])>0).at(-1)?.[0]||"无有效日期";
+  const warning=error?`<div class="simulation-warning" role="status">最新公共指数未能加载：${esc(error)}。当前同代码指数历史截止 ${esc(lastIndexDate)}，仅比较实际共同日期，未视为最新。<button type="button" class="text-button" data-pb-common-benchmark-retry data-pb-onclick="retryPureBondComparisonBenchmark()">仅重试公共指数</button></div>`:"";
   const indexMap=new Map(rawIndex.filter(p=>isFiniteValue(p[1])&&Number(p[1])>0).map(([date,v])=>[date,Number(v)]));
   const common=navPts.filter(p=>indexMap.has(p[0])).map(([date,value])=>({date,fund:1+Number(value),benchmark:indexMap.get(date)}));
-  if(!common.length)return `<div class="method-note">所选指数与基金无共同有效日期</div>`;
+  if(!common.length)return warning+`<div class="method-note">所选指数与基金无共同有效日期</div>`;
   const selected=rebaseNavPoints(common.filter(p=>!idxZoom||(+new Date(p.date)>=idxZoom.x0&&+new Date(p.date)<=idxZoom.x1)));
-  if(!selected.length)return `<div class="method-note">所选区间无共同有效日期</div><button type="button" class="zoom-reset" data-pb-onclick="resetIdxZoom()">↺ 重置缩放</button>`;
+  if(!selected.length)return warning+`<div class="method-note">所选区间无共同有效日期</div><button type="button" class="zoom-reset" data-pb-onclick="resetIdxZoom()">↺ 重置缩放</button>`;
   const label=contract?.name||`${lib?.labels?.[bucketCode]||bucketCode}·中债新综合财富指数（研究参照）`;
   const fullX0=+new Date(common[0].date),fullX1=+new Date(common.at(-1).date);
   const actual={x0:+new Date(selected[0].date),x1:+new Date(selected.at(-1).date)};
   const resetBtn=idxZoom?`<button type="button" class="zoom-reset" data-pb-onclick="resetIdxZoom()">↺ 重置缩放</button>`:"";
-  return resetBtn+`<div class="method-note">实际共同区间 ${esc(selected[0].date)} — ${esc(selected.at(-1).date)}；首日归一为0%。</div>`+lineChart([
+  return warning+resetBtn+`<div class="method-note">实际共同区间 ${esc(selected[0].date)} — ${esc(selected.at(-1).date)}；首日归一为0%。</div>`+lineChart([
     {name:"基金区间收益",color:"var(--teal)",points:selected.map(p=>[p.date,p.fund-1]),fill:"var(--teal)",sw:3},
     {name:label,color:"var(--gold)",points:selected.map(p=>[p.date,p.benchmark-1]),sw:2}
   ],{h:220,pctY:true,navDisplay:true,forceX:actual,slider:{fullX0,fullX1,onChange:zoomIdxCompare}});
@@ -672,7 +675,7 @@ function renderHead(d){
     <div class="fund-page-metrics">
       <div><span>成立以来收益</span><strong class="${since.cum>=0?'pos':'neg'}">${P(since.cum)}</strong></div>
       <div><span>近1年收益</span><strong class="${y1.cum>=0?'pos':'neg'}">${P(y1.cum)}</strong></div>
-      <div><span>成立以来最大回撤</span><strong class="neg">${P(since.mdd)}</strong></div>
+      <div><span>成立以来最大回撤</span><strong class="neg">${P(since.mdd,2,{preserveSmall:true})}</strong></div>
       <div><span>最新杠杆</span><strong>${styleLast.lev!=null?NN(styleLast.lev,2)+"x":"—"}</strong>${styleLast.dt?`<small>${esc(styleLast.dt)} 季报</small>`:""}</div>
       <div><span>最新久期</span><strong>${durLast.dur!=null?NN(durLast.dur,2)+"y":"—"}</strong>${durLast.dt?`<small>${esc(durLast.dt)}</small>`:""}</div>
       <div><span>券种占净值(国/金/企)</span><strong style="font-size:16px">${styleLast.gov!=null?`${NN(styleLast.gov,0)}%/${NN(styleLast.fin,0)}%/${NN(styleLast.corp,0)}%`:"—"}</strong>${styleLast.dt?`<small>${esc(styleLast.dt)} 季报</small>`:""}</div>
@@ -852,7 +855,7 @@ function stageTable(rows){
       <td class="${pcls(s.cum)}"><strong>${P(s.cum)}</strong></td>
       <td>${dim(s,P(s.ann))}</td>
       <td>${P(s.vol)}</td>
-      <td class="${s.mdd!=null?"value-negative":""}">${P(s.mdd)}</td>
+      <td class="${s.mdd!=null?"value-negative":""}">${P(s.mdd,2,{preserveSmall:true})}</td>
       <td>${dim(s,NN(s.sharpe))}</td>
       <td>${dim(s,NN(s.calmar))}</td></tr>`;
   });
@@ -1016,7 +1019,8 @@ function bondTable(period){
     if(b.sub==="是")  t+=`<span class="btag" style="background:#e7ddf3;color:#5b3f8a">次级</span>`;
     return t;
   };
-  const head=`<div class="rt-wrap"><table class="rt"><thead><tr><th>债券代码</th><th>债券名称</th><th>券种</th>`+
+  const columns=[105,125,90,80,105,135,175,85,100];
+  const head=`<div class="rt-wrap"><table class="rt" style="min-width:${columns.reduce((a,b)=>a+b,0)}px"><colgroup>${columns.map(width=>`<col style="width:${width}px">`).join("")}</colgroup><thead><tr><th>债券代码</th><th>债券名称</th><th>券种</th>`+
     `<th>剩余期限</th><th>评级</th><th>主体类型</th><th>发行人</th><th>市值占净值</th><th>环比</th></tr></thead><tbody>`;
   const rows=period.bonds.map(b=>
     `<tr><td style="font-family:ui-monospace,Consolas">${esc(b.code)}</td>`+
@@ -1775,6 +1779,6 @@ document.addEventListener("click",event=>{
 });
 
 
-window.__PB={renderHead:renderHead,setCompareWindow:function(v){cmpWin=v;renderCompare();},setCompareFactor:function(v){cmpFac=v;renderCompare();},renderPerf:renderPerf,renderAlloc:renderAlloc,renderBondStruct:renderBondStruct,renderCorr:renderCorr,renderCampisi:renderCampisi,ensureDurKF:ensureDurKF,ensureCorrShard:ensureCorrShard,refreshDurKF:refreshDurKF,setCurrent:function(d){CURRENT=d;idxZoom=null;navZoom=null;}};
+window.__PB={refreshIdxCompare:refreshIdxCompare,renderHead:renderHead,setCompareWindow:function(v){cmpWin=v;renderCompare();},setCompareFactor:function(v){cmpFac=v;renderCompare();},renderPerf:renderPerf,renderAlloc:renderAlloc,renderBondStruct:renderBondStruct,renderCorr:renderCorr,renderCampisi:renderCampisi,ensureDurKF:ensureDurKF,ensureCorrShard:ensureCorrShard,refreshDurKF:refreshDurKF,setCurrent:function(d){CURRENT=d;idxZoom=null;navZoom=null;}};
 window.setNavRange=setNavRange;window.togglePeerPctlFac=togglePeerPctlFac;window.resetNavZoom=resetNavZoom;window.resetIdxZoom=resetIdxZoom;window.switchIndexBucket=switchIndexBucket;window.switchBondPeriod=switchBondPeriod;window.switchPureBondBasis=switchPureBondBasis;window.switchCorrWin=switchCorrWin;window.switchIndexCorrWin=switchIndexCorrWin;window.switchFacWin=switchFacWin;window.switchPeerFac=switchPeerFac;window.doCompare=doCompare;window.clearCompare=clearCompare;window.switchTab=switchTab;window.fillCmpOptions=fillCmpOptions;window.renderCompare=renderCompare;
 })();
