@@ -364,10 +364,10 @@ function stackArea(rows,keys,opt={}){
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
   xTicks(x0,x1).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
   const colors=opt.colors||SC,names=opt.names||SCN;
-  const geometry=ReviewCore.stackAreas(rows.map(r=>r.dt),rows.map(r=>keys.map(k=>r[k])),{left:pl,right:w-pr});
+  const geometry=ReviewCore.stackAreas(rows.map(r=>r.dt),rows.map(r=>keys.map(k=>r[k])),{left:pl,right:w-pr,orderByCoverage:true});
   geometry.segments.forEach(s=>s.bands.forEach(b=>{
     const k=keys[b.layer],tag=`data-stack-layer="${k}" data-stack-start="${s.start}" data-stack-end="${s.end}" data-stack-mask="${s.signature}"`;
-    if(b.points.length===1){const p=b.points[0];svg+=`<circle data-stack-point ${tag} cx="${p.x}" cy="${Y(p.upper)}" r="2.5" fill="${colors[k]}"><title>${p.date} · ${esc(names[k])} ${NN(p.value,2)}%</title></circle>`;return;}
+    if(b.points.length===1){const p=b.points[0];if(p.value===0)return;svg+=`<circle data-stack-point ${tag} cx="${p.x}" cy="${Y(p.upper)}" r="2.5" fill="${colors[k]}"><title>${p.date} · ${esc(names[k])} ${NN(p.value,2)}%</title></circle>`;return;}
     const points=[...b.points.map(p=>`${p.x},${Y(p.upper)}`),...b.points.slice().reverse().map(p=>`${p.x},${Y(p.lower)}`)].join(' ');
     svg+=`<polygon ${tag} points="${points}" fill="${colors[k]}" opacity="0.85" stroke="none"><title>${s.start} — ${s.end} · ${esc(names[k])}</title></polygon>`;
   }));
@@ -387,7 +387,7 @@ function stackArea(rows,keys,opt={}){
     return `<span class="${z?"lg-zero":""}"${z?' title="现有记录中该科目全期为0%"':""}>`
       +`<i class="sw" style="height:10px;width:10px;border-radius:2px;background:${colors[k]}"></i>${names[k]}`
       +`${k==="enterprise"&&typeof rows.at(-1).enterprise_detail==="number"&&typeof rows.at(-1).corp==="number"?"（计入信用债）":rows.at(-1).denominator_missing&&rows.at(-1).known_numerators?.includes(k)?"（分母未取得）":lgMissing(k)?"（未取得）":latestMissing(k)?"（本期未取得）":z?"（0%）":""}</span>`;
-  }).join("")+`</div><p class="method-note">色带仅连接相同已取得分项的相邻报告期；分项变化或缺季处分段，孤立报告期仅标点。</p>`;
+  }).join("")+`</div><p class="method-note">色带按实际可得报告连接；本层或下层的显式缺项变化处断开，未补造缺失报告。</p>`;
 }
 function wireStackArea(id,rows,keys,g){
   const hit=document.getElementById("hit_"+id),vl=document.getElementById("vl_"+id);

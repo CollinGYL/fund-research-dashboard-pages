@@ -51,25 +51,34 @@
     status:invalid?'invalid':!bands.length?'unavailable':missing.length?'partial':total===0?'zero':'available'};
   });
  }
- // A whole stack shares one availability mask. Never carry an upper band across
- // a change in a missing lower component, or across an unobserved quarter.
- function stackAreas(dates,values,{left=0,right=1,maxGapDays=110}={}){
+ // Each band depends only on its own value and the availability of lower
+ // bands. A missing upper component cannot invalidate a known lower area.
+ // Explicit empty observations break the series; calendar distance alone is
+ // not evidence of a missing report (some sources are semiannual/annual).
+ function stackAreas(dates,values,{left=0,right=1,maxGapDays=Infinity,orderByCoverage=false}={}){
   if(!(right>left)||!(maxGapDays>0))throw Error('堆积面积图坐标或日期间隔无效');
-  const reports=stackColumns(dates,values,{left,right}),segments=[];let current=null;
-  reports.forEach(r=>{
-   const signature=r.bands.map(b=>b.layer).join(',');
-   if(!r.bands.length){current=null;return;}
-   const previous=current?.reports.at(-1);
-   if(!current||current.signature!==signature||(Date.parse(r.date)-Date.parse(previous.date))/86400000>maxGapDays){
-    current={index:segments.length,signature,reports:[],bands:[]};segments.push(current);
-   }
-   current.reports.push(r);
-  });
-  segments.forEach(s=>{
-   s.start=s.reports[0].date;s.end=s.reports.at(-1).date;
-   s.bands=s.reports[0].bands.map((b,j)=>({layer:b.layer,points:s.reports.map(r=>({date:r.date,x:r.center,...r.bands[j]}))}));
-  });
-  return {reports,segments};
+  const count=Math.max(0,...values.map(r=>r.length));
+  const order=Array.from({length:count},(_,i)=>i);
+  if(orderByCoverage)order.sort((a,b)=>values.filter(r=>Number.isFinite(r[b])).length-values.filter(r=>Number.isFinite(r[a])).length||a-b);
+  const rank=new Map(order.map((layer,i)=>[layer,i]));
+  const reports=stackColumns(dates,values.map(r=>order.map(i=>r[i])),{left,right}),segments=[];
+  reports.forEach(r=>{r.bands.forEach(b=>{b.layer=order[b.layer];});r.missing=r.missing.map(i=>order[i]);});
+  for(const layer of order){
+   let current=null;
+   reports.forEach(r=>{
+    const band=r.bands.find(b=>b.layer===layer);
+    if(!band){current=null;return;}
+    const signature=r.bands.filter(b=>rank.get(b.layer)<=rank.get(layer)).map(b=>b.layer).join(',');
+    const previous=current?.reports.at(-1);
+    if(!current||current.signature!==signature||(Date.parse(r.date)-Date.parse(previous.date))/86400000>maxGapDays){
+     current={index:segments.length,signature,reports:[],bands:[{layer,points:[]}]};segments.push(current);
+    }
+    current.reports.push(r);
+    current.bands[0].points.push({date:r.date,x:r.center,...band});
+   });
+  }
+  segments.forEach(s=>{s.start=s.reports[0].date;s.end=s.reports.at(-1).date;});
+  return {reports,segments,order};
  }
  root.ReviewCore={matches,normalize,scale,dateLabel,stackColumns,stackAreas};
  if(typeof module!=='undefined')module.exports=root.ReviewCore;

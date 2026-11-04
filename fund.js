@@ -1776,7 +1776,7 @@ function renderAssetAllocationAreaChart(history = []) {
       </svg>
       <div class="asset-allocation-hover-card" hidden></div>
     </div>
-    <p class="method-note">色带仅连接相同已取得分项的相邻报告期；分项变化或缺季处分段，孤立报告期仅标点。港股属于股票资产的组成部分，不重复堆叠；基金投资使用披露字段，不用差额反推。各分项保留原披露比例；杠杆使合计可能超过100%。缺失分项在悬停明细中记为—。</p>`;
+    <p class="method-note">色带按实际可得报告连接；本层或下层的显式缺项变化处断开，未补造缺失报告。港股属于股票资产的组成部分，不重复堆叠；基金投资使用披露字段，不用差额反推。各分项保留原披露比例；杠杆使合计可能超过100%。缺失分项在悬停明细中记为—。</p>`;
 }
 
 function bindAssetAllocationChart(history = []) {
@@ -7421,7 +7421,7 @@ function normalizeGenericBondHistory(raw) {
       const oldWeight=previous?.weights.get(holding.code),difference=isFiniteValue(holding.weight)&&isFiniteValue(oldWeight)?Number(holding.weight)-Number(oldWeight):null;
       holding.change=!comparable?null:!previous.weights.has(holding.code)?'新进':difference===null?null:difference>0.0001?'加仓':difference< -0.0001?'减仓':'持平';
     }
-    const result={report_date:period.d || period.report_date,announcement_date:period.a || period.announcement_date,source:period.source,scope,holdings,comparison_status:comparable?'comparable':'not_computed_incomparable_disclosure',entered:comparable?holdings.filter(h=>h.change==='新进').map(h=>({code:h.code,name:h.name})):null,exited:comparable?previous.holdings.filter(h=>!current.has(h.code)).map(h=>({code:h.code,name:h.name})):null,turnover_proxy:comparable?period.t:null,rolling_4q_turnover_proxy:comparable?period.r:null,convertible_turnover_proxy:comparable?period.c:null,convertible_rolling_4q_turnover_proxy:comparable?period.q:null};
+    const result={report_date:period.d || period.report_date,announcement_date:period.a || period.announcement_date,available_at:period.available_at,acquired_at:period.acquired_at,source:period.source,scope,holdings,comparison_status:comparable?'comparable':'not_computed_incomparable_disclosure',entered:comparable?holdings.filter(h=>h.change==='新进').map(h=>({code:h.code,name:h.name})):null,exited:comparable?previous.holdings.filter(h=>!current.has(h.code)).map(h=>({code:h.code,name:h.name})):null,turnover_proxy:comparable?period.t:null,rolling_4q_turnover_proxy:comparable?period.r:null,convertible_turnover_proxy:comparable?period.c:null,convertible_rolling_4q_turnover_proxy:comparable?period.q:null};
     previous={scope,usable,weights:current,holdings};return result;
   });
 }
