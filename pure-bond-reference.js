@@ -360,7 +360,11 @@ function stackArea(rows,keys,opt={}){
   const ymax=Math.max(...rows.map(r=>keys.map(k=>r[k]).filter(v=>typeof v==='number'&&Number.isFinite(v)).reduce((a,v)=>a+v,0)),100);
   const Y=v=>pt+ph-v/ymax*ph;
   let svg=`<svg viewBox="0 0 ${w} ${h}" id="svg_${id}">`;
-  for(let i=0;i<=4;i++){const v=ymax*i/4,y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${v.toFixed(0)}%</text>`;}
+  const regularTicks=Array.from({length:5},(_,i)=>ymax*i/4);
+  // Keep the reference value explicit and avoid a near-duplicate tick beside it.
+  const ref=Number.isFinite(opt.refLine)&&opt.refLine>=0&&opt.refLine<=ymax?opt.refLine:null;
+  const ticks=ref==null?regularTicks:[...regularTicks.filter(v=>Math.abs(v-ref)>ymax/4*.15),ref].sort((a,b)=>a-b);
+  ticks.forEach(v=>{const y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${v.toFixed(0)}%</text>`;});
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
   xTicks(x0,x1).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
   const colors=opt.colors||SC,names=opt.names||SCN;
@@ -939,7 +943,8 @@ function pureBondStructurePanel(d,basis){
   const label={fixed_income:'固定收益投资市值（含ABS）',bonds:'债券市值（不含ABS）',nav:'基金净资产'}[basis];
   const valid=v=>typeof v==='number'&&Number.isFinite(v);
   const chart=bStyle.length?stackArea(bStyle,keys,{h:320,colors:SC,names:SCN,refLine:100}):'<div class="method-note">无报告期数据</div>';
-  const note=last?`<p class="method-note" data-bond-denominator>最新报告期 ${esc(last.dt)} · 分母：${label}${basis==='nav'?'':valid(last.denominator)?'，占净值 '+NN(last.denominator,4)+'%':'尚未取得'}。${basis==='bonds'?'本口径不包含ABS。':''}${!valid(last.denominator)?'可切换其他口径查看已取得的券种数据。':''}</p>`:'';
+  const missingPeriods=bStyle.filter(r=>r.denominator_missing).length;
+  const note=last?`<p class="method-note" data-bond-denominator>最新报告期 ${esc(last.dt)} · 分母：${label}${basis==='nav'?'':valid(last.denominator)?'，占净值 '+NN(last.denominator,4)+'%':'尚未取得'}。${basis==='bonds'?'本口径不包含ABS。':''}${basis==='nav'?'展示已取得券种的占净值比例，未归一至100%；缺项保持未取得。':missingPeriods?` ${missingPeriods}期分母未取得，内部比例留空；“占基金净值”可查看这些报告期的已知券种。`:''}</p>`:'';
   const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':last.denominator_missing&&last.known_numerators?.includes(k)?'分母未取得':'未取得'}</strong></div>`).join('')+'</div>':'';
   const creditDetails=source&&['enterprise_detail','commercial_paper','medium_term_note'].some(k=>valid(source[k]))?'<details class="selection-method"><summary>信用债细项 · 占基金净值</summary><div class="metric-grid-in" style="grid-template-columns:repeat(3,1fr)">'+[['enterprise_detail','企业债'],['commercial_paper','短期融资券'],['medium_term_note','中期票据']].map(([k,label])=>`<div class="rmetric"><span>${label}</span><strong>${valid(source[k])?NN(source[k],4)+'%':'未取得'}</strong></div>`).join('')+'</div></details>':'';
   return note+chart+summary+creditDetails;
@@ -948,11 +953,12 @@ function switchPureBondBasis(basis){
   const host=document.getElementById('pureBondStructureChart');
   if(CURRENT&&host&&['fixed_income','bonds','nav'].includes(basis))host.innerHTML=pureBondStructurePanel(CURRENT,basis);
 }
+function defaultPureBondBasis(){return 'nav';}
 function renderBondStruct(d){
   const style=d.alloc.style||[];
   const latestStyle=style.at(-1);
-  const initialBasis=latestStyle?.bond_denominators_status==='same_report_typed'&&latestStyle.fixed_income_total_including_abs==null?'bonds':'fixed_income';
-  const structureControls=`<label>显示口径 <select class="period" aria-label="券种分布口径" data-pb-onchange="switchPureBondBasis(this.value)"><option value="fixed_income"${initialBasis==='fixed_income'?' selected':''}>固定收益内部（含ABS）</option><option value="bonds"${initialBasis==='bonds'?' selected':''}>债券内部（不含ABS）</option><option value="nav">占基金净值</option></select></label>`;
+  const initialBasis=defaultPureBondBasis();
+  const structureControls=`<label>显示口径 <select class="period" aria-label="券种分布口径" data-pb-onchange="switchPureBondBasis(this.value)"><option value="fixed_income"${initialBasis==='fixed_income'?' selected':''}>固定收益内部（含ABS）</option><option value="bonds"${initialBasis==='bonds'?' selected':''}>债券内部（不含ABS）</option><option value="nav"${initialBasis==='nav'?' selected':''}>占基金净值</option></select></label>`;
   const structureBody=`<div id="pureBondStructureChart">${pureBondStructurePanel(d,initialBasis)}</div>`;
   const bonds=d.bonds||[];const last=bonds.length?bonds[bonds.length-1]:null;
   let holdHtml=`<div class="method-note">无持仓数据</div>`;
