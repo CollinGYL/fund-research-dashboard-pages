@@ -4735,7 +4735,7 @@ function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
     const check=byDate.get(r.date), matched=comparable.has(r.date);
     const item=series.get(r.date)||{report_date:r.date};
     // Verified comparison uses the audited net-assets formula; other points keep their source value.
-    item[matched?'disclosed':'historical']=matched?Number(check.actual):Number(r.duration);series.set(r.date,item);
+    item.disclosed=matched?Number(check.actual):Number(r.duration);series.set(r.date,item);
     const source=r.source==='verified_report_net_assets'?'原报告核验':r.source==='choice_fpdurationbyir'?'Choice利率敏感性字段':'已有报告敏感性历史';
     const reason=matched?'可用于披露对照':kalmanDuration?.status!=='ok'?'暂无有效日频估计':r.date<(kalmanDuration.dates?.[0]||'')?'报告期早于模型估计起点':(reasons[check?.excluded_reason]||'仅展示历史披露，尚不满足严格对照条件');
     return [escapeHTML(r.date),`${num(r.duration,4)}年`,escapeHTML(source),escapeHTML(reason)];
@@ -4745,8 +4745,8 @@ function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
   const points=[...series.values()].filter(r=>r.report_date>='2018-01-01').sort((a,b)=>a.report_date.localeCompare(b.report_date));
   return `<section class="bond-disclosed-history"><div class="subpanel-heading"><div><h3>日频估计与半年报／年报久期</h3><span>图示自2018年起 · 披露日期按报告期末标注 · 单位：年</span></div></div>
     ${missing?`<p class="method-note">${escapeHTML(state.target_report_date||'')}：${missing}</p>`:''}
-    ${points.length>=2?renderMiniLineChart(points,[{key:'duration',label:'日频估计',color:'#0a7c78',format:'years'},{key:'disclosed',label:'已核验披露对照',color:'#c17729',format:'years',points:true},{key:'historical',label:'其他历史披露',color:'#98465f',format:'years',points:true}],`${fund.name}日频估计与历史披露久期`,true):'<p class="empty-copy">可用久期点不足以绘图；已有披露见下表。</p>'}
-    <p class="method-note">橙色实心点：已核验披露；紫红色实心点：其他历史披露。悬停查看日期和数值，全部历史披露保留在下表。</p>
+    ${points.length>=2?renderMiniLineChart(points,[{key:'duration',label:'日频估计',color:'#0a7c78',format:'years'},{key:'disclosed',label:'披露久期',color:'#c17729',format:'years',points:true}],`${fund.name}日频估计与历史披露久期`,true):'<p class="empty-copy">可用久期点不足以绘图；已有披露见下表。</p>'}
+    <p class="method-note">黄色实心点为报告披露久期。来源及能否用于误差统计见下表。</p>
     ${rows.length?`<details><summary>全部历史披露（${rows.length}期）</summary>${renderTable(['报告期','披露久期','来源','对照说明'],rows.reverse())}</details>`:'<p class="method-note">暂未取得可用的历史数值披露。</p>'}
   </section>`;
 }
@@ -6723,7 +6723,7 @@ function mergePureBondTypedStyle(assets, savedStyle) {
   const finite = v => typeof v === 'number' && Number.isFinite(v);
   return rows.map((row, i) => {
     const item = assets[i], totals = item.bond_denominators;
-    row.enterprise_detail = finite(item.enterprise_bond) ? item.enterprise_bond*100 : null;
+    row.enterprise_detail = finite(item.enterprise_bond) ? item.enterprise_bond*100 : row.enterprise;
     row.commercial_paper = finite(item.commercial_paper) ? item.commercial_paper*100 : null;
     row.medium_term_note = finite(item.medium_term_note) ? item.medium_term_note*100 : null;
     if (finite(item.credit_bond) && item.credit_bond_basis === 'enterprise_plus_cp_plus_mtn') {
@@ -6757,6 +6757,32 @@ function pureBondStructureRows(style, basis, keys) {
       known_numerators:keys.filter(k=>finite(r[k])), denominator_status:typed ? 'same_report_typed' : 'legacy_fixed_income'};
     keys.forEach(k => {out[k] = valid && finite(r[k]) ? r[k]/denominator*100 : null;});
     return out;
+  });
+}
+
+function alignPureBondAnnualRanks(reference, detail, annual, fundCode) {
+  const perf = reference.perf;
+  const valid = annual?.catalog_generated_at === FundLifecycle.data().catalog_generated_at;
+  const ranks = valid ? annual.pure_bond_annual?.[fundCode] || [] : [];
+  perf.annual_peer_ranks = ranks;
+  perf.annual_peer_as_of = FundLifecycle.data().as_of || null;
+  if (!ranks.length) return;
+  const nav = genericFundNavPoints(detail);
+  const byYear = new Map(ranks.map(r => [r[0],r]));
+  perf.annual_rank_metrics = (perf.annual || []).map(row => {
+    const rank = byYear.get(row.year);
+    const window = annual.pure_bond_annual_windows?.[row.year];
+    if (!rank || !window || rank[1] !== window[1]) return row;
+    const [anchor,end] = window;
+    const points = nav.filter(p => p.date >= anchor && p.date <= end);
+    if (points[0]?.date !== anchor || points.at(-1)?.date !== end) return row;
+    const stats = performanceStats(points);
+    if (!stats) return row;
+    // Weekend disclosure dates do not shift the common annual ranking window.
+    return {...row, end, cum:stats.cumulative, mdd:stats.maxDrawdown,
+      vol:points.length>=3?stats.volatility:null,
+      sharpe:stats.volatility>0?(stats.annualizedReturn-0.015)/stats.volatility:null,
+      calmar:stats.calmar,partial:false};
   });
 }
 
@@ -6828,7 +6854,11 @@ function refreshPureBondReferenceData(reference, fund, detail, currentDuration) 
         year: Number(year),
         cum: compounded(values),
         mdd: stats?.maxDrawdown ?? null,
-        partial: year === nav[0].date.slice(0, 4) && !nav[0].date.endsWith("01-01"),
+        vol: points.length>=3 ? stats?.volatility ?? null : null,
+        sharpe: stats?.volatility > 0 ? (stats.annualizedReturn - 0.015) / stats.volatility : null,
+        calmar: stats?.calmar ?? null,
+        end: points.at(-1)?.date || null,
+        partial: !points.some(p => p.date < `${year}-01-01`),
         n: points.length,
       };
     });
@@ -6946,16 +6976,50 @@ function applyCurrentPureBondHoldings(reference, history) {
       nature:v.issuer_type?`${v.issuer_type}（名录参考）`:null,btype:v.bond_type,
       attribute_date:v.issuer_reference_date,rating_date:v.rating_date};
   };
-  // Reconcile attributes on existing history without replacing holdings or dates.
-  const periods=new Map((reference.bonds||[]).map(period=>[period.dt,{...period,bonds:(period.bonds||[]).map(row=>({...row,...attribute(row,period.dt)}))}]));
-  for (const period of history||[]) {
-    if(period.scope!=='reported_bond_rows_not_full_portfolio')continue;
-    const bonds=period.holdings.map(row=>({code:row.code,name:row.name,wt:isFiniteValue(row.weight)?row.weight*100:null,
-      ...attribute(row,period.report_date),chg:null}));
-    periods.set(period.report_date,{dt:period.report_date,n:bonds.length,wt_sum:bonds.length&&bonds.every(b=>isFiniteValue(b.wt))?bonds.reduce((n,b)=>n+b.wt,0):null,bonds,cleared:[],turnover_available:false,
-      source_note:'本期已披露重仓券；期限按报告日与到期日计算，评级仅用对应报告期带日期记录。发行人/主体类型为独立日期名录参考，历史时点未核。未知留空。',announcement_date:period.announcement_date});
+  const periods = new Map((reference.bonds || []).map(period => [period.dt,{
+    ...period, scope:'reported_top5_bonds', bonds:(period.bonds || []).map(row=>({...row,...attribute(row,period.dt)}))
+  }]));
+  for (const period of history || []) {
+    const bonds = period.holdings.map(row => ({
+      code:row.code, name:row.name, market_value:row.market_value, wt:isFiniteValue(row.weight)?row.weight*100:null,
+      ...attribute(row,period.report_date),
+    }));
+    periods.set(period.report_date,{dt:period.report_date,n:bonds.length,
+      wt_sum:bonds.length&&bonds.every(b=>isFiniteValue(b.wt))?bonds.reduce((sum,b)=>sum+b.wt,0):null,
+      bonds,scope:period.scope,announcement_date:period.announcement_date,
+      source_note:'本期已披露重仓券；期限按报告日与到期日计算，评级仅用对应报告期带日期记录。发行人/主体类型为独立日期名录参考，历史时点未核。未知留空。'});
   }
-  reference.bonds=Array.from(periods.values()).sort((a,b)=>a.dt.localeCompare(b.dt));
+  reference.bonds = Array.from(periods.values()).sort((a,b)=>a.dt.localeCompare(b.dt));
+  reference.bond_list_comparison = true;
+  const quarter = day => Number(day.slice(0,4))*4 + Math.floor((Number(day.slice(5,7))-1)/3);
+  const topFive = period => {
+    if (!period || !period.bonds.length || (period.scope!=='reported_top5_bonds' && period.bonds.length<5)) return null;
+    const rows = period.bonds;
+    if (rows.some(b=>!b.code||b.code==='—'||!isFiniteValue(b.wt)||Number(b.wt)<0)
+        || new Set(rows.map(b=>b.code)).size!==rows.length) return null;
+    if (period.scope==='reported_top5_bonds') return new Map(rows.map(b=>[b.code,b]));
+    const hasAmounts=rows.every(b=>isFiniteValue(b.market_value)&&Number(b.market_value)>=0);
+    const rankValue=b=>Number(hasAmounts?b.market_value:b.wt);
+    const sorted=rows.slice().sort((a,b)=>rankValue(b)-rankValue(a));
+    const cutoff=rankValue(sorted[Math.min(sorted.length,5)-1]);
+    return new Map(sorted.filter(b=>rankValue(b)>=cutoff).map(b=>[b.code,b]));
+  };
+  let previous = null, previousList = null;
+  for (const period of reference.bonds) {
+    const current = topFive(period);
+    const adjacent = previous && quarter(period.dt)===quarter(previous.dt)+1;
+    const comparable = Boolean(adjacent && previousList && current);
+    period.turnover_available = comparable;
+    period.comparison_note = !previous?'没有上一期名单':!adjacent?'缺少上一季度名单':!comparable?'名单或权重不足以比较':'';
+    period.cleared = comparable?[...previousList.values()].filter(row=>!current.has(row.code)):[];
+    for (const row of period.bonds) {
+      row.chg = null;
+      if (!comparable || !current.has(row.code)) continue;
+      const old = previousList.get(row.code);
+      row.chg = !old?'新进':row.wt-old.wt>0.01?'加仓':row.wt-old.wt< -0.01?'减仓':'持平';
+    }
+    previous = period; previousList = current;
+  }
 }
 
 function createPureBondTabLoader(fund, detail) {
@@ -7030,7 +7094,9 @@ function createPureBondTabLoader(fund, detail) {
         if (id === 'perf') await Promise.all([
           WarmPerformance.load(fund.code).catch(error => { fund.warm_context_error=error.message; }),
           loadPureBondComparisonBenchmarks(),
-        ]);
+        ]).then(() => {
+          alignPureBondAnnualRanks(reference, detail, window.FUND_LIFECYCLE_RANKS, fund.code);
+        });
         if (!target.isConnected) return;
         const render = {perf:window.__PB.renderPerf, alloc:window.__PB.renderAlloc, bond:window.__PB.renderBondStruct, corr:window.__PB.renderCorr, campisi:window.__PB.renderCampisi}[id];
         if (!render) return;

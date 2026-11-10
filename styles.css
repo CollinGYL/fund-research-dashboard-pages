@@ -437,7 +437,10 @@ select { width: 190px; padding: 0 14px; color: #435568; }
 .drawdown-shadow { fill: rgba(8,120,111,.18); stroke: rgba(8,120,111,.58); stroke-width: 1; }
 .legend-drawdown::before { background: rgba(8,120,111,.34) !important; }
 .performance-chart-wrap { position: relative; }
-.performance-legend button { padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+/* The line sample carries the chart color. The series control keeps a neutral background. */
+.performance-legend { flex-wrap: wrap; align-items: center; gap: 4px 20px; }
+.performance-legend button { min-height: 32px; padding: 3px 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.performance-legend button:hover { text-decoration: underline; }
 .performance-legend button::before { content: ""; display: inline-block; width: 18px; height: 3px; margin-right: 8px; border-radius: 2px; vertical-align: middle; }
 .performance-legend button[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
 .performance-crosshair { stroke: #536779; stroke-width: 1.2; stroke-dasharray: 4 4; pointer-events: none; }

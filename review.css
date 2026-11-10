@@ -26,6 +26,8 @@ body.workbench.warm-workbench.decision-detail .fund-tab-nav.all-functions button
 body.workbench.warm-workbench.decision-detail .fund-tab-nav.all-functions button.active{background:none;color:#9c4a3d;border-bottom-color:#9c4a3d;box-shadow:none;font-weight:600}
 body.workbench.warm-workbench .value-positive{color:#a34c3e!important}body.workbench.warm-workbench .value-negative{color:#697b65!important}
 body.workbench.warm-workbench .legend-drawdown::before{background:#c2b59f!important}
+body.workbench.warm-workbench .performance-hover-fund{stroke:#9c4a3d}
+body.workbench.warm-workbench .performance-hover-benchmark{stroke:#a69578}
 body.workbench.warm-workbench .subpanel,body.workbench.warm-workbench .research-overview-grid .subpanel{background:none;border-radius:0;box-shadow:none}
 @media(max-width:760px){body.workbench.warm-workbench.decision-detail .fund-tab-nav.all-functions{top:58px;gap:22px}}
 

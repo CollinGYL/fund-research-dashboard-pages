@@ -1,10 +1,10 @@
 /* Local warm edition: usable controls, industry composition and simulation layout. */
-body.workbench.warm-workbench button:not(.daily-allocation-row) {
+body.workbench.warm-workbench button:not(.daily-allocation-row):not([data-nav-series]) {
   color:#40372e!important;background-color:#fffdf8!important;border-color:#91816f!important;opacity:1;
 }
-body.workbench.warm-workbench button:not(.daily-allocation-row):hover:not(:disabled) {color:#302820!important;background-color:#e9dece!important;border-color:#76634e!important;}
-body.workbench.warm-workbench button:is(.active,[aria-pressed="true"],[aria-selected="true"]):not(.daily-allocation-row) {color:#fffdf8!important;background-color:#843e32!important;border-color:#843e32!important;font-weight:600;}
-body.workbench.warm-workbench button:is(.active,[aria-pressed="true"],[aria-selected="true"]):hover:not(:disabled):not(.daily-allocation-row) {background-color:#6c3028!important;color:#fffdf8!important;}
+body.workbench.warm-workbench button:not(.daily-allocation-row):not([data-nav-series]):hover:not(:disabled) {color:#302820!important;background-color:#e9dece!important;border-color:#76634e!important;}
+body.workbench.warm-workbench button:is(.active,[aria-pressed="true"],[aria-selected="true"]):not(.daily-allocation-row):not([data-nav-series]) {color:#fffdf8!important;background-color:#843e32!important;border-color:#843e32!important;font-weight:600;}
+body.workbench.warm-workbench button:is(.active,[aria-pressed="true"],[aria-selected="true"]):hover:not(:disabled):not(.daily-allocation-row):not([data-nav-series]) {background-color:#6c3028!important;color:#fffdf8!important;}
 body.workbench.warm-workbench button:disabled {color:#63594e!important;background-color:#e7e1d7!important;border-color:#b2a593!important;opacity:1!important;cursor:not-allowed!important;}
 body.workbench.warm-workbench :is(button,select,input,summary,a):focus-visible {outline:3px solid #31656a!important;outline-offset:3px;}
 body.workbench.warm-workbench :is(select,input[type="date"],input[type="search"]) {color:#40372e!important;border-color:#91816f!important;background-color:#fffdf8!important;}

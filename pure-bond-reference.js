@@ -121,7 +121,18 @@ function lineChart(series,opt={}){
     const pts=drawPoints.map(p=>[X(+new Date(p[0])),Y(p[1])]);
     if(!pts.length)return;
     if(s.fill){svg+=`<path d="${"M"+pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" L")} L${pts[pts.length-1][0].toFixed(1)},${Y(Math.max(ymin,0)).toFixed(1)} L${pts[0][0].toFixed(1)},${Y(Math.max(ymin,0)).toFixed(1)} Z" fill="${s.color}" opacity="0.1"/>`;}
-    if(s.sw!==0)svg+=`<path d="${"M"+pts.map((p,i)=>(i?"L":"")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ")}" fill="none" stroke="${s.color}" stroke-width="${s.sw||2.6}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if(s.sw!==0){
+      let commands="M"+pts.map((p,i)=>(i?"L":"")+p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+      if(opt.breakOnMissing){
+        let next="M";
+        commands=series.find(source=>source.name===s.name).points.filter(p=>inRange(+new Date(p[0]))).map(p=>{
+          if(p[1]==null){next="M";return "";}
+          const command=next+X(+new Date(p[0])).toFixed(1)+","+Y(p[1]).toFixed(1);
+          next="L";return command;
+        }).join(" ");
+      }
+      svg+=`<path d="${commands}" fill="none" stroke="${s.color}" stroke-width="${s.sw||2.6}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }
     // ★2026-08-31:s.dots=true 的系列画成离散圆点(半年频披露真值这类低频观测,连成线会让人
     // 误以为每天都有值)。只在系列显式声明 dots 时生效,不影响任何既有调用方。
     if(s.dots)pts.forEach(p=>{svg+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.8" fill="${s.color}" stroke="#fff" stroke-width="1.3"/>`;});
@@ -410,7 +421,7 @@ function wireStackArea(id,rows,keys,g){
     let bi=0,bd=Infinity;
     g.xs.forEach((x,i)=>{const dd=Math.abs(x-t);if(dd<bd){bd=dd;bi=i;}});
     const row=rows[bi];
-    const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${typeof row[k]==="number" && Number.isFinite(row[k])?NN(row[k],4)+"%":row.credit_parent_known&&['enterprise','cp','mtn'].includes(k)?"计入信用债":"未取得"}</b>`).join("<br>");
+    const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${typeof row[k]==="number" && Number.isFinite(row[k])?NN(row[k],4)+"%":row.credit_parent_known&&['enterprise','cp','mtn'].includes(k)?"计入信用债":k==='corp'&&row.credit_partial?"分项未齐":"未取得"}</b>`).join("<br>");
     const details=keys.includes('corp')?[['enterprise_detail','企业债'],['commercial_paper_detail','短期融资券'],['medium_term_note_detail','中期票据']]:[];
     const detailHTML=details.some(([k])=>typeof row[k]==='number'&&Number.isFinite(row[k]))
       ?`<div style="margin-top:6px;opacity:.75">信用债细项 · 占净值</div>`+details.map(([k,label])=>`${label}: <b>${typeof row[k]==='number'&&Number.isFinite(row[k])?NN(row[k],4)+'%':'未取得'}</b>`).join('<br>'):'';
@@ -801,9 +812,9 @@ function durKFBlock(d){
               :`<div class="method-note">久期日频拟合数据加载中…</div>`;
   }
   const line=K.dates.map((dt,i)=>[dt,Number.isFinite(K.dur[i])?K.dur[i]:null]).filter(p=>p[0]>="2018-01-01");
-  // Only clip the displayed interval; retain the full model and disclosure histories.
-  const truth=Array.isArray(K.core_evaluation?.points)?durKFPair(K).map(r=>({dt:r.dt,dur:r.real})):(K.truth||[]);
-  const tin=truth.filter(t=>t.dt>="2018-01-01"&&t.dt>=K.meta.d0&&t.dt<=K.meta.d1&&Number.isFinite(t.dur));
+  const truth = new Map((K.truth||[]).map(row=>[row.dt,row]));
+  durKFPair(K).forEach(row=>truth.set(row.dt,{dt:row.dt,dur:row.real}));
+  const tin=[...truth.values()].filter(t=>t.dt>="2018-01-01"&&Number.isFinite(t.dur)&&t.dur>=0&&t.dur<=30);
   const series=[{name:"卡尔曼日频估计",color:"var(--teal)",points:line,dp:2,unit:"年",sw:1.5}];
   if(tin.length)series.push({name:"披露对照（半年频）",color:"var(--gold)",
     points:tin.map(t=>[t.dt,t.dur]),dp:2,unit:"年",sw:0,dots:true});
@@ -876,6 +887,26 @@ function stageTable(rows){
   return tbl;
 }
 
+function annualPeerRankBlock(perf){
+  const rows=(perf.annual_rank_metrics||perf.annual||[]).filter(row=>row.end).slice().reverse();
+  if(!rows.length)return '';
+  const ranks=new Map((perf.annual_peer_ranks||[]).map(r=>[r[0],r]));
+  const yearToDate=(perf.annual_peer_as_of||rows[0]?.end||'').slice(0,4);
+  return `<div class="rt-wrap"><table class="rt stage-tbl" data-pb-annual-ranks><thead><tr>
+    <th>年度</th><th>收益率</th><th>年化波动率</th><th>最大回撤</th><th>夏普</th><th>卡马</th><th>同类收益排名</th>
+    </tr></thead><tbody>${rows.map(r=>{
+      const rank=ranks.get(r.year);
+      const label=String(r.year)===yearToDate?`${r.year}年迄今`:String(r.year);
+      const ranking=rank&&rank[1]===r.end?`<b>${rank[2]}</b> / ${rank[3]}`:'—';
+      return `<tr><td>${label}${r.partial?'<br><span class="pr-dim">年初净值不足</span>':''}
+        <br><span class="pr-dim">截至 ${esc(r.end)}</span></td>
+        <td class="${pcls(r.cum)}">${P(r.cum)}</td><td>${P(r.vol)}</td>
+        <td class="value-negative">${P(r.mdd,2,{preserveSmall:true})}</td>
+        <td>${NN(r.sharpe)}</td><td>${NN(r.calmar)}</td><td>${ranking}</td></tr>`;
+    }).join('')}</tbody></table></div>
+    <p class="method-note">以复权净值计算；夏普、卡马使用年化收益，夏普的无风险利率为 1.5%／年。收益排名按现行长债／短债分类、每基金一个份额，同年同日且净值覆盖完整才入榜，未纳入已退出现行目录的产品。样本不足或排名资料未就绪时留空。</p>`;
+}
+
 function renderPerf(d){
   const p=d.perf;
   const navChart=`<div id="navPerfWrap">${navPerfChart(d)}</div>`;
@@ -904,6 +935,7 @@ function renderPerf(d){
       ${sub("年度表现","分年度收益率",annBar+annNote)}
       ${sub("同类排名","当前同类产品 · 相同净值截止日",peerRankBlock(d))}
     </div>
+    ${sub("历年同类排名","自然年度风险收益 · 同类收益名次",annualPeerRankBlock(p))}
     ${sub("阶段表现","区间 · 累计收益 · 年化收益 · 年化波动 · 最大回撤 · Sharpe · Calmar",stageTbl)}
     ${sub("月度表现","年 × 月收益热力图",monthlyHeatmap(p.monthly))}
     ${sub("指数对比","vs 中债新综合财富指数（按久期匹配期限档）",idxHtml)}`;
@@ -958,7 +990,7 @@ function pureBondStructureRows(style, basis, keys) {
       ? (typed ? r.fixed_income_total_including_abs : r.bond)
       : (typed ? r.bond_total_excluding_abs : finite(r.bond) && finite(r.absv) ? r.bond-r.absv : null);
     const valid = finite(denominator) && denominator > 0;
-    const out = {dt:r.dt, denominator, denominator_basis:basis, enterprise_detail:r.enterprise_detail, commercial_paper_detail:r.commercial_paper, medium_term_note_detail:r.medium_term_note, credit_parent_known:finite(r.corp), denominator_missing:!valid,
+    const out = {dt:r.dt, denominator, denominator_basis:basis, enterprise_detail:r.enterprise_detail, commercial_paper_detail:r.commercial_paper, medium_term_note_detail:r.medium_term_note, credit_parent_known:finite(r.corp), credit_partial:!finite(r.corp)&&[r.enterprise_detail,r.commercial_paper,r.medium_term_note].some(finite), denominator_missing:!valid,
       known_numerators:keys.filter(k=>finite(r[k])), denominator_status:typed ? 'same_report_typed' : 'legacy_fixed_income'};
     keys.forEach(k => {out[k] = valid && finite(r[k]) ? r[k]/denominator*100 : null;});
     return out;
@@ -976,7 +1008,7 @@ function pureBondStructurePanel(d,basis){
   const chart=bStyle.length?stackArea(bStyle,keys,{h:320,colors:SC,names:SCN,refLine:100}):'<div class="method-note">无报告期数据</div>';
   const missingPeriods=bStyle.filter(r=>r.denominator_missing).length;
   const note=last?`<p class="method-note" data-bond-denominator>最新报告期 ${esc(last.dt)} · 分母：${label}${basis==='nav'?'':valid(last.denominator)?'，占净值 '+NN(last.denominator,4)+'%':'尚未取得'}。${basis==='bonds'?'本口径不包含ABS。':''}${basis==='nav'?'展示已取得券种的占净值比例，未归一至100%；缺项保持未取得。':missingPeriods?` ${missingPeriods}期分母未取得，内部比例留空；“占基金净值”可查看这些报告期的已知券种。`:''}</p>`:'';
-  const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':last.denominator_missing&&last.known_numerators?.includes(k)?'分母未取得':'未取得'}</strong></div>`).join('')+'</div>':'';
+  const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':last.denominator_missing&&last.known_numerators?.includes(k)?'分母未取得':k==='corp'&&last.credit_partial?'分项未齐':'未取得'}</strong></div>`).join('')+'</div>':'';
   const creditDetails=source&&['enterprise_detail','commercial_paper','medium_term_note'].some(k=>valid(source[k]))?'<details class="selection-method"><summary>信用债细项 · 占基金净值</summary><div class="metric-grid-in" style="grid-template-columns:repeat(3,1fr)">'+[['enterprise_detail','企业债'],['commercial_paper','短期融资券'],['medium_term_note','中期票据']].map(([k,label])=>`<div class="rmetric"><span>${label}</span><strong>${valid(source[k])?NN(source[k],4)+'%':'未取得'}</strong></div>`).join('')+'</div></details>':'';
   return note+chart+summary+creditDetails;
 }
@@ -1001,8 +1033,13 @@ function renderBondStruct(d){
   if(bonds.length){
     concHtml=lineChart([{name:"可得非ABS债券前五/净资产",color:"var(--teal)",points:bonds.map(b=>[b.dt,disclosedBondTotals(b).top5===null?null:disclosedBondTotals(b).top5/100]),fill:"var(--teal)",sw:2.6}],{h:190,pctY:true,dp:1})+
       `<div class="method-note">从可得披露中按权重取非ABS债券前五，按基金净资产计算；ABS和全部披露合计单列。未匹配券种不猜分类；不是完整组合集中度。</div>`;
-    turnHtml=turnoverChart(bonds)+
-      `<div class="method-note">比较相邻可得披露期的名单和净值权重。披露范围可能含ABS且不完整；新出现/不再出现不代表实际买入/清仓，权重变化也含价格、净值变化。</div>`;
+    const latestAsset = latestStyle?.dt;
+    const notice = d.bond_list_comparison && latestAsset && latestAsset>last.dt
+      ? `<p class="method-note">最新资产报告期为 ${esc(latestAsset)}，该期债券名单尚未取得。</p>` : '';
+    const coverage = d.bond_list_comparison && last.turnover_available===false
+      ? `<p class="method-note">${esc(last.dt)}：已取得债券名单；${esc(last.comparison_note)}，本期不计算名单变化。</p>` : '';
+    turnHtml=notice+coverage+turnoverChart(bonds)+
+      `<div class="method-note">${d.bond_list_comparison?'比较相邻季度披露的前五名债券；名单取可得市值前五，并列照录。缺期不跨期补算。':'比较相邻可得披露期的名单和净值权重。'}名单变化不代表买卖，权重变化还受价格和净值影响。</div>`;
   }
   return `<p class="tab-lead">券种分布 · 披露债券与ABS · 集中度 · 名单变化</p>`+
     `<div class="two-column">
@@ -1024,7 +1061,8 @@ function disclosedBondTotals(period) {
   return {top5:unknown?null:sum(ranked.slice(0,5)),top5_count:Math.min(5,ranked.length),abs:sum(rows.filter(isABS)),all:sum(rows),unknown};
 }
 function turnoverChart(bonds){
-  const rows=bonds.filter(b=>b.turnover_available!==false).map(b=>{
+  const rows=bonds.map(b=>{
+    if(b.turnover_available===false)return {dt:b.dt,neu:null,add:null,cut:null,clr:null};
     let neu=0,add=0,cut=0;
     (b.bonds||[]).forEach(x=>{
       if(!x.chg)return;
@@ -1034,12 +1072,14 @@ function turnoverChart(bonds){
     });
     return {dt:b.dt,neu,add,cut,clr:(b.cleared||[]).length};
   });
+  if(!rows.some(r=>r.neu!==null))return '<p class="method-note">暂无连续两期可比名单。</p>';
   return lineChart([
-    {name:"新出现于披露",color:"var(--f-curve)",points:rows.map(r=>[r.dt,r.neu])},
-    {name:"披露权重增加",color:"var(--f-level)",points:rows.map(r=>[r.dt,r.add])},
-    {name:"披露权重减少",color:"var(--f-slope)",points:rows.map(r=>[r.dt,r.cut])},
-    {name:"不再出现于披露",color:"var(--f-default)",points:rows.map(r=>[r.dt,r.clr])}
-  ],{h:190,dp:0,floor:0,integerTicks:true});
+    {name:"新出现于披露",color:"var(--f-curve)",points:rows.map(r=>[r.dt,r.neu]),dots:true},
+    {name:"披露权重增加",color:"var(--f-level)",points:rows.map(r=>[r.dt,r.add]),dots:true},
+    {name:"披露权重减少",color:"var(--f-slope)",points:rows.map(r=>[r.dt,r.cut]),dots:true},
+    {name:"不再出现于披露",color:"var(--f-default)",points:rows.map(r=>[r.dt,r.clr]),dots:true}
+  ],{h:190,dp:0,floor:0,integerTicks:true,breakOnMissing:true,
+    forceX:{x0:Date.parse(rows[0].dt),x1:Date.parse(rows.at(-1).dt)}});
 }
 function bondTable(period){
   // 评级带来源角标:发行人评级与债项评级口径不同(主体信用 vs 债项信用),不标来源会误导
