@@ -6999,10 +6999,9 @@ function applyCurrentPureBondHoldings(reference, history) {
   const attribute=(row,date)=>{
     const v=window.BondVisualDetails?.featureView(row,features,date);
     if(!v)return {ptm:null,rating:null,rating_src:null,issuer:null,nature:null};
-    const provenance=v.issuer_reference_date||'名录未注明日期';
     return {ptm:v.remaining_years,rating:v.rating?`${v.rating}（${v.rating_source}；${v.rating_date}）`:null,rating_src:v.rating_source?'报告期'+v.rating_source:null,
-      issuer:v.issuer_name?`${v.issuer_name}（名录参考：${provenance}；历史时点未核）`:null,
-      nature:v.issuer_type?`${v.issuer_type}（名录参考）`:null,btype:v.bond_type,
+      issuer:v.issuer_name||null,
+      nature:v.issuer_type||null,btype:v.bond_type,
       attribute_date:v.issuer_reference_date,rating_date:v.rating_date};
   };
   const periods = new Map((reference.bonds || []).map(period => [period.dt,{
@@ -7016,7 +7015,7 @@ function applyCurrentPureBondHoldings(reference, history) {
     periods.set(period.report_date,{dt:period.report_date,n:bonds.length,
       wt_sum:bonds.length&&bonds.every(b=>isFiniteValue(b.wt))?bonds.reduce((sum,b)=>sum+b.wt,0):null,
       bonds,scope:period.scope,announcement_date:period.announcement_date,
-      source_note:'本期已披露重仓券；期限优先使用Choice对应报告日剩余期限，缺项时按到期日计算；永续债期限为—。评级仅用对应报告期带日期记录。发行人/主体类型为独立日期名录参考，历史时点未核。未知留空。'});
+      source_note:`本期已披露重仓券；期限优先使用Choice对应报告日剩余期限，缺项时按到期日计算；永续债期限为—。评级仅用对应报告期带日期记录。发行人/主体类型来自基础资料（资料日期：${[...new Set(bonds.map(b=>b.attribute_date).filter(Boolean))].sort().join('、')||'—'}），历史时点未核。未知留空。`});
   }
   reference.bonds = Array.from(periods.values()).sort((a,b)=>a.dt.localeCompare(b.dt));
   reference.bond_list_comparison = true;

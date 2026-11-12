@@ -1098,12 +1098,8 @@ function turnoverChart(bonds){
     forceX:{x0:Date.parse(rows[0].dt),x1:Date.parse(rows.at(-1).dt)}});
 }
 function bondTable(period){
-  // 评级带来源角标:发行人评级与债项评级口径不同(主体信用 vs 债项信用),不标来源会误导
-  const rat=b=>{
-    if(!b.rating) return "—";
-    const s=b.rating_src==="债项"?`<span style="color:var(--muted);font-size:10px" title="该券无发行人评级，回落显示债项评级">债项</span>`:"";
-    return `${esc(b.rating)} ${s}`;
-  };
+  // Only the grade is shown; original ratings and dated sources stay in the data.
+  const rat=b=>b.rating?esc(b.rating.split('（')[0].replace(/pi$/i,'')):'—';
   // 主体类型:企业性质为主,城投/次级另加小标签
   const nat=b=>{
     if(!b.nature&&!b.muni) return "—";
