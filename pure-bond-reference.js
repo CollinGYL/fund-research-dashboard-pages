@@ -401,18 +401,18 @@ function stackArea(rows,keys,opt={}){
   svg+=`</svg>`;
   CHART_GEOM[id]={pl,pr,pt,pb,pw,ph,x0,x1,xs};
   stackArea.lastId=id;
-  setTimeout(()=>wireStackArea(id,rows,keys,{pl,pr,pt,pb,pw,ph,x0,x1,xs,colors,names}),0);
+  setTimeout(()=>wireStackArea(id,rows,keys,{pl,pr,pt,pb,pw,ph,x0,x1,xs,colors,names,emptyPercentZero:opt.emptyPercentZero}),0);
   // ★2026-08-17 全期为 0 的科目:图例保留但灰化。判据是该键在所有报告期都不>0。
   const missingValue=v=>typeof v!=="number" || !Number.isFinite(v);
   const lgZero=k=>rows.every(r=>!missingValue(r[k]) && r[k]===0);
   const lgMissing=k=>rows.every(r=>missingValue(r[k]));
   const latestMissing=k=>missingValue(rows.at(-1)[k]);
   return `<div class="chart-wrap">${svg}</div><div class="chart-legend">`+keys.map(k=>{
-    const z=lgZero(k);
-    return `<span class="${z?"lg-zero":""}"${z?' title="现有记录中该科目全期为0%"':""}>`
+    const z=lgZero(k),missing=latestMissing(k),zeroEmpty=opt.emptyPercentZero&&!rows.at(-1).denominator_missing;
+    return `<span class="${z?"lg-zero":""}"${z?' title="现有记录中该科目全期为0%"':missing&&zeroEmpty?' title="源字段为空，按显示设置展示0.00%"':""}>`
       +`<i class="sw" style="height:10px;width:10px;border-radius:2px;background:${colors[k]}"></i>${names[k]}`
-      +`${k==="enterprise"&&typeof rows.at(-1).enterprise_detail==="number"&&typeof rows.at(-1).corp==="number"?"（计入信用债）":rows.at(-1).denominator_missing&&rows.at(-1).known_numerators?.includes(k)?"（—）":lgMissing(k)?"（—）":latestMissing(k)?"（—）":z?"（0%）":""}</span>`;
-  }).join("")+`</div><p class="method-note">${opt.coverageRemainder?"未分项债券为报告合计减去已知互斥券种，不归入信用债；缺失值显示“—”。":"色带按实际可得报告连接；本层或下层的显式缺项变化处断开，未补造缺失报告。"}</p>`;
+      +`${k==="enterprise"&&typeof rows.at(-1).enterprise_detail==="number"&&typeof rows.at(-1).corp==="number"?"（计入信用债）":rows.at(-1).denominator_missing&&rows.at(-1).known_numerators?.includes(k)?"（—）":lgMissing(k)||missing?(zeroEmpty?"（0.00%）":"（—）"):z?(opt.emptyPercentZero?"（0.00%）":"（0%）"):""}</span>`;
+  }).join("")+`</div>`+(opt.coverageRemainder?'':'<p class="method-note">色带按实际可得报告连接；本层或下层的显式缺项变化处断开，未补造缺失报告。</p>');
 }
 function wireStackArea(id,rows,keys,g){
   const hit=document.getElementById("hit_"+id),vl=document.getElementById("vl_"+id);
@@ -425,10 +425,14 @@ function wireStackArea(id,rows,keys,g){
     let bi=0,bd=Infinity;
     g.xs.forEach((x,i)=>{const dd=Math.abs(x-t);if(dd<bd){bd=dd;bi=i;}});
     const row=rows[bi];
-    const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${typeof row[k]==="number" && Number.isFinite(row[k])?NN(row[k],4)+"%":row.credit_parent_known&&['enterprise','cp','mtn'].includes(k)?"计入信用债":k==='corp'&&row.credit_partial?"—":"—"}</b>`).join("<br>");
+    // The zero display convention is limited to bond components with a known denominator.
+    const percent=value=>typeof value==='number'&&Number.isFinite(value)
+      ?(g.emptyPercentZero&&value===0?'0.00%':NN(value,4)+'%')
+      :g.emptyPercentZero&&!row.denominator_missing?'<span title="源字段为空，按显示设置展示0.00%">0.00%</span>':'—';
+    const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${typeof row[k]==="number" && Number.isFinite(row[k])?percent(row[k]):row.credit_parent_known&&['enterprise','cp','mtn'].includes(k)?"计入信用债":percent(row[k])}</b>`).join("<br>");
     const details=keys.includes('corp')?[['enterprise_detail','企业债'],['commercial_paper_detail','短期融资券'],['medium_term_note_detail','中期票据']]:[];
     const detailHTML=details.some(([k])=>typeof row[k]==='number'&&Number.isFinite(row[k]))
-      ?`<div style="margin-top:6px;opacity:.75">信用债细项 · 占净值</div>`+details.map(([k,label])=>`${label}: <b>${typeof row[k]==='number'&&Number.isFinite(row[k])?NN(row[k],4)+'%':'—'}</b>`).join('<br>'):'';
+      ?`<div style="margin-top:6px;opacity:.75">信用债细项 · 占净值</div>`+details.map(([k,label])=>`${label}: <b>${percent(row[k])}</b>`).join('<br>'):'';
     const scope=keys.includes('bond')&&row.asset_bond_scope
       ?`<div style="margin-top:6px;opacity:.75">${row.asset_bond_scope==='excluding_abs'?'本期色带为债券（不含ABS）；ABS：—':'本期固定收益含ABS'}</div>`:'';
     showTT(`<div style="opacity:.75">${esc(row.dt)}</div>${lines}${detailHTML}${scope}`,ev);
@@ -1026,12 +1030,13 @@ function pureBondStructurePanel(d,basis){
   const last=bStyle.at(-1),source=displayStyle.at(-1);
   const label={fixed_income:'固定收益投资市值（含ABS）',bonds:'债券市值（不含ABS）',nav:'基金净资产'}[basis];
   const valid=v=>typeof v==='number'&&Number.isFinite(v);
-  const chart=bStyle.length?stackArea(bStyle,keys,{h:320,colors:SC,names:SCN,refLine:100,coverageRemainder:true}):'<div class="method-note">无报告期数据</div>';
+  const chart=bStyle.length?stackArea(bStyle,keys,{h:320,colors:SC,names:SCN,refLine:100,coverageRemainder:true,emptyPercentZero:true}):'<div class="method-note">无报告期数据</div>';
   const missingPeriods=bStyle.filter(r=>r.denominator_missing).length;
   const conflicts=bStyle.filter(r=>r.total_conflict);
   const note=last?`<p class="method-note" data-bond-denominator>最新报告期 ${esc(last.dt)} · 分母：${label}${basis==='nav'?'':valid(last.denominator)?'，占净值 '+NN(last.denominator,4)+'%':'—'}。${basis==='bonds'?'本口径不包含ABS。':''}${basis==='nav'?`图示持债合计 ${valid(last.report_total)?NN(last.report_total,2)+'%':'—'}；同报告期基金杠杆 ${valid(source?.lev)?NN(source.lev*100,2)+'%':'—'}。色带为持债比例。`:missingPeriods?` ${missingPeriods}期分母缺失，内部比例显示“—”。`:''}</p>`:'';
-  const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':last.denominator_missing&&last.known_numerators?.includes(k)?'—':k==='corp'&&last.credit_partial?'—':'—'}</strong></div>`).join('')+'</div>':'';
-  const creditDetails=source&&['enterprise_detail','commercial_paper','medium_term_note'].some(k=>valid(source[k]))?'<details class="selection-method"><summary>信用债细项 · 占基金净值</summary><div class="metric-grid-in" style="grid-template-columns:repeat(3,1fr)">'+[['enterprise_detail','企业债'],['commercial_paper','短期融资券'],['medium_term_note','中期票据']].map(([k,label])=>`<div class="rmetric"><span>${label}</span><strong>${valid(source[k])?NN(source[k],4)+'%':'—'}</strong></div>`).join('')+'</div></details>':'';
+  const emptyPercent=last?.denominator_missing?'—':'<span title="源字段为空，按显示设置展示0.00%">0.00%</span>';
+  const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':emptyPercent}</strong></div>`).join('')+'</div>':'';
+  const creditDetails=source&&['enterprise_detail','commercial_paper','medium_term_note'].some(k=>valid(source[k]))?'<details class="selection-method"><summary>信用债细项 · 占基金净值</summary><div class="metric-grid-in" style="grid-template-columns:repeat(3,1fr)">'+[['enterprise_detail','企业债'],['commercial_paper','短期融资券'],['medium_term_note','中期票据']].map(([k,label])=>`<div class="rmetric"><span>${label}</span><strong>${valid(source[k])?NN(source[k],4)+'%':'<span title="源字段为空，按显示设置展示0.00%">0.00%</span>'}</strong></div>`).join('')+'</div></details>':'';
   const conflictNote=conflicts.length?`<p class="method-note">${conflicts.length}期已知券种合计与报告总额不一致，保留原数值供核对，未按100%调整。</p>`:'';
   return note+conflictNote+chart+summary+creditDetails;
 }
