@@ -408,10 +408,10 @@ function stackArea(rows,keys,opt={}){
   const lgMissing=k=>rows.every(r=>missingValue(r[k]));
   const latestMissing=k=>missingValue(rows.at(-1)[k]);
   return `<div class="chart-wrap">${svg}</div><div class="chart-legend">`+keys.map(k=>{
-    const z=lgZero(k),missing=latestMissing(k),zeroEmpty=opt.emptyPercentZero&&!rows.at(-1).denominator_missing;
-    return `<span class="${z?"lg-zero":""}"${z?' title="现有记录中该科目全期为0%"':missing&&zeroEmpty?' title="源字段为空，按显示设置展示0.00%"':""}>`
+    const z=opt.emptyLegendLabel?rows.every(r=>missingValue(r[k])||r[k]<=0):lgZero(k),missing=latestMissing(k),zeroEmpty=opt.emptyPercentZero&&!rows.at(-1).denominator_missing;
+    return `<span class="${z?"lg-zero":""}"${z?(opt.emptyLegendLabel?' title="现有记录中无正值"':' title="现有记录中该科目全期为0%"'):missing&&zeroEmpty?' title="源字段为空，按显示设置展示0.00%"':""}>`
       +`<i class="sw" style="height:10px;width:10px;border-radius:2px;background:${colors[k]}"></i>${names[k]}`
-      +`${opt.legendNamesOnly?"":k==="enterprise"&&typeof rows.at(-1).enterprise_detail==="number"&&typeof rows.at(-1).corp==="number"?"（计入信用债）":rows.at(-1).denominator_missing&&rows.at(-1).known_numerators?.includes(k)?"（—）":lgMissing(k)||missing?(zeroEmpty?"（0.00%）":"（—）"):z?(opt.emptyPercentZero?"（0.00%）":"（0%）"):""}</span>`;
+      +`${opt.emptyLegendLabel?(z?"（"+esc(opt.emptyLegendLabel)+"）":""):opt.legendNamesOnly?"":k==="enterprise"&&typeof rows.at(-1).enterprise_detail==="number"&&typeof rows.at(-1).corp==="number"?"（计入信用债）":rows.at(-1).denominator_missing&&rows.at(-1).known_numerators?.includes(k)?"（—）":lgMissing(k)||missing?(zeroEmpty?"（0.00%）":"（—）"):z?(opt.emptyPercentZero?"（0.00%）":"（0%）"):""}</span>`;
   }).join("")+`</div>`+(opt.coverageRemainder||opt.hideNote?'':'<p class="method-note">色带按实际可得报告连接；本层或下层的显式缺项变化处断开，未补造缺失报告。</p>');
 }
 function wireStackArea(id,rows,keys,g){
@@ -966,7 +966,7 @@ function renderAlloc(d,options={}){
   const style=pureBondAssetRows(d.alloc.style||[]);
   const partial=style.filter(r=>r.asset_bond_scope==='excluding_abs');
   const names=partial.length?{...ACN,bond:'债券及ABS（已披露部分）'}:ACN;
-  const assetChart=stackArea(style,AKEYS,{h:220,colors:AC,names,refLine:100,bottomKeys:["cash","othasset"],matchMiniAxes:true,legendNamesOnly:true,hideNote:true});
+  const assetChart=stackArea(style,AKEYS,{h:220,colors:AC,names,refLine:100,bottomKeys:["cash","othasset"],matchMiniAxes:true,emptyLegendLabel:"无正值",hideNote:true});
   return sub("资产分布","实际报告日期 · 占基金净资产（可超过100%）",assetChart)+
     (options.includeDuration===false?"":sub("日频久期估计","年",`<div id="durkfWrap">${durKFBlock(d)}</div>`));
 }

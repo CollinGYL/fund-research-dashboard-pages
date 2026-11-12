@@ -4789,7 +4789,7 @@ function genericPureBondKalmanDurationPanel(fund, detail, kalmanDuration) {
   const recentPairs = pairs.slice(-8).reverse().map((item) => [
     escapeHTML(item.reportDate),
     `${num(item.actual, 2)}年`,
-    `${num(item.estimate, 2)}年<small>${escapeHTML(item.estimateDate)}</small>`,
+    `${num(item.estimate, 2)}年`,
     `<strong class="${item.error > 0 ? "value-positive" : item.error < 0 ? "value-negative" : ""}">${item.error >= 0 ? "+" : ""}${num(item.error, 2)}年</strong>`,
   ]);
   const meta = kalmanDuration.meta || {};
