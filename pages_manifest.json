@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-10T15:31:02+08:00",
+  "generatedAt": "2026-11-12T14:30:58+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -90,7 +90,7 @@
     },
     "bond-original-single.html": {
       "size": 729730,
-      "sha256": "2596e634a6d39ef3a0bd8dadbeb0d303d10a245d1ad80ea54c2776f1720cb161"
+      "sha256": "12f6d71137b7b5a9cbc664697ff41525e3499279f8a71fbe58d0af6fee1bee47"
     },
     "bond-research.html": {
       "size": 6193,
@@ -102,15 +102,15 @@
     },
     "compare.html": {
       "size": 4798,
-      "sha256": "ddb6617bfa42b0f600a94af771d4dcc5d99f8845052944c68bba459b7694e77d"
+      "sha256": "17e46abde556014b5e013008d7fc2cba445523f381e7e785706cef0206863a3a"
     },
     "compare.js": {
       "size": 9845,
       "sha256": "3735a37aa39a52d3b90344559041927c7893a308627300c1a338d54255c41815"
     },
     "demo-theme.css": {
-      "size": 8092,
-      "sha256": "e850ffe5b21689f5b8ca4089f2ca3cb051711bd47633ac3ad355c61815a51236"
+      "size": 8124,
+      "sha256": "b3fb7b507103bbd6ae21b97fcfcc44b6b6f0a9dd1c30d0f01ca7411044045210"
     },
     "desktop-detail.css": {
       "size": 4510,
@@ -142,7 +142,7 @@
     },
     "fund.html": {
       "size": 5815,
-      "sha256": "ba61af372f179a317e71602a952ea80db02cafb5f6038a74d466a3423c0bfcf1"
+      "sha256": "5c436b2ee75e495fd30dce4fb0785df75db402fae9b96b35bd6ee829d9d8ea82"
     },
     "fund.js": {
       "size": 667756,
@@ -150,7 +150,7 @@
     },
     "index.html": {
       "size": 14161,
-      "sha256": "291eb546f60c2b278fc9ba205e1bd35b86d8146f24ee9156bd31ec6add2ba1a3"
+      "sha256": "0583c47e67646213ed2c22dddc7c70847020fa0e057aaa44c6b9d4c129c71d82"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -209,8 +209,8 @@
       "sha256": "ac517f31a03c02ec138c8c68aa626b5bcc2dd2cc46e297f75447b60ea6696eb3"
     },
     "warm-ui-repair.css": {
-      "size": 9803,
-      "sha256": "a87aa37b1c90874b2d784d62035fc65f65c6353b7921e3a74da50f158c41698e"
+      "size": 9835,
+      "sha256": "d8ab36c33a2667ca1bac29d3183cbd3c01c91d0d7514090d1ba379f0eeaf7d8b"
     },
     "bond-advanced-pack.js": {
       "size": 25405,

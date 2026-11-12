@@ -39,10 +39,10 @@ body.workbench.warm-workbench .fund-table tbody tr {background:#fff;}
 body.workbench.warm-workbench .fund-table tbody tr:nth-child(even) {background:#fcfbf9;}
 body.workbench.warm-workbench .fund-table tbody tr:hover {background:#faf3f3;}
 body.workbench.warm-workbench :is(input[type="search"],input[type="date"],select) {color:#253247!important;background:#fff!important;border-color:#b9afa4!important;border-radius:3px;}
-body.workbench.warm-workbench button:not(.daily-allocation-row):not([data-nav-series]):not([role="tab"]) {color:#253247!important;background:#fff!important;border-color:#b9afa4!important;border-radius:3px;box-shadow:none;}
-body.workbench.warm-workbench button:not(.daily-allocation-row):not([data-nav-series]):not([role="tab"]):hover:not(:disabled) {background:#f5efea!important;color:#253247!important;}
-body.workbench.warm-workbench button:is(.active,[aria-pressed="true"]):not(.daily-allocation-row):not([data-nav-series]):not([role="tab"]) {color:#fff!important;background:#b01625!important;border-color:#b01625!important;}
-body.workbench.warm-workbench button:is(.active,[aria-pressed="true"]):hover:not(:disabled):not(.daily-allocation-row):not([data-nav-series]):not([role="tab"]) {color:#fff!important;background:#931220!important;border-color:#931220!important;}
+body.workbench.warm-workbench button:not(.daily-allocation-row):where(:not([data-nav-series])):not([role="tab"]) {color:#253247!important;background:#fff!important;border-color:#b9afa4!important;border-radius:3px;box-shadow:none;}
+body.workbench.warm-workbench button:not(.daily-allocation-row):where(:not([data-nav-series])):not([role="tab"]):hover:not(:disabled) {background:#f5efea!important;color:#253247!important;}
+body.workbench.warm-workbench button:is(.active,[aria-pressed="true"]):not(.daily-allocation-row):where(:not([data-nav-series])):not([role="tab"]) {color:#fff!important;background:#b01625!important;border-color:#b01625!important;}
+body.workbench.warm-workbench button:is(.active,[aria-pressed="true"]):hover:not(:disabled):not(.daily-allocation-row):where(:not([data-nav-series])):not([role="tab"]) {color:#fff!important;background:#931220!important;border-color:#931220!important;}
 body.workbench.warm-workbench button:disabled {color:#706960!important;background:#eeebe6!important;border-color:#cfc6bc!important;opacity:1!important;}
 body.workbench.warm-workbench :is(button,select,input,summary,a):focus-visible {outline:3px solid #496675!important;outline-offset:3px;}
 body.workbench.warm-workbench footer {border-top:1px solid #e3dfd8;color:#625b55;}
