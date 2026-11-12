@@ -58,11 +58,14 @@
  }
  function remainingYears(row,feature={},date){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return null;
-  if(feature.is_perpetual==='是')return null;
+  if((feature.local_static?.is_perpetual||feature.is_perpetual)==='是')return null;
+  const dated=feature.report_features?.[date];
+  if(ok(dated?.remaining_years))return dated.remaining_years;
+  if(feature.local_static?.maturity_conflict)return null;
   const local=feature.local_static?.maturity_date,maturity=feature.maturity_date||local;
   if(local&&feature.maturity_date&&local!==feature.maturity_date)return null;
   if(/^\d{4}-\d{2}-\d{2}$/.test(maturity||'')){const days=(Date.parse(maturity)-Date.parse(date))/86400000;return days>=0?days/365.25:null;}
-  const dated=feature.report_features?.[date];return ok(dated?.remaining_years)?dated.remaining_years:null;
+  return null;
  }
  function featureView(row,features={},date){
   const b=securityFeature(row,features),s=b.local_static||{},p=b.report_features?.[date],r=p?.ratings?.bond||p?.ratings?.issuer;

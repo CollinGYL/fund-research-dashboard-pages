@@ -6994,7 +6994,7 @@ function applyCurrentPureBondHoldings(reference, history) {
     periods.set(period.report_date,{dt:period.report_date,n:bonds.length,
       wt_sum:bonds.length&&bonds.every(b=>isFiniteValue(b.wt))?bonds.reduce((sum,b)=>sum+b.wt,0):null,
       bonds,scope:period.scope,announcement_date:period.announcement_date,
-      source_note:'本期已披露重仓券；期限按报告日与到期日计算，评级仅用对应报告期带日期记录。发行人/主体类型为独立日期名录参考，历史时点未核。未知留空。'});
+      source_note:'本期已披露重仓券；期限优先使用Choice对应报告日剩余期限，缺项时按到期日计算；永续债期限为—。评级仅用对应报告期带日期记录。发行人/主体类型为独立日期名录参考，历史时点未核。未知留空。'});
   }
   reference.bonds = Array.from(periods.values()).sort((a,b)=>a.dt.localeCompare(b.dt));
   reference.bond_list_comparison = true;

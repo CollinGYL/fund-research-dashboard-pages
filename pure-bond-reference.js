@@ -1051,7 +1051,7 @@ function renderBondStruct(d){
   return `<p class="tab-lead">券种分布 · 披露债券与ABS · 集中度</p>`+
     `<div class="two-column">
       ${sub("券种分布","按真实报告期与所选分母展示",structureControls+structureBody)}
-      ${sub("持仓集中度趋势","可得非ABS债券前五/净资产（季度）",concHtml)}
+      ${sub("前五持仓债券占比","占基金净资产 · 可得非ABS债券（季度）",concHtml)}
     </div>
     ${sub("重仓债券","按报告期切换 · 全部可得披露",holdHtml)}`;
 }
