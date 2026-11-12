@@ -14,7 +14,7 @@ const SC={gov:"var(--c-gov)",fin:"var(--c-fin)",corp:"var(--c-corp)",cp:"#99734d
           other:"var(--c-other)"};
 const SCN={gov:"国债及地方政府债",fin:"金融债",corp:"信用债（含短融、中票）",cp:"短期融资券",mtn:"中期票据",enterprise:"企业债",unscoped_corporate:"企业／信用债（口径待核）",cb:"可转债",
            bill:"央行票据",absv:"资产支持证券",cds:"同业存单",othbd:"其他债券",
-           other:"未明细"};
+           other:"未分项债券"};
 const SKEYS=["gov","fin","corp","enterprise","unscoped_corporate","cb","bill","absv","cds","othbd","other"];
 /* 大类六项,合计=杠杆率×100(实测 100.00% 相等),不是 100 */
 const AC={bond:"var(--c-bond)",cash:"var(--c-cash)",stk:"var(--c-stk)",
@@ -385,7 +385,8 @@ function stackArea(rows,keys,opt={}){
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
   xTicks(x0,x1).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
   const colors=opt.colors||SC,names=opt.names||SCN;
-  const geometry=ReviewCore.stackAreas(rows.map(r=>r.dt),rows.map(r=>keys.map(k=>r[k])),{left:pl,right:w-pr,orderByCoverage:true});
+  const geometryValues=rows.map(r=>keys.map(k=>opt.coverageRemainder && typeof r.other==='number' && Number.isFinite(r.other) && (r[k]==null) ? 0 : r[k]));
+  const geometry=ReviewCore.stackAreas(rows.map(r=>r.dt),geometryValues,{left:pl,right:w-pr,orderByCoverage:true});
   geometry.segments.forEach(s=>s.bands.forEach(b=>{
     const k=keys[b.layer],tag=`data-stack-layer="${k}" data-stack-start="${s.start}" data-stack-end="${s.end}" data-stack-mask="${s.signature}"`;
     if(b.points.length===1){const p=b.points[0];if(p.value===0)return;svg+=`<circle data-stack-point ${tag} cx="${p.x}" cy="${Y(p.upper)}" r="2.5" fill="${colors[k]}"><title>${p.date} · ${esc(names[k])} ${NN(p.value,2)}%</title></circle>`;return;}
@@ -407,8 +408,8 @@ function stackArea(rows,keys,opt={}){
     const z=lgZero(k);
     return `<span class="${z?"lg-zero":""}"${z?' title="现有记录中该科目全期为0%"':""}>`
       +`<i class="sw" style="height:10px;width:10px;border-radius:2px;background:${colors[k]}"></i>${names[k]}`
-      +`${k==="enterprise"&&typeof rows.at(-1).enterprise_detail==="number"&&typeof rows.at(-1).corp==="number"?"（计入信用债）":rows.at(-1).denominator_missing&&rows.at(-1).known_numerators?.includes(k)?"（分母未取得）":lgMissing(k)?"（未取得）":latestMissing(k)?"（本期未取得）":z?"（0%）":""}</span>`;
-  }).join("")+`</div><p class="method-note">色带按实际可得报告连接；本层或下层的显式缺项变化处断开，未补造缺失报告。</p>`;
+      +`${k==="enterprise"&&typeof rows.at(-1).enterprise_detail==="number"&&typeof rows.at(-1).corp==="number"?"（计入信用债）":rows.at(-1).denominator_missing&&rows.at(-1).known_numerators?.includes(k)?"（—）":lgMissing(k)?"（—）":latestMissing(k)?"（—）":z?"（0%）":""}</span>`;
+  }).join("")+`</div><p class="method-note">${opt.coverageRemainder?"未分项债券为报告合计减去已知互斥券种，不归入信用债；缺失值显示“—”。":"色带按实际可得报告连接；本层或下层的显式缺项变化处断开，未补造缺失报告。"}</p>`;
 }
 function wireStackArea(id,rows,keys,g){
   const hit=document.getElementById("hit_"+id),vl=document.getElementById("vl_"+id);
@@ -421,10 +422,10 @@ function wireStackArea(id,rows,keys,g){
     let bi=0,bd=Infinity;
     g.xs.forEach((x,i)=>{const dd=Math.abs(x-t);if(dd<bd){bd=dd;bi=i;}});
     const row=rows[bi];
-    const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${typeof row[k]==="number" && Number.isFinite(row[k])?NN(row[k],4)+"%":row.credit_parent_known&&['enterprise','cp','mtn'].includes(k)?"计入信用债":k==='corp'&&row.credit_partial?"分项未齐":"未取得"}</b>`).join("<br>");
+    const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${typeof row[k]==="number" && Number.isFinite(row[k])?NN(row[k],4)+"%":row.credit_parent_known&&['enterprise','cp','mtn'].includes(k)?"计入信用债":k==='corp'&&row.credit_partial?"—":"—"}</b>`).join("<br>");
     const details=keys.includes('corp')?[['enterprise_detail','企业债'],['commercial_paper_detail','短期融资券'],['medium_term_note_detail','中期票据']]:[];
     const detailHTML=details.some(([k])=>typeof row[k]==='number'&&Number.isFinite(row[k]))
-      ?`<div style="margin-top:6px;opacity:.75">信用债细项 · 占净值</div>`+details.map(([k,label])=>`${label}: <b>${typeof row[k]==='number'&&Number.isFinite(row[k])?NN(row[k],4)+'%':'未取得'}</b>`).join('<br>'):'';
+      ?`<div style="margin-top:6px;opacity:.75">信用债细项 · 占净值</div>`+details.map(([k,label])=>`${label}: <b>${typeof row[k]==='number'&&Number.isFinite(row[k])?NN(row[k],4)+'%':'—'}</b>`).join('<br>'):'';
     showTT(`<div style="opacity:.75">${esc(row.dt)}</div>${lines}${detailHTML}`,ev);
   });
   hit.addEventListener("mouseleave",()=>{hideTT();vl.setAttribute("opacity","0");});
@@ -993,6 +994,19 @@ function pureBondStructureRows(style, basis, keys) {
     const out = {dt:r.dt, denominator, denominator_basis:basis, enterprise_detail:r.enterprise_detail, commercial_paper_detail:r.commercial_paper, medium_term_note_detail:r.medium_term_note, credit_parent_known:finite(r.corp), credit_partial:!finite(r.corp)&&[r.enterprise_detail,r.commercial_paper,r.medium_term_note].some(finite), denominator_missing:!valid,
       known_numerators:keys.filter(k=>finite(r[k])), denominator_status:typed ? 'same_report_typed' : 'legacy_fixed_income'};
     keys.forEach(k => {out[k] = valid && finite(r[k]) ? r[k]/denominator*100 : null;});
+    const total = basis === 'nav'
+      ? r.bond_source_scope === 'bonds_excluding_abs' && finite(r.bond)
+        ? r.bond + (finite(r.absv) ? r.absv : 0)
+        : r.bond_denominators_status === 'same_report_typed'
+        ? (finite(r.fixed_income_total_including_abs) ? r.fixed_income_total_including_abs : r.bond_total_excluding_abs)
+        : r.bond
+      : denominator;
+    const known = keys.filter(k=>k!=='other' && finite(out[k])).reduce((sum,k)=>sum+out[k],0);
+    const scaledTotal = valid && finite(total) ? total/denominator*100 : null;
+    out.report_total = scaledTotal;
+    out.other = finite(scaledTotal) && scaledTotal-known>=-.0003 ? Math.max(0,scaledTotal-known) : null;
+    out.total_conflict = finite(scaledTotal) && scaledTotal-known<-.0003;
+
     return out;
   });
 }
@@ -1005,12 +1019,14 @@ function pureBondStructurePanel(d,basis){
   const last=bStyle.at(-1),source=displayStyle.at(-1);
   const label={fixed_income:'固定收益投资市值（含ABS）',bonds:'债券市值（不含ABS）',nav:'基金净资产'}[basis];
   const valid=v=>typeof v==='number'&&Number.isFinite(v);
-  const chart=bStyle.length?stackArea(bStyle,keys,{h:320,colors:SC,names:SCN,refLine:100}):'<div class="method-note">无报告期数据</div>';
+  const chart=bStyle.length?stackArea(bStyle,keys,{h:320,colors:SC,names:SCN,refLine:100,coverageRemainder:true}):'<div class="method-note">无报告期数据</div>';
   const missingPeriods=bStyle.filter(r=>r.denominator_missing).length;
-  const note=last?`<p class="method-note" data-bond-denominator>最新报告期 ${esc(last.dt)} · 分母：${label}${basis==='nav'?'':valid(last.denominator)?'，占净值 '+NN(last.denominator,4)+'%':'尚未取得'}。${basis==='bonds'?'本口径不包含ABS。':''}${basis==='nav'?'展示已取得券种的占净值比例，未归一至100%；缺项保持未取得。':missingPeriods?` ${missingPeriods}期分母未取得，内部比例留空；“占基金净值”可查看这些报告期的已知券种。`:''}</p>`:'';
-  const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':last.denominator_missing&&last.known_numerators?.includes(k)?'分母未取得':k==='corp'&&last.credit_partial?'分项未齐':'未取得'}</strong></div>`).join('')+'</div>':'';
-  const creditDetails=source&&['enterprise_detail','commercial_paper','medium_term_note'].some(k=>valid(source[k]))?'<details class="selection-method"><summary>信用债细项 · 占基金净值</summary><div class="metric-grid-in" style="grid-template-columns:repeat(3,1fr)">'+[['enterprise_detail','企业债'],['commercial_paper','短期融资券'],['medium_term_note','中期票据']].map(([k,label])=>`<div class="rmetric"><span>${label}</span><strong>${valid(source[k])?NN(source[k],4)+'%':'未取得'}</strong></div>`).join('')+'</div></details>':'';
-  return note+chart+summary+creditDetails;
+  const conflicts=bStyle.filter(r=>r.total_conflict);
+  const note=last?`<p class="method-note" data-bond-denominator>最新报告期 ${esc(last.dt)} · 分母：${label}${basis==='nav'?'':valid(last.denominator)?'，占净值 '+NN(last.denominator,4)+'%':'—'}。${basis==='bonds'?'本口径不包含ABS。':''}${basis==='nav'?`图示持债合计 ${valid(last.report_total)?NN(last.report_total,2)+'%':'—'}；同报告期基金杠杆 ${valid(source?.lev)?NN(source.lev*100,2)+'%':'—'}。色带为持债比例。`:missingPeriods?` ${missingPeriods}期分母缺失，内部比例显示“—”。`:''}</p>`:'';
+  const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':last.denominator_missing&&last.known_numerators?.includes(k)?'—':k==='corp'&&last.credit_partial?'—':'—'}</strong></div>`).join('')+'</div>':'';
+  const creditDetails=source&&['enterprise_detail','commercial_paper','medium_term_note'].some(k=>valid(source[k]))?'<details class="selection-method"><summary>信用债细项 · 占基金净值</summary><div class="metric-grid-in" style="grid-template-columns:repeat(3,1fr)">'+[['enterprise_detail','企业债'],['commercial_paper','短期融资券'],['medium_term_note','中期票据']].map(([k,label])=>`<div class="rmetric"><span>${label}</span><strong>${valid(source[k])?NN(source[k],4)+'%':'—'}</strong></div>`).join('')+'</div></details>':'';
+  const conflictNote=conflicts.length?`<p class="method-note">${conflicts.length}期已知券种合计与报告总额不一致，保留原数值供核对，未按100%调整。</p>`:'';
+  return note+conflictNote+chart+summary+creditDetails;
 }
 function switchPureBondBasis(basis){
   const host=document.getElementById('pureBondStructureChart');
@@ -1035,9 +1051,9 @@ function renderBondStruct(d){
   return `<p class="tab-lead">券种分布 · 披露债券与ABS · 集中度</p>`+
     `<div class="two-column">
       ${sub("券种分布","按真实报告期与所选分母展示",structureControls+structureBody)}
-      ${sub("重仓债券","按报告期切换 · 全部可得披露",holdHtml)}
+      ${sub("持仓集中度趋势","可得非ABS债券前五/净资产（季度）",concHtml)}
     </div>
-    ${sub("持仓集中度趋势","可得非ABS债券前五/净资产（季度）",concHtml)}`;
+    ${sub("重仓债券","按报告期切换 · 全部可得披露",holdHtml)}`;
 }
 function disclosedBondTotals(period) {
   const rows=period.bonds||[], valid=v=>typeof v==='number'&&Number.isFinite(v);
@@ -1084,8 +1100,8 @@ function bondTable(period){
     if(b.sub==="是")  t+=`<span class="btag" style="background:#e7ddf3;color:#5b3f8a">次级</span>`;
     return t;
   };
-  const columns=[105,125,90,80,105,135,175,85,100];
-  const head=`<div class="rt-wrap"><table class="rt" style="min-width:${columns.reduce((a,b)=>a+b,0)}px"><colgroup>${columns.map(width=>`<col style="width:${width}px">`).join("")}</colgroup><thead><tr><th>债券代码</th><th>债券名称</th><th>券种</th>`+
+  const columns=[9,13,9,7,7,10,23,10,12];
+  const head=`<div class="rt-wrap"><table class="rt pb-bond-table"><colgroup>${columns.map(width=>`<col style="width:${width}%">`).join("")}</colgroup><thead><tr><th>债券代码</th><th>债券名称</th><th>券种</th>`+
     `<th>剩余期限</th><th>评级</th><th>主体类型</th><th>发行人</th><th>市值占净值</th><th>环比</th></tr></thead><tbody>`;
   const rows=period.bonds.map(b=>
     `<tr><td style="font-family:ui-monospace,Consolas">${esc(b.code)}</td>`+
@@ -1094,7 +1110,7 @@ function bondTable(period){
       `<td>${b.ptm==null?"—":NN(b.ptm,2)+" 年"}</td>`+
       `<td>${rat(b)}</td>`+
       `<td style="font-size:11px">${nat(b)}</td>`+
-      `<td style="font-size:11px;color:var(--muted)">${esc(b.issuer||"—")}</td>`+
+      `<td style="font-size:11px;color:var(--muted)">${esc((b.issuer||"—").split("（名录参考：")[0])}</td>`+
       `<td><b>${NN(b.wt,2)}%</b></td>`+
       `<td style="color:var(--muted);font-size:11px">${esc((b.chg||"—").replace(/疑似新进|新进/g,"新出现于披露").replace(/加仓/g,"披露权重增加").replace(/减仓/g,"披露权重减少").replace(/清仓/g,"不再出现于披露"))}</td></tr>`
   );
@@ -1105,7 +1121,7 @@ function bondTable(period){
   const table=values=>head+values.join("")+tail;
   const h=rows.length<=previewRows?table(rows):
     `<div class="research-table-preview" data-table-total="${rows.length}" data-table-preview="${previewRows}" style="--research-table-columns:9">${table(rows.slice(0,previewRows))}<details class="research-table-more"><summary><span class="table-more-closed">展开其余 ${rows.length-previewRows} 条持仓（本期共 ${rows.length} 条）</span><span class="table-more-open">收起明细，仅显示前 ${previewRows} 条持仓</span></summary>${table(rows.slice(previewRows))}</details></div>`;
-  const sums=disclosedBondTotals(period),show=v=>v===null?'—（未取得）':NN(v,2)+'%';
+  const sums=disclosedBondTotals(period),show=v=>v===null?'—':NN(v,2)+'%';
   return `<div class="method-note">报告期 ${esc(period.dt)}；可得非ABS债券前五/净资产 ${show(sums.top5)}；ABS披露合计/净资产 ${show(sums.abs)}；全部披露合计/净资产 ${show(sums.all)}；券种未匹配 ${sums.unknown}只。名单变化对比相邻可得披露期，不代表实际买卖。</div>`+h+(period.source_note?`<div class="method-note">${esc(period.source_note)} 公告日 ${esc(period.announcement_date||"—")}</div>`:"")+(miss?`<div class="method-note">${miss}</div>`:"");
 }
 

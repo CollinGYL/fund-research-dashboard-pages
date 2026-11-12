@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-12T14:44:37+08:00",
+  "generatedAt": "2026-11-12T15:15:05+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -90,7 +90,7 @@
     },
     "bond-original-single.html": {
       "size": 729730,
-      "sha256": "12f6d71137b7b5a9cbc664697ff41525e3499279f8a71fbe58d0af6fee1bee47"
+      "sha256": "b9a4e907bb7ad3250a8f7415d8d698ff6284c6a13d6816d8671322ed26988b3d"
     },
     "bond-research.html": {
       "size": 6193,
@@ -102,7 +102,7 @@
     },
     "compare.html": {
       "size": 4798,
-      "sha256": "17e46abde556014b5e013008d7fc2cba445523f381e7e785706cef0206863a3a"
+      "sha256": "4ddf77b09b138c9c387a2c00f583c5f4707ba4744c320d0755473a0963697804"
     },
     "compare.js": {
       "size": 9845,
@@ -142,11 +142,11 @@
     },
     "fund.html": {
       "size": 5815,
-      "sha256": "394febec372a8be9dcb9f3cf1cdc99e3e45d90287666f33a4cab2d42ac514dee"
+      "sha256": "d14bc46404138666bdf9039b177d4a363d6e9437270df9832cb670d911ae48ef"
     },
     "fund.js": {
-      "size": 667756,
-      "sha256": "75435fe22644a5fefb92df8d3bb0ad9ac1844fb601826866ba6d598d72a64f3f"
+      "size": 668232,
+      "sha256": "0009e2848b9d5defcb26ed31933b078597cfa4b9199f26c3d47efbf861e14fda"
     },
     "index.html": {
       "size": 14161,
@@ -165,12 +165,12 @@
       "sha256": "9de56d3b5560d81a588d0224d2dfd3590bafbe2c5c38061bd661f6d48145acb7"
     },
     "pure-bond-reference.css": {
-      "size": 22114,
-      "sha256": "c88ab8454792d1365e868e4aafbc101d7114ac495360a8bb24816809e96813a3"
+      "size": 22474,
+      "sha256": "07925f943901cecacb7d2825cca5d7df422560f233807093eb7fa3eee06dd40e"
     },
     "pure-bond-reference.js": {
-      "size": 129938,
-      "sha256": "2a401f13500abbf429ac89f57f87fd84e93ef2a0641026c47afda417b35c9346"
+      "size": 131180,
+      "sha256": "fea43fc5ad80b1177dbd57b065b63f74928242a5f470a1d4fb5450d425cf8d17"
     },
     "research-core.js": {
       "size": 35630,

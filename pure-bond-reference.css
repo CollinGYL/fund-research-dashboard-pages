@@ -37,3 +37,8 @@
   border-top:1px solid var(--line);font-size:11px;line-height:1.65}.pb-scope .bc-grid>div{padding:6px 9px 6px 0;border-bottom:1px solid var(--line);min-width:0}.pb-scope .bc-h{font-weight:700;color:var(--ink);font-size:10.5px;letter-spacing:.04em;
   padding-bottom:5px!important;white-space:nowrap}.pb-scope .bc-col{font-weight:700;color:var(--ink);white-space:nowrap}.pb-scope .bc-src{color:var(--muted);white-space:nowrap}.pb-scope .bc-t{font-size:9.5px;color:var(--muted);opacity:.85;word-break:break-all;white-space:normal}.pb-scope .bc-fld code{font-size:9.5px;word-break:break-all}.pb-scope .bc-how{color:var(--muted)}.pb-scope .bc-def{display:block;margin-top:5px;padding-left:8px;border-left:2px solid var(--line);color:var(--muted);font-size:10.5px;line-height:1.7}.pb-scope .bc-foot{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);
   color:var(--muted);font-size:11px;line-height:1.75}@media(max-width:900px){.pb-scope .bc-grid{grid-template-columns:1fr}.pb-scope .bc-grid>div{border-bottom:0;padding:2px 0}.pb-scope .bc-h{display:none}.pb-scope .bc-col{margin-top:8px;border-top:1px solid var(--line);padding-top:6px!important}}.pb-scope .pb-rank-table th, .pb-scope .pb-rank-table td{padding:9px 8px}.pb-scope .pb-rank-table .pr-range{white-space:nowrap;font-size:11px}
+
+/* Whole-row holdings table: wrap long names and keep all columns visible on desktop. */
+.pb-scope .pb-bond-table{width:100%;table-layout:fixed;min-width:0}
+.pb-scope .pb-bond-table th,.pb-scope .pb-bond-table td{white-space:normal;overflow-wrap:anywhere;padding:10px 8px;vertical-align:top}
+@media(max-width:760px){.pb-scope .pb-bond-table{min-width:900px}}

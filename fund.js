@@ -6686,7 +6686,7 @@ function mergePureBondSourceStyle(assets, savedStyle) {
       return null;
     };
     const explicitScope = item.corporate_bond_basis;
-    const declaredChoice = (item.source || '').startsWith('choice');
+    const declaredChoice = (item.source || '').startsWith('choice') || item.leverage_source === 'choice_prtleverage';
     const currentCorporate = pct(item.corporate_bond);
     const savedCreditAgrees = compatible && ok(prior.corp) && prior.corp > 0
       && ok(currentCorporate) && Math.abs(prior.corp - currentCorporate) <= .011;
@@ -6713,7 +6713,7 @@ function mergePureBondSourceStyle(assets, savedStyle) {
       othasset:pct(item.other),repo:pct(item.buyback_sale),mm:null,
       na:ok(item.net_asset)?item.net_asset/1e8:null,
       lev:ok(item.leverage)?item.leverage:null,
-      component_source_notes:notes};
+      component_source_notes:notes,bond_source_scope:declaredChoice?'bonds_excluding_abs':'fixed_income_including_abs'};
   });
 }
 
@@ -6726,7 +6726,7 @@ function mergePureBondTypedStyle(assets, savedStyle) {
     row.enterprise_detail = finite(item.enterprise_bond) ? item.enterprise_bond*100 : row.enterprise;
     row.commercial_paper = finite(item.commercial_paper) ? item.commercial_paper*100 : null;
     row.medium_term_note = finite(item.medium_term_note) ? item.medium_term_note*100 : null;
-    if (finite(item.credit_bond) && item.credit_bond_basis === 'enterprise_plus_cp_plus_mtn') {
+    if (finite(item.credit_bond) && ['enterprise_plus_cp_plus_mtn','choice_corporate_bonds_sum'].includes(item.credit_bond_basis)) {
       row.corp = item.credit_bond * 100;
       row.enterprise = null;
       row.unscoped_corporate = null;
@@ -6734,7 +6734,14 @@ function mergePureBondTypedStyle(assets, savedStyle) {
         source:item.bond_component_provenance?.source || null});
     }
     if (!totals || totals.report_date !== item.date || !finite(item.net_asset)
-        || totals.NAV_CNY !== item.net_asset) return row;
+        || totals.NAV_CNY !== item.net_asset) {
+      if (row.bond_source_scope === 'bonds_excluding_abs' && finite(row.bond)) {
+        row.bond_total_excluding_abs = row.bond;
+        row.fixed_income_total_including_abs = finite(row.absv) ? row.bond + row.absv : null;
+        row.bond_denominators_status = 'same_report_typed';
+      }
+      return row;
+    }
     const percent = value => finite(value) && value >= 0 ? value * 100 : null;
     row.bond_total_excluding_abs = percent(totals.bonds_excluding_abs?.NAV_fraction);
     row.fixed_income_total_including_abs = percent(totals.fixed_income_including_abs?.NAV_fraction);
