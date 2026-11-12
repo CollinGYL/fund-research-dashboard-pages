@@ -1018,8 +1018,6 @@ function switchPureBondBasis(basis){
 }
 function defaultPureBondBasis(){return 'nav';}
 function renderBondStruct(d){
-  const style=d.alloc.style||[];
-  const latestStyle=style.at(-1);
   const initialBasis=defaultPureBondBasis();
   const structureControls=`<label>显示口径 <select class="period" aria-label="券种分布口径" data-pb-onchange="switchPureBondBasis(this.value)"><option value="fixed_income"${initialBasis==='fixed_income'?' selected':''}>固定收益内部（含ABS）</option><option value="bonds"${initialBasis==='bonds'?' selected':''}>债券内部（不含ABS）</option><option value="nav"${initialBasis==='nav'?' selected':''}>占基金净值</option></select></label>`;
   const structureBody=`<div id="pureBondStructureChart">${pureBondStructurePanel(d,initialBasis)}</div>`;
@@ -1029,27 +1027,17 @@ function renderBondStruct(d){
     const opts=bonds.map((b,i)=>`<option value="${i}"${i===bonds.length-1?" selected":""}>${b.dt}（${b.n}只，全部披露合计${NN(b.wt_sum,1)}%）</option>`).join("");
     holdHtml=`<select class="period" id="bondPeriod" data-pb-onchange="switchBondPeriod(this.value)">${opts}</select><div id="bondTbl" style="margin-top:12px">${bondTable(last)}</div>`;
   }
-  let concHtml=`<div class="method-note">无数据</div>`,turnHtml=`<div class="method-note">无数据</div>`;
+  let concHtml=`<div class="method-note">无数据</div>`;
   if(bonds.length){
     concHtml=lineChart([{name:"可得非ABS债券前五/净资产",color:"var(--teal)",points:bonds.map(b=>[b.dt,disclosedBondTotals(b).top5===null?null:disclosedBondTotals(b).top5/100]),fill:"var(--teal)",sw:2.6}],{h:190,pctY:true,dp:1})+
       `<div class="method-note">从可得披露中按权重取非ABS债券前五，按基金净资产计算；ABS和全部披露合计单列。未匹配券种不猜分类；不是完整组合集中度。</div>`;
-    const latestAsset = latestStyle?.dt;
-    const notice = d.bond_list_comparison && latestAsset && latestAsset>last.dt
-      ? `<p class="method-note">最新资产报告期为 ${esc(latestAsset)}，该期债券名单尚未取得。</p>` : '';
-    const coverage = d.bond_list_comparison && last.turnover_available===false
-      ? `<p class="method-note">${esc(last.dt)}：已取得债券名单；${esc(last.comparison_note)}，本期不计算名单变化。</p>` : '';
-    turnHtml=notice+coverage+turnoverChart(bonds)+
-      `<div class="method-note">${d.bond_list_comparison?'比较相邻季度披露的前五名债券；名单取可得市值前五，并列照录。缺期不跨期补算。':'比较相邻可得披露期的名单和净值权重。'}名单变化不代表买卖，权重变化还受价格和净值影响。</div>`;
   }
-  return `<p class="tab-lead">券种分布 · 披露债券与ABS · 集中度 · 名单变化</p>`+
+  return `<p class="tab-lead">券种分布 · 披露债券与ABS · 集中度</p>`+
     `<div class="two-column">
       ${sub("券种分布","按真实报告期与所选分母展示",structureControls+structureBody)}
       ${sub("重仓债券","按报告期切换 · 全部可得披露",holdHtml)}
     </div>
-    <div class="two-column">
-      ${sub("持仓集中度趋势","可得非ABS债券前五/净资产（季度）",concHtml)}
-      ${sub("披露名单变化","新出现/权重增加/权重减少/不再出现",turnHtml)}
-    </div>`;
+    ${sub("持仓集中度趋势","可得非ABS债券前五/净资产（季度）",concHtml)}`;
 }
 function disclosedBondTotals(period) {
   const rows=period.bonds||[], valid=v=>typeof v==='number'&&Number.isFinite(v);
