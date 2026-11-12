@@ -1338,6 +1338,12 @@ function miniLineValue(value, format = "percent") {
   return pct(value, 2);
 }
 
+function miniLineHoverPoint(data, x, snapIndexes = [], radius = 6) {
+  const nearest = rows => rows.reduce((best, point) => !best || Math.abs(point.x-x)<Math.abs(best.x-x) ? point : best, null);
+  const anchors = data.filter(point => snapIndexes.some(i=>Number.isFinite(point.values[i])) && Math.abs(point.x-x)<=radius);
+  return nearest(anchors) || nearest(data);
+}
+
 function renderMiniLineChart(series, lines, ariaLabel, timeAxis = false, navDisplay = false) {
   if (!series || series.length < 2) return '<p class="empty-copy">趋势数据不足。</p>';
   const width = 900;
@@ -1358,19 +1364,19 @@ function renderMiniLineChart(series, lines, ariaLabel, timeAxis = false, navDisp
   const formats = lines.map((line) => line.format || "percent");
   return `
     <div class="mini-chart-legend">${lines.map((line) => `<span style="--line-color:${line.color}">${escapeHTML(line.label)}</span>`).join("")}</div>
-    <div class="nav-chart-wrap mini-line-chart-wrap"><svg class="nav-chart mini-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(ariaLabel)}" data-nav-display="${navDisplay}" data-min="${min}" data-max="${max}" data-labels="${escapeHTML(lines.map((line) => line.label).join("|"))}">
+    <div class="nav-chart-wrap mini-line-chart-wrap"><svg class="nav-chart mini-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(ariaLabel)}" data-nav-display="${navDisplay}" data-min="${min}" data-max="${max}" data-labels="${escapeHTML(lines.map((line) => line.label).join("|"))}" data-snap-lines="${lines.flatMap((line,index)=>line.snap?[index]:[]).join("|")}">
       ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 9}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${navDisplay ? (formats[0] === 'number' ? tick.toFixed(axis.digits) : navPercentLabel(tick, navPercentDigits(axis.step))) : miniLineValue(tick, formats[0])}</text>`).join("")}
       ${lines.map((line) => {
         const points=series.map((item,index)=>[index,isFiniteValue(item[line.key])?Number(item[line.key]):NaN]).filter(([,value])=>Number.isFinite(value));
         if (line.points) return points.map(([index,value])=>`<circle cx="${x(index).toFixed(1)}" cy="${y(value).toFixed(1)}" r="4" fill="${line.hollow?'white':line.color}" stroke="${line.color}" stroke-width="2"><title>${escapeHTML(series[index].report_date)} · ${escapeHTML(line.label)}：${miniLineValue(value,line.format)}</title></circle>`).join('');
         const segments=[]; let segment=[];
-        series.forEach((item,index)=>{if(isFiniteValue(item[line.key])) segment.push([index,Number(item[line.key])]); else if(segment.length){segments.push(segment);segment=[];}});
+        series.forEach((item,index)=>{if(isFiniteValue(item[line.key])) segment.push([index,Number(item[line.key])]); else if(line.skipMissingFlag && item[line.skipMissingFlag]) return; else if(segment.length){segments.push(segment);segment=[];}});
         if(segment.length) segments.push(segment);
         return segments.map(part=>`<polyline points="${part.map(([index,value])=>`${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(' ')}" class="chart-line" style="stroke:${line.color};stroke-width:${line.width||2.5}"/>`).join('');
       }).join('')}
 
       ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label chart-axis-date" text-anchor="${index === 0 ? "start" : index === series.length - 1 ? "end" : "middle"}">${escapeHTML(series[index].report_date.slice(0, 7))}</text>`).join("")}
-      ${series.map((item, index) => `<g class="mini-line-data" data-date="${escapeHTML(item.report_date)}" data-values="${lines.map((line) => isFiniteValue(item[line.key]) ? Number(item[line.key]) : "NaN").join("|")}" data-x="${x(index).toFixed(2)}"></g>`).join("")}
+      ${series.map((item, index) => `<g class="mini-line-data" data-date="${escapeHTML(item.report_date)}" data-values="${lines.map((line) => isFiniteValue(item[line.hoverKey]) ? Number(item[line.hoverKey]) : isFiniteValue(item[line.key]) ? Number(item[line.key]) : "NaN").join("|")}" data-note="${escapeHTML(item.hover_note || "")}" data-x="${x(index).toFixed(2)}"></g>`).join("")}
       <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="mini-line-crosshair" hidden/>
       ${lines.map((line) => `<circle r="4" class="mini-line-hover-dot" style="stroke:${line.color};${line.points&&!line.hollow?`fill:${line.color}`:""}" hidden/>`).join("")}
       <rect x="${margin.left}" y="${margin.top}" width="${width - margin.left - margin.right}" height="${height - margin.top - margin.bottom}" class="mini-line-hover-target"/>
@@ -1389,6 +1395,7 @@ function bindMiniLineCharts() {
       date: item.dataset.date,
       values: item.dataset.values.split("|").map(Number),
       x: Number(item.dataset.x),
+      note: item.dataset.note || "",
     }));
     if (!svg || !target || !crosshair || !card || data.length < 2) return;
     const width = 900;
@@ -1399,6 +1406,7 @@ function bindMiniLineCharts() {
     const labels = (svg.dataset.labels || "").split("|");
     const formats = (card.dataset.formats || "").split("|");
     const navDisplay = svg.dataset.navDisplay === "true";
+    const snapIndexes = (svg.dataset.snapLines || "").split("|").filter(Boolean).map(Number);
     const y = (value) => margin.top + ((max - value) / (navDisplay ? max - min : Math.max(max - min, 0.01))) * (height - margin.top - margin.bottom);
     const setVisible = (visible) => {
       [crosshair, card, ...dots].forEach((item) => {
@@ -1409,23 +1417,21 @@ function bindMiniLineCharts() {
     const update = (event) => {
       const bounds = svg.getBoundingClientRect();
       let localX = (event.clientX - bounds.left) / bounds.width * width;
-      const matrix = navDisplay ? svg.getScreenCTM() : null;
-      if (navDisplay) {
-        if (!matrix) return;
+      const matrix = svg.getScreenCTM?.();
+      if (matrix) {
         const cursor = svg.createSVGPoint(); cursor.x = event.clientX; cursor.y = event.clientY;
         try { localX = cursor.matrixTransform(matrix.inverse()).x; } catch { return; }
-      }
+      } else if (navDisplay) return;
       const rawX = Math.min(width - margin.right, Math.max(margin.left, localX));
-      const index = data.reduce((best, point, i) => Math.abs(point.x-rawX) < Math.abs(data[best].x-rawX) ? i : best, 0);
-      const point = data[index];
+      const point = miniLineHoverPoint(data, rawX, snapIndexes);
       crosshair.setAttribute("x1", point.x);
       crosshair.setAttribute("x2", point.x);
       dots.forEach((dot, lineIndex) => {
         dot.setAttribute("cx", point.x);
-        dot.setAttribute("cy", y(point.values[lineIndex]));
+        if(Number.isFinite(point.values[lineIndex]))dot.setAttribute("cy", y(point.values[lineIndex]));
       });
-      card.innerHTML = `<strong>${escapeHTML(point.date)}</strong>${point.values.map((value, lineIndex) => `<span>${escapeHTML(labels[lineIndex] || `序列${lineIndex + 1}`)}：${miniLineValue(value, formats[lineIndex])}</span>`).join("")}`;
-      if (navDisplay) {
+      card.innerHTML = `<strong>${escapeHTML(point.date)}</strong>${point.values.map((value, lineIndex) => `<span>${escapeHTML(labels[lineIndex] || `序列${lineIndex + 1}`)}：${miniLineValue(value, formats[lineIndex])}</span>`).join("")}${point.note?`<small>${escapeHTML(point.note)}</small>`:""}`;
+      if (matrix) {
         const anchor = svg.createSVGPoint(); anchor.x = point.x; anchor.y = margin.top;
         const box = wrap.getBoundingClientRect();
         if (box.width > 0) {
@@ -4723,6 +4729,16 @@ function downsamplePureBondDuration(kalmanDuration, maximum = 900, startDate = "
   return [...indexes].sort((a, b) => a - b).map(index => rows[index]);
 }
 
+function pureBondDurationEstimateAtReport(model, reportDate) {
+  if (model?.status !== 'ok') return null;
+  const dates=model.dates||[],values=model.duration||[];
+  let low=0,high=dates.length-1,index=-1;
+  while(low<=high){const mid=Math.floor((low+high)/2);if(dates[mid]<=reportDate){index=mid;low=mid+1;}else high=mid-1;}
+  if(index<0||!isFiniteValue(values[index]))return null;
+  const gap=Math.round((Date.parse(reportDate)-Date.parse(dates[index]))/86400000);
+  return gap>=0&&gap<=4?{date:dates[index],value:Number(values[index]),gap}:null;
+}
+
 function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
   const history=(detail?.duration_history||[]).filter(r=>isFiniteValue(r.duration)&&Number(r.duration)>=0&&Number(r.duration)<=30);
   const comparisons=kalmanDuration?.core_evaluation?.points||[];
@@ -4730,12 +4746,18 @@ function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
   const comparable=new Set(comparisons.filter(r=>!r.excluded_reason&&isFiniteValue(r.actual)).map(r=>r.report_date));
   const model=kalmanDuration?.status==='ok'?downsamplePureBondDuration(kalmanDuration,900,'2018-01-01'):[];
   const series=new Map(model.map(r=>[r.report_date,{...r}]));
+  const fullModel=new Map((kalmanDuration?.status==='ok'?kalmanDuration.dates:[]).map((date,index)=>[date,kalmanDuration.duration?.[index]]));
   const reasons={missing_same_period_signed_sensitivity:'缺少同报告期双向利率敏感性核验',missing_same_period_net_assets:'缺少同报告期净资产核验',invalid_sensitivity_direction:'敏感性方向未通过核验',unverified_disclosure:'披露来源尚未完成核验',no_estimate_before_report:'报告期早于模型估计起点',estimate_too_far:'最近估计日距报告期过远'};
   const rows=history.map(r=>{
     const check=byDate.get(r.date), matched=comparable.has(r.date);
     const item=series.get(r.date)||{report_date:r.date};
     // Verified comparison uses the audited net-assets formula; other points keep their source value.
-    item.disclosed=matched?Number(check.actual):Number(r.duration);series.set(r.date,item);
+    item.disclosed=matched?Number(check.actual):Number(r.duration);
+    const estimate=pureBondDurationEstimateAtReport(kalmanDuration,r.date);
+    if(fullModel.has(r.date))item.duration=isFiniteValue(fullModel.get(r.date))?Number(fullModel.get(r.date)):null;
+    else item.duration_report_only=true;
+    if(estimate){item.hover_duration=estimate.value;item.hover_note=estimate.gap?`模型估计日：${estimate.date}（报告期末前${estimate.gap}天）`:'';}
+    series.set(r.date,item);
     const source=r.source==='verified_report_net_assets'?'原报告核验':r.source==='choice_fpdurationbyir'?'Choice利率敏感性字段':'已有报告敏感性历史';
     const reason=matched?'可用于披露对照':kalmanDuration?.status!=='ok'?'暂无有效日频估计':r.date<(kalmanDuration.dates?.[0]||'')?'报告期早于模型估计起点':(reasons[check?.excluded_reason]||'仅展示历史披露，尚不满足严格对照条件');
     return [escapeHTML(r.date),`${num(r.duration,4)}年`,escapeHTML(source),escapeHTML(reason)];
@@ -4745,8 +4767,8 @@ function pureBondDisclosedHistoryPanel(fund, detail, kalmanDuration) {
   const points=[...series.values()].filter(r=>r.report_date>='2018-01-01').sort((a,b)=>a.report_date.localeCompare(b.report_date));
   return `<section class="bond-disclosed-history"><div class="subpanel-heading"><div><h3>日频估计与半年报／年报久期</h3><span>图示自2018年起 · 披露日期按报告期末标注 · 单位：年</span></div></div>
     ${missing?`<p class="method-note">${escapeHTML(state.target_report_date||'')}：${missing}</p>`:''}
-    ${points.length>=2?renderMiniLineChart(points,[{key:'duration',label:'日频估计',color:'#0a7c78',format:'years'},{key:'disclosed',label:'披露久期',color:'#c17729',format:'years',points:true}],`${fund.name}日频估计与历史披露久期`,true):'<p class="empty-copy">可用久期点不足以绘图；已有披露见下表。</p>'}
-    <p class="method-note">黄色实心点为报告披露久期。来源及能否用于误差统计见下表。</p>
+    ${points.length>=2?renderMiniLineChart(points,[{key:'duration',label:'日频估计',color:'#0a7c78',format:'years',hoverKey:'hover_duration',skipMissingFlag:'duration_report_only'},{key:'disclosed',label:'披露久期',color:'#c17729',format:'years',points:true,snap:true}],`${fund.name}日频估计与历史披露久期`,true):'<p class="empty-copy">可用久期点不足以绘图；已有披露见下表。</p>'}
+    <p class="method-note">黄色实心点为报告披露久期。移至点附近可同时查看披露值和模型估计；非交易日报告期使用此前最多4天内的估计并注明日期。来源及能否用于误差统计见下表。</p>
     ${rows.length?`<details><summary>全部历史披露（${rows.length}期）</summary>${renderTable(['报告期','披露久期','来源','对照说明'],rows.reverse())}</details>`:'<p class="method-note">暂未取得可用的历史数值披露。</p>'}
   </section>`;
 }

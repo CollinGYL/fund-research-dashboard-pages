@@ -385,10 +385,11 @@ function stackArea(rows,keys,opt={}){
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
   xTicks(x0,x1).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
   const colors=opt.colors||SC,names=opt.names||SCN;
-  const geometryValues=rows.map(r=>keys.map(k=>opt.coverageRemainder && typeof r.other==='number' && Number.isFinite(r.other) && (r[k]==null) ? 0 : r[k]));
+  const geometryKeys=opt.bottomKeys?[...opt.bottomKeys,...keys.filter(k=>!opt.bottomKeys.includes(k))]:keys;
+  const geometryValues=rows.map(r=>geometryKeys.map(k=>opt.coverageRemainder && typeof r.other==='number' && Number.isFinite(r.other) && (r[k]==null) ? 0 : r[k]));
   const geometry=ReviewCore.stackAreas(rows.map(r=>r.dt),geometryValues,{left:pl,right:w-pr,orderByCoverage:true});
   geometry.segments.forEach(s=>s.bands.forEach(b=>{
-    const k=keys[b.layer],tag=`data-stack-layer="${k}" data-stack-start="${s.start}" data-stack-end="${s.end}" data-stack-mask="${s.signature}"`;
+    const k=geometryKeys[b.layer],tag=`data-stack-layer="${k}" data-stack-start="${s.start}" data-stack-end="${s.end}" data-stack-mask="${s.signature}"`;
     if(b.points.length===1){const p=b.points[0];if(p.value===0)return;svg+=`<circle data-stack-point ${tag} cx="${p.x}" cy="${Y(p.upper)}" r="2.5" fill="${colors[k]}"><title>${p.date} · ${esc(names[k])} ${NN(p.value,2)}%</title></circle>`;return;}
     const points=[...b.points.map(p=>`${p.x},${Y(p.upper)}`),...b.points.slice().reverse().map(p=>`${p.x},${Y(p.lower)}`)].join(' ');
     svg+=`<polygon ${tag} points="${points}" fill="${colors[k]}" opacity="0.85" stroke="none"><title>${s.start} — ${s.end} · ${esc(names[k])}</title></polygon>`;
@@ -426,7 +427,9 @@ function wireStackArea(id,rows,keys,g){
     const details=keys.includes('corp')?[['enterprise_detail','企业债'],['commercial_paper_detail','短期融资券'],['medium_term_note_detail','中期票据']]:[];
     const detailHTML=details.some(([k])=>typeof row[k]==='number'&&Number.isFinite(row[k]))
       ?`<div style="margin-top:6px;opacity:.75">信用债细项 · 占净值</div>`+details.map(([k,label])=>`${label}: <b>${typeof row[k]==='number'&&Number.isFinite(row[k])?NN(row[k],4)+'%':'—'}</b>`).join('<br>'):'';
-    showTT(`<div style="opacity:.75">${esc(row.dt)}</div>${lines}${detailHTML}`,ev);
+    const scope=keys.includes('bond')&&row.asset_bond_scope
+      ?`<div style="margin-top:6px;opacity:.75">${row.asset_bond_scope==='excluding_abs'?'本期色带为债券（不含ABS）；ABS：—':'本期固定收益含ABS'}</div>`:'';
+    showTT(`<div style="opacity:.75">${esc(row.dt)}</div>${lines}${detailHTML}${scope}`,ev);
   });
   hit.addEventListener("mouseleave",()=>{hideTT();vl.setAttribute("opacity","0");});
 }
@@ -947,17 +950,19 @@ function pureBondAssetRows(style) {
   return style.map(row => {
     if (row.bond_denominators_status !== 'same_report_typed') return {...row};
     const fixed = row.fixed_income_total_including_abs;
-    return {...row, bond:finite(fixed) ? fixed : null,
-      bond_only:finite(fixed) ? null : row.bond_total_excluding_abs};
+    // One fixed-income band retains the known amount and its report scope.
+    return {...row, bond:finite(fixed) ? fixed : row.bond_total_excluding_abs,
+      asset_bond_scope:finite(fixed) ? 'including_abs' : 'excluding_abs'};
   });
 }
 
 function renderAlloc(d,options={}){
-  const style=d.alloc.style||[];
-  const typedStyle=pureBondAssetRows(style);
-  const keys=typedStyle.some(r=>typeof r.bond_only==="number")?[...AKEYS,"bond_only"]:AKEYS;
-  const assetChart=stackArea(typedStyle,keys,{h:220,colors:{...AC,bond_only:"#759c9a"},names:{...ACN,bond_only:"债券（ABS未取得）"},refLine:100});
-  return sub("资产分布","实际报告日期 · 占基金净资产（可超过100%）",assetChart)+
+  const style=pureBondAssetRows(d.alloc.style||[]);
+  const partial=style.filter(r=>r.asset_bond_scope==='excluding_abs');
+  const names=partial.length?{...ACN,bond:'债券及ABS（已披露部分）'}:ACN;
+  const assetChart=stackArea(style,AKEYS,{h:220,colors:AC,names,refLine:100,bottomKeys:["cash","othasset"]});
+  const note=partial.length?`<p class="method-note">${partial.length}个报告期的ABS为—，色带仅显示这些期已取得的债券比例；各期具体范围见悬浮提示。</p>`:'';
+  return sub("资产分布","实际报告日期 · 占基金净资产（可超过100%）",assetChart+note)+
     (options.includeDuration===false?"":sub("日频久期估计","年",`<div id="durkfWrap">${durKFBlock(d)}</div>`));
 }
 
