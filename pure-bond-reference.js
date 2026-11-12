@@ -12,7 +12,7 @@ const pcls=x=>x==null?"":(x>=0?"value-positive":"value-negative");
 const SC={gov:"var(--c-gov)",fin:"var(--c-fin)",corp:"var(--c-corp)",cp:"#99734d",mtn:"#a79c5b",enterprise:"#ca9954",unscoped_corporate:"#9c9989",cb:"var(--c-cb)",
           bill:"var(--c-bill)",absv:"var(--c-abs)",cds:"var(--c-cds)",othbd:"var(--c-othbd)",
           other:"var(--c-other)"};
-const SCN={gov:"国债及地方政府债",fin:"金融债",corp:"信用债（含短融、中票）",cp:"短期融资券",mtn:"中期票据",enterprise:"企业债",unscoped_corporate:"企业／信用债（口径待核）",cb:"可转债",
+const SCN={gov:"国债及地方政府债",fin:"金融债",corp:"信用债（含企业债、短融、中票）",cp:"短期融资券",mtn:"中期票据",enterprise:"企业债",unscoped_corporate:"企业／信用债（口径待核）",cb:"可转债",
            bill:"央行票据",absv:"资产支持证券",cds:"同业存单",othbd:"其他债券",
            other:"未分项债券"};
 const SKEYS=["gov","fin","corp","enterprise","unscoped_corporate","cb","bill","absv","cds","othbd","other"];
@@ -428,7 +428,7 @@ function wireStackArea(id,rows,keys,g){
     // The zero display convention is limited to bond components with a known denominator.
     const percent=value=>typeof value==='number'&&Number.isFinite(value)
       ?(g.emptyPercentZero&&value===0?'0.00%':NN(value,4)+'%')
-      :g.emptyPercentZero&&!row.denominator_missing?'<span title="源字段为空，按显示设置展示0.00%">0.00%</span>':'—';
+      :g.emptyPercentZero&&!row.denominator_missing?'0.00%':'—';
     const lines=keys.map(k=>`<span style="color:${g.colors[k]}">●</span> ${g.names[k]}: <b>${typeof row[k]==="number" && Number.isFinite(row[k])?percent(row[k]):row.credit_parent_known&&['enterprise','cp','mtn'].includes(k)?"计入信用债":percent(row[k])}</b>`).join("<br>");
     const details=keys.includes('corp')?[['enterprise_detail','企业债'],['commercial_paper_detail','短期融资券'],['medium_term_note_detail','中期票据']]:[];
     const detailHTML=details.some(([k])=>typeof row[k]==='number'&&Number.isFinite(row[k]))
@@ -1034,9 +1034,9 @@ function pureBondStructurePanel(d,basis){
   const missingPeriods=bStyle.filter(r=>r.denominator_missing).length;
   const conflicts=bStyle.filter(r=>r.total_conflict);
   const note=last?`<p class="method-note" data-bond-denominator>最新报告期 ${esc(last.dt)} · 分母：${label}${basis==='nav'?'':valid(last.denominator)?'，占净值 '+NN(last.denominator,4)+'%':'—'}。${basis==='bonds'?'本口径不包含ABS。':''}${basis==='nav'?`图示持债合计 ${valid(last.report_total)?NN(last.report_total,2)+'%':'—'}；同报告期基金杠杆 ${valid(source?.lev)?NN(source.lev*100,2)+'%':'—'}。色带为持债比例。`:missingPeriods?` ${missingPeriods}期分母缺失，内部比例显示“—”。`:''}</p>`:'';
-  const emptyPercent=last?.denominator_missing?'—':'<span title="源字段为空，按显示设置展示0.00%">0.00%</span>';
-  const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':emptyPercent}</strong></div>`).join('')+'</div>':'';
-  const creditDetails=source&&['enterprise_detail','commercial_paper','medium_term_note'].some(k=>valid(source[k]))?'<details class="selection-method"><summary>信用债细项 · 占基金净值</summary><div class="metric-grid-in" style="grid-template-columns:repeat(3,1fr)">'+[['enterprise_detail','企业债'],['commercial_paper','短期融资券'],['medium_term_note','中期票据']].map(([k,label])=>`<div class="rmetric"><span>${label}</span><strong>${valid(source[k])?NN(source[k],4)+'%':'<span title="源字段为空，按显示设置展示0.00%">0.00%</span>'}</strong></div>`).join('')+'</div></details>':'';
+  const emptyPercent=last?.denominator_missing?'—':'0.00%';
+  const summary=last?'<div class="metric-grid-in" style="grid-template-columns:repeat(4,1fr)">'+keys.filter(k=>k!=='other'&&!(k==='enterprise'&&valid(last.corp))&&!(k==='unscoped_corporate'&&!valid(source?.unscoped_corporate)&&(valid(source?.corp)||valid(source?.enterprise)))).map(k=>`<div class="rmetric"><span>${SCN[k]}</span><strong>${k==='enterprise'&&valid(source?.enterprise_detail)&&valid(source?.corp)?'计入信用债':valid(last[k])?NN(last[k],2)+'%':emptyPercent}</strong></div>`).join('')+'</div>':'';
+  const creditDetails=source&&['enterprise_detail','commercial_paper','medium_term_note'].some(k=>valid(source[k]))?'<details class="selection-method"><summary>信用债细项 · 占基金净值</summary><div class="metric-grid-in" style="grid-template-columns:repeat(3,1fr)">'+[['enterprise_detail','企业债'],['commercial_paper','短期融资券'],['medium_term_note','中期票据']].map(([k,label])=>`<div class="rmetric"><span>${label}</span><strong>${valid(source[k])?NN(source[k],4)+'%':'0.00%'}</strong></div>`).join('')+'</div></details>':'';
   const conflictNote=conflicts.length?`<p class="method-note">${conflicts.length}期已知券种合计与报告总额不一致，保留原数值供核对，未按100%调整。</p>`:'';
   return note+conflictNote+chart+summary+creditDetails;
 }
