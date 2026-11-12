@@ -377,13 +377,15 @@ function stackArea(rows,keys,opt={}){
   const ymax=Math.max(...rows.map(r=>keys.map(k=>r[k]).filter(v=>typeof v==='number'&&Number.isFinite(v)).reduce((a,v)=>a+v,0)),100);
   const Y=v=>pt+ph-v/ymax*ph;
   let svg=`<svg viewBox="0 0 ${w} ${h}" id="svg_${id}">`;
+  // Match the 900-unit mini-chart axes after this SVG is scaled to its container.
+  const axisText=opt.matchMiniAxes?`class="chart-axis-label" style="font-size:${10*w/900}px"`:`font-size="11" fill="#7b8a98"`;
   const regularTicks=Array.from({length:5},(_,i)=>ymax*i/4);
   // Keep the reference value explicit and avoid a near-duplicate tick beside it.
   const ref=Number.isFinite(opt.refLine)&&opt.refLine>=0&&opt.refLine<=ymax?opt.refLine:null;
   const ticks=ref==null?regularTicks:[...regularTicks.filter(v=>Math.abs(v-ref)>ymax/4*.15),ref].sort((a,b)=>a-b);
-  ticks.forEach(v=>{const y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${v.toFixed(0)}%</text>`;});
+  ticks.forEach(v=>{const y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" ${axisText}>${v.toFixed(0)}%</text>`;});
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#c0392b" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
-  xTicks(x0,x1).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
+  xTicks(x0,x1).forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" ${axisText}>${lb}</text>`;});
   const colors=opt.colors||SC,names=opt.names||SCN;
   const geometryKeys=opt.bottomKeys?[...opt.bottomKeys,...keys.filter(k=>!opt.bottomKeys.includes(k))]:keys;
   const geometryValues=rows.map(r=>geometryKeys.map(k=>opt.coverageRemainder && typeof r.other==='number' && Number.isFinite(r.other) && (r[k]==null) ? 0 : r[k]));
@@ -960,7 +962,7 @@ function renderAlloc(d,options={}){
   const style=pureBondAssetRows(d.alloc.style||[]);
   const partial=style.filter(r=>r.asset_bond_scope==='excluding_abs');
   const names=partial.length?{...ACN,bond:'债券及ABS（已披露部分）'}:ACN;
-  const assetChart=stackArea(style,AKEYS,{h:220,colors:AC,names,refLine:100,bottomKeys:["cash","othasset"]});
+  const assetChart=stackArea(style,AKEYS,{h:220,colors:AC,names,refLine:100,bottomKeys:["cash","othasset"],matchMiniAxes:true});
   const note=partial.length?`<p class="method-note">${partial.length}个报告期的ABS为—，色带仅显示这些期已取得的债券比例；各期具体范围见悬浮提示。</p>`:'';
   return sub("资产分布","实际报告日期 · 占基金净资产（可超过100%）",assetChart+note)+
     (options.includeDuration===false?"":sub("日频久期估计","年",`<div id="durkfWrap">${durKFBlock(d)}</div>`));
