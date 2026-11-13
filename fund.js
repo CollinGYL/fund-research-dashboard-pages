@@ -2828,8 +2828,21 @@ function bindHoldingAnalysis(analysis) {
     else if (selectedSummary) selectedSummary.textContent = current ? `所选季度前十大 · 报告期 ${current.report_date} · 公告 ${current.announcement_date || '待核'} · 已披露 ${current.holdings.length}只 · 前十大占净值 ${pct(current.total_weight,2)}；完整股票总仓位见最新完整披露。` : '所选报告期暂无披露。';
     tableOutput.innerHTML = renderHoldingSnapshot(current, state.dimension, state.scope);
     changesOutput.innerHTML = renderHoldingChanges(current, state.scope);
+    const matrixScroll = trendOutput.querySelector(".timeline-heatmap-wrap")?.scrollLeft || 0;
     const selectedStock = stockOptions.find(item => item.code === state.stockCode);
     trendOutput.innerHTML = (selectedStock ? `<h4>${escapeHTML(selectedStock.name)} · ${escapeHTML(selectedStock.code)}</h4><p role="status" data-holding-selection-status>已选择历史股票；披露权重见下方。</p>${renderHoldingTrajectoryChart(currentPeriods, state.stockCode, selectedStock.name, state.scope)}` : '') + renderHoldingTrajectoryHeatmap(currentPeriods, state.scope, 20, {sortIndex:state.periodIndex, direction:state.sortDirection});
+    const matrix = trendOutput.querySelector('.timeline-heatmap-wrap');
+    if (matrix) {
+      matrix.scrollLeft = matrixScroll;
+      const selectedDate = matrix.querySelector('[data-holding-heatmap-sort][aria-pressed="true"]');
+      if (selectedDate) {
+        const bounds = matrix.getBoundingClientRect(), dateBounds = selectedDate.getBoundingClientRect();
+        const left = matrix.querySelector('thead th')?.getBoundingClientRect().right || bounds.left;
+        // Keep the selected date visible without moving the page vertically.
+        if (dateBounds.right > bounds.right) matrix.scrollLeft += dateBounds.right - bounds.right + 8;
+        else if (dateBounds.left < left) matrix.scrollLeft -= left - dateBounds.left + 8;
+      }
+    }
     if (selectedStock) bindHoldingTrajectoryHover(currentPeriods, state.stockCode, selectedStock.name, state.scope);
     const url = new URL(location.href); url.searchParams.set('holdingScope', state.scope); if (current?.report_date) url.searchParams.set('holdingDate', current.report_date); if (state.stockCode) url.searchParams.set('holdingStock', state.stockCode); window.history.replaceState(null, '', url);
     trendOutput.querySelectorAll('[data-holding-heatmap-sort]').forEach(button => button.addEventListener('click', () => {
