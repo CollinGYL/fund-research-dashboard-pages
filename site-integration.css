@@ -139,6 +139,8 @@ body.workbench .fund-pagination .page-jump input:focus-visible {outline:2px soli
 
 
 /* Heatmap date headers: paper background and one continuous short selection rule. */
+body.workbench.warm-workbench .timeline-heatmap thead,
+body.workbench.warm-workbench .timeline-heatmap thead.desktop-detail-table-head {background:#fff;}
 body.workbench.warm-workbench .timeline-heatmap thead th:not(:first-child) {background:transparent;}
 body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[aria-pressed],
 body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[aria-pressed]:hover:not(:disabled) {
