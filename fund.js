@@ -2687,7 +2687,7 @@ function renderHoldingTrajectoryChart(periods, stockCode, stockName, scope) {
   </div>`;
 }
 
-function renderHoldingTrajectoryHeatmap(periods, scope, rowLimit = 20) {
+function renderHoldingTrajectoryHeatmap(periods, scope, rowLimit = 20, options = {}) {
   if (!periods?.length) return '<p class="empty-copy">暂无可连续比较的持仓披露期。</p>';
   const stocks = new Map();
   periods.forEach((period) => (period.holdings || []).forEach((holding) => {
@@ -2697,6 +2697,22 @@ function renderHoldingTrajectoryHeatmap(periods, scope, rowLimit = 20) {
     stocks.set(holding.code, current);
   }));
   const ranked = [...stocks.values()].sort((left, right) => right.count - left.count || right.max - left.max).slice(0, rowLimit);
+  const selected = Number.isInteger(options.sortIndex) && options.sortIndex >= 0 && options.sortIndex < periods.length ? options.sortIndex : null;
+  const ascending = options.direction === "asc";
+  if (selected !== null) {
+    const period = periods[selected];
+    const weights = new Map(ranked.map((stock) => {
+      const conflict = period.security_conflicts?.some(c => c.key === comparableSecurityCode(stock.code));
+      const holding = period.holdings.find(item => item.code === stock.code);
+      return [stock.code, !conflict && isFiniteValue(holding?.weight) ? Number(holding.weight) : null];
+    }));
+    // Keep the original stock set and stable ties; unknown weights stay last.
+    ranked.sort((left, right) => {
+      const a = weights.get(left.code), b = weights.get(right.code);
+      if (a === null || b === null) return a === b ? 0 : a === null ? 1 : -1;
+      return ascending ? a - b : b - a;
+    });
+  }
   const scale = Math.max(...ranked.map((item) => item.max), 0.01);
   const rows = ranked.map((stock) => {
     const cells = periods.map((period) => {
@@ -2714,7 +2730,7 @@ function renderHoldingTrajectoryHeatmap(periods, scope, rowLimit = 20) {
     }).join("");
     return `<tr><th scope="row"><button class="timeline-heatmap-row-link" data-holding-stock="${escapeHTML(stock.code)}">${escapeHTML(stock.name)}<small>${escapeHTML(stock.code)}</small></button></th>${cells}</tr>`;
   }).join("");
-  return `<div class="timeline-heatmap-wrap"><table class="timeline-heatmap holding-timeline-heatmap"><thead><tr><th>股票</th>${periods.map((period) => `<th>${escapeHTML(period.report_date.slice(2, 7))}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div><p class="method-note">按披露出现次数和历史最高权重展示前${ranked.length}只。季度空白仅表示未列前十大；完整持仓空白表示当期完整名单未披露持有。点击股票查看披露权重；已有行情的股票同时联动上方价格图。</p>`;
+  return `<div class="timeline-heatmap-wrap"><table class="timeline-heatmap holding-timeline-heatmap"><thead><tr><th>股票</th>${periods.map((period, index) => `<th aria-sort="${index === selected ? (ascending ? 'ascending' : 'descending') : 'none'}"><button type="button" class="heatmap-sort" data-holding-heatmap-sort="${index}" aria-pressed="${index === selected}" aria-label="${escapeHTML(period.report_date)} 按披露权重排序" title="点击按本期披露权重排序">${escapeHTML(period.report_date.slice(2, 7))} ${index === selected ? (ascending ? '↑' : '↓') : '↕'}</button></th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div><p class="method-note">按披露出现次数和历史最高权重展示前${ranked.length}只。季度空白仅表示未列前十大；完整持仓空白表示当期完整名单未披露持有。点击股票查看披露权重；已有行情的股票同时联动上方价格图。</p>`;
 }
 
 function bindHoldingTrajectoryHover(periods, stockCode, stockName, scope) {
@@ -2761,7 +2777,7 @@ function bindHoldingAnalysis(analysis) {
   const saved = new URLSearchParams(location.search);
   const initialScope = ['quarterly','full'].includes(saved.get('holdingScope')) && history[saved.get('holdingScope')]?.length ? saved.get('holdingScope') : history.default_scope || (history.quarterly?.length ? 'quarterly' : 'full');
   const savedPeriod = (history[initialScope] || []).findIndex(p => p.report_date === saved.get('holdingDate'));
-  const state = { scope: initialScope, dimension: 'sector', periodIndex: savedPeriod >= 0 ? savedPeriod : (history[initialScope] || []).length - 1, stockCode: comparableSecurityCode(saved.get('holdingStock')) };
+  const state = { scope: initialScope, dimension: 'sector', periodIndex: savedPeriod >= 0 ? savedPeriod : (history[initialScope] || []).length - 1, sortDirection: 'desc', stockCode: comparableSecurityCode(saved.get('holdingStock')) };
   const scopeButtons = [...root.querySelectorAll("[data-holding-scope]")];
   const dimensionButtons = [...root.querySelectorAll("[data-holding-dimension]")];
   const periodSelect = root.querySelector("#holding-period-select");
@@ -2813,15 +2829,22 @@ function bindHoldingAnalysis(analysis) {
     tableOutput.innerHTML = renderHoldingSnapshot(current, state.dimension, state.scope);
     changesOutput.innerHTML = renderHoldingChanges(current, state.scope);
     const selectedStock = stockOptions.find(item => item.code === state.stockCode);
-    trendOutput.innerHTML = (selectedStock ? `<h4>${escapeHTML(selectedStock.name)} · ${escapeHTML(selectedStock.code)}</h4><p role="status" data-holding-selection-status>已选择历史股票；披露权重见下方。</p>${renderHoldingTrajectoryChart(currentPeriods, state.stockCode, selectedStock.name, state.scope)}` : '') + renderHoldingTrajectoryHeatmap(currentPeriods, state.scope);
+    trendOutput.innerHTML = (selectedStock ? `<h4>${escapeHTML(selectedStock.name)} · ${escapeHTML(selectedStock.code)}</h4><p role="status" data-holding-selection-status>已选择历史股票；披露权重见下方。</p>${renderHoldingTrajectoryChart(currentPeriods, state.stockCode, selectedStock.name, state.scope)}` : '') + renderHoldingTrajectoryHeatmap(currentPeriods, state.scope, 20, {sortIndex:state.periodIndex, direction:state.sortDirection});
     if (selectedStock) bindHoldingTrajectoryHover(currentPeriods, state.stockCode, selectedStock.name, state.scope);
     const url = new URL(location.href); url.searchParams.set('holdingScope', state.scope); if (current?.report_date) url.searchParams.set('holdingDate', current.report_date); if (state.stockCode) url.searchParams.set('holdingStock', state.stockCode); window.history.replaceState(null, '', url);
+    trendOutput.querySelectorAll('[data-holding-heatmap-sort]').forEach(button => button.addEventListener('click', () => {
+      const index = Number(button.dataset.holdingHeatmapSort);
+      state.sortDirection = index === state.periodIndex && state.sortDirection === 'desc' ? 'asc' : 'desc';
+      periodSelect.value = String(index);
+      periodSelect.dispatchEvent(new Event('change'));
+    }));
     bindStockLinks();
   };
   scopeButtons.forEach((button) => button.addEventListener("click", () => {
     state.scope = button.dataset.holdingScope;
     state.periodIndex = periods().length - 1;
     state.stockCode = null;
+    state.sortDirection = 'desc';
     draw();
   }));
   dimensionButtons.forEach((button) => button.addEventListener("click", () => {
