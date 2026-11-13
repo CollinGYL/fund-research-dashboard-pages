@@ -136,3 +136,17 @@ body.workbench .fund-pagination .page-jump label {display:inline-flex;align-item
 body.workbench .fund-pagination .page-jump input {box-sizing:border-box;width:54px;min-width:0;min-height:32px;padding:5px 6px;text-align:center;font:inherit;font-variant-numeric:tabular-nums;color:#332c27;border:1px solid #a89987;border-radius:3px;background:#fff;}
 body.workbench .fund-pagination .page-jump input:focus-visible {outline:2px solid #8d3532;outline-offset:2px;}
 @media(max-width:600px){body.workbench .fund-pagination{flex-wrap:wrap;gap:8px;}body.workbench .fund-pagination .page-jump input{min-height:40px;width:48px;}.page-jump{gap:6px;}}
+
+
+/* Heatmap date headers: paper background and one continuous short selection rule. */
+body.workbench.warm-workbench .timeline-heatmap thead th:not(:first-child) {background:transparent;}
+body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[aria-pressed],
+body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[aria-pressed]:hover:not(:disabled) {
+ position:relative;background:transparent!important;border-color:transparent!important;border-radius:0!important;
+ color:inherit!important;box-shadow:none!important;text-decoration:none;
+}
+body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[aria-pressed="true"],
+body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[aria-pressed="true"]:hover:not(:disabled) {color:#9c4a3d!important;}
+body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[aria-pressed="true"]::after {
+ content:"";position:absolute;left:35%;right:35%;bottom:-4px;height:2px;background:currentColor;pointer-events:none;
+}
