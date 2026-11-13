@@ -3623,6 +3623,55 @@ function loadFullFilterDaily(code) {
   return loadEquityModelAsset('equity_filter_daily', 'FUND_FILTER_DAILY', code, '每日 Filter', validateFullFilterDaily);
 }
 
+function validateCurrentFilterHoldings(data, code) {
+  const number=v=>Number.isFinite(v)&&v>=0&&v<=1.05000001;
+  if(data?.schema!==1 || data.code!==code || !['available','unavailable'].includes(data.status)) throw new Error('个股估计数据无效，请重试');
+  if(data.status==='unavailable') return data;
+  const fields=['named_stock_weight','unidentified_A_weight','hk_weight','bond_weight'];
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(data.date||'') || data.algorithm_version!=='corrected-v2'
+      || data.method!=='kalman_event_p_filter' || data.basis!=='fund_nav' || data.scope!=='named_A_share_candidates_only'
+      || !/^[a-f0-9]{64}$/.test(data.segment_signature||'') || !Array.isArray(data.stocks)
+      || data.stocks.some(row=>!/^\d{6}\.(SH|SZ|BJ)$/.test(row?.code||'') || typeof row.name!=='string' || !number(row.weight))
+      || new Set(data.stocks.map(row=>row.code)).size!==data.stocks.length || fields.some(key=>!number(data[key]))
+      || fields.reduce((sum,key)=>sum+data[key],0)>1.05000001
+      || Math.abs(data.stocks.reduce((sum,row)=>sum+row.weight,0)-data.named_stock_weight)>1e-10) {
+    throw new Error('个股估计日期或权重无效，请重试');
+  }
+  return data;
+}
+
+function loadCurrentFilterHoldings(code) {
+  return loadEquityModelAsset('equity_filter_holdings','FUND_FILTER_HOLDINGS',code,'当前个股估计',validateCurrentFilterHoldings);
+}
+
+function currentFilterHoldingsPanel(data, daily, pending=false, error='') {
+  const head='<h2>模型估计当前持仓</h2><p class="method-note"><strong>卡尔曼滤波估计 · 非实际持仓</strong></p>';
+  const shell=content=>`<article class="subpanel current-filter-holdings" data-current-filter-holdings>${head}${content}</article>`;
+  if(error) return shell(`<p class="empty-copy" role="alert">${escapeHTML(error)}</p><button type="button" class="text-button" data-model-retry="stocks">重新加载个股估计</button>`);
+  if(!data || pending) return shell('<p class="empty-copy" role="status">正在加载个股估计…</p>');
+  if(data.status!=='available') return shell(`<p class="empty-copy">${escapeHTML(data.reason||'本基金暂无可用的个股估计。')}</p>`);
+  if(!daily) return shell('<p class="empty-copy">等待每日估计数据校验，暂不显示个股权重。</p>');
+  const segments=daily.segments.filter(s=>s.dates?.length).sort((a,b)=>b.dates.at(-1).localeCompare(a.dates.at(-1)));
+  const latest=segments[0];
+  if(!latest || latest.dates.at(-1)!==data.date || latest.input_signature!==data.segment_signature) {
+    return shell('<p class="empty-copy" role="status">每日估计与个股估计正在更新，校验一致后显示。</p><button type="button" class="text-button" data-current-filter-refresh>刷新估计</button>');
+  }
+  const totals=[data.named_stock_weight+data.unidentified_A_weight,data.hk_weight,data.bond_weight];
+  const last=latest.weights.at(-1),published=[last.slice(0,-2).reduce((a,b)=>a+b,0),...last.slice(-2)];
+  // Public daily weights are rounded to 6 decimals; the endpoint retains full precision.
+  if(totals.some((v,i)=>Math.abs(v-published[i])>(i===0?last.length*0.0000005+1e-10:0.0000005+1e-10))) {
+    return shell('<p class="empty-copy" role="alert">个股与每日配置权重不一致，暂不显示。</p>');
+  }
+  const rows=data.stocks.filter(row=>row.weight>0).slice().sort((a,b)=>b.weight-a.weight||a.code.localeCompare(b.code));
+  const tableRows=rows.map(row=>[escapeHTML(row.name),escapeHTML(row.code),pct(row.weight,2)]);
+  const table=items=>renderTable(['股票名称','股票代码','估计权重'],items,'table-scroll');
+  const tableHTML=table(tableRows.slice(0,10))+(rows.length>10?`<details class="current-filter-holdings-more"><summary>其余 ${rows.length-10} 只股票</summary>${table(tableRows.slice(10))}</details>`:'');
+  return shell(`<p class="simulation-date-note">估计日期：<strong>${escapeHTML(data.date)}</strong>${data.date<daily.end?` · 结果尚未更新至 ${escapeHTML(daily.end)}`:''}</p>
+    <p class="method-note">仅估计已披露候选 A 股，无法识别未披露的新股票；权重占基金净值。</p>
+    ${rows.length?tableHTML:'<p class="empty-copy">本期模型未给出正权重的候选 A 股。</p>'}
+    <p class="method-note">个股估计合计 ${pct(data.named_stock_weight,2)} · 未细分至个股的 A 股 ${pct(data.unidentified_A_weight,2)} · 港股 ${pct(data.hk_weight,2)} · 债券 ${pct(data.bond_weight,2)}</p>`);
+}
+
 // Coverage comes from actual segment bounds, never interpolated model weights.
 function comparisonCoverage(segments, referenceDates, start, end, method, declaredEnd='', issues=[]) {
   const shift=(date,days)=>new Date(Date.parse(date)+days*86400000).toISOString().slice(0,10);
@@ -3879,10 +3928,10 @@ function bindCombinedEquitySimulation(target, current=null, historical=null, his
   let researchToolsOpen=mode!=='comparison';
   // Each model owns its loading state: a failed legacy pilot must not hide the daily Filter.
   const state = (value=null, error='') => ({value,error,pending:false});
-  const resources = {current:state(current),history:state(historical,historicalError),eventp:state(eventp,eventpError),daily:state()};
-  const loaders = {current:()=>loadEquitySimulation(code),history:()=>loadEquityReconstruction(code),eventp:()=>loadEquityEventP(code),daily:()=>loadFullFilterDaily(code)};
-  const dependencies = {comparison:['daily'],eventp:['eventp'],history:['history'],current:['current']};
-  const labels = {current:'旧试点',history:'历史接续',eventp:'披露验证',daily:'逐日估计'};
+  const resources = {current:state(current),history:state(historical,historicalError),eventp:state(eventp,eventpError),daily:state(),stocks:state()};
+  const loaders = {current:()=>loadEquitySimulation(code),history:()=>loadEquityReconstruction(code),eventp:()=>loadEquityEventP(code),daily:()=>loadFullFilterDaily(code),stocks:()=>loadCurrentFilterHoldings(code)};
+  const dependencies = {comparison:['daily','stocks'],eventp:['eventp'],history:['history'],current:['current']};
+  const labels = {current:'旧试点',history:'历史接续',eventp:'披露验证',daily:'逐日估计',stocks:'当前个股估计'};
   const options={view:['1','2','3','stocks'].includes(params.get('historyView'))?params.get('historyView'):'1',range:['1','3','5','all'].includes(params.get('historyRange'))?params.get('historyRange'):'all',count:params.get('historyCount')==='all'?'all':'12',date:params.get('historyDate')||'',basis:params.get('simBasis')==='equity'?'equity':'nav'};
   const dailyOptions={range:['1','3','5','all'].includes(params.get('historyRange'))?params.get('historyRange'):'1',date:params.get('historyDate')||'',industry:params.get('dailyIndustry')||'',search:params.get('dailySearch')||'',autoRange:!params.has('historyRange')&&!params.has('historyDate')};
   const ensure = (key, retry=false) => {
@@ -3908,7 +3957,7 @@ function bindCombinedEquitySimulation(target, current=null, historical=null, his
     const body=target.querySelector('[data-model-content]');
     if(mode==='comparison') {
       if(daily&&dailyOptions.autoRange){dailyOptions.range=dailyFilterViewModel(daily,dailyOptions).range;dailyOptions.autoRange=false;}
-      body.innerHTML=dailyFilterPanel(daily,{...dailyOptions,pending:resources.daily.pending},resources.daily.error);
+      body.innerHTML=dailyFilterPanel(daily,{...dailyOptions,pending:resources.daily.pending},resources.daily.error)+currentFilterHoldingsPanel(resources.stocks.value,daily,resources.stocks.pending,resources.stocks.error);
       bindDailyFilterExplorer(body,daily,dailyOptions,(changes,rerender=true)=>{Object.assign(dailyOptions,changes);if('range' in changes||'date' in changes)dailyOptions.autoRange=false;syncURL();if(rerender)render();});
     } else if(resources[mode].error) body.innerHTML=errorPanel(mode);
     else if(mode==='eventp') body.innerHTML=eventp?.index?eventPPanel(eventp.data,eventp.index,eventpDate):'<p class="empty-copy" role="status">正在加载披露期验证…</p>';
@@ -3917,6 +3966,7 @@ function bindCombinedEquitySimulation(target, current=null, historical=null, his
       if(history?.data?.extension_issue) body.innerHTML+='<button type="button" class="text-button" data-model-retry="history">重新加载接续段</button>';
     } else if(current) bindEquitySimulation(body,current.data,current.index);
     else body.innerHTML='<p class="empty-copy" role="status">正在加载原试点对照…</p>';
+    target.querySelector('[data-current-filter-refresh]')?.addEventListener('click',()=>{ensure('daily',true);ensure('stocks',true);render();});
     target.querySelector('[data-eventp-date]')?.addEventListener('change',e=>{eventpDate=e.target.value;update();});
     target.querySelector('[data-research-tools]')?.addEventListener('toggle',event=>{if(event.currentTarget.isConnected!==false)researchToolsOpen=event.currentTarget.open;});
     target.querySelectorAll('[data-model-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.modelMode;if(mode!=='comparison')researchToolsOpen=true;options.basis=new URLSearchParams(location.search).get('simBasis')==='equity'?'equity':'nav';update();}));
