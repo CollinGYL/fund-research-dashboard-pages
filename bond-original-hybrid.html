@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>一级二级债基 · 单基金详细分析</title>
-<style>
+<style>/* Fixed Manrope 500 face, used only by former Georgia rules. */
+@font-face{font-family:"Manrope Medium";font-style:normal;font-weight:500;font-display:swap;src:url("manrope-medium.ttf") format("truetype")}
+
 /* ===== 研究报告统一视觉系统(citic-report-html-style,与纯债基金-通用分析同款) ===== */
 :root{
   --ink:#122235;--muted:#67788b;--line:#dce5ea;--paper:#f4f7f5;--white:#fff;
@@ -25,7 +27,7 @@ button,input,select{font:inherit}
   gap:20px;min-height:74px;padding:0 5vw;border-bottom:1px solid rgba(220,229,234,.85);
   background:rgba(244,247,245,.9);backdrop-filter:blur(18px)}
 .brand{display:flex;align-items:center;gap:12px}
-.brand-mark{display:grid;width:40px;height:40px;place-items:center;color:#fff;border-radius:11px;background:var(--navy);font-family:Georgia,serif;font-size:19px}
+.brand-mark{display:grid;width:40px;height:40px;place-items:center;color:#fff;border-radius:11px;background:var(--navy);font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:19px;font-weight:500}
 .brand strong{display:block;letter-spacing:.04em;font-size:15px}
 .brand small{display:block;margin-top:2px;color:var(--muted);font-size:10px;letter-spacing:.11em}
 .hdr-search{position:relative;min-width:300px;flex:0 1 380px}
@@ -43,7 +45,7 @@ button,input,select{font:inherit}
 .fund-page{padding-block:44px 0}
 .fund-page-hero{display:grid;grid-template-columns:minmax(0,1fr) 300px;align-items:end;gap:40px}
 .fund-page-hero .eyebrow{margin:0 0 10px;color:var(--teal);font-size:12px;font-weight:700;letter-spacing:.16em}
-.fund-page-hero h1{margin:0;font-family:Georgia,"Songti SC",serif;font-size:clamp(34px,4.6vw,60px);line-height:1.1;letter-spacing:-.03em}
+.fund-page-hero h1{margin:0;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:clamp(34px,4.6vw,60px);line-height:1.1;letter-spacing:-.03em;font-weight:500}
 .fund-page-hero h1 .code{display:block;margin-top:8px;color:var(--muted);font-family:Inter,"PingFang SC",sans-serif;font-size:15px;font-weight:500;letter-spacing:0}
 .fund-page-summary{margin:20px 0 0;color:var(--muted);font-size:15px;line-height:1.8}
 .hero-facts{display:grid;gap:1px;margin:0;overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--line)}
@@ -53,20 +55,20 @@ button,input,select{font:inherit}
 .fund-page-metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;margin-top:40px;overflow:hidden;border:1px solid var(--line);border-radius:15px;background:var(--line)}
 .fund-page-metrics div{padding:18px;background:var(--white)}
 .fund-page-metrics span{display:block;color:var(--muted);font-size:11px}
-.fund-page-metrics strong{display:block;margin-top:9px;color:var(--navy);font-family:Georgia,serif;font-size:26px}
+.fund-page-metrics strong{display:block;margin-top:9px;color:var(--navy);font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:26px;font-weight:500}
 .fund-page-metrics strong.pos{color:var(--pos)}.fund-page-metrics strong.neg{color:var(--neg)}
 .fund-page-metrics small{display:block;margin-top:4px;color:var(--muted);font-size:9.5px}
 @media(max-width:900px){.fund-page-hero{grid-template-columns:1fr}.fund-page-metrics{grid-template-columns:repeat(3,1fr)}}
 
 .panel-intro{display:flex;align-items:end;justify-content:space-between;gap:36px;margin-top:40px;padding:24px 30px;color:#fff;border-radius:17px;background:var(--navy)}
 .panel-intro .eyebrow{margin:0 0 6px;color:#79d0c7;font-size:11px;font-weight:700;letter-spacing:.16em}
-.panel-intro h2{margin:0;font-family:Georgia,"Songti SC",serif;font-size:clamp(24px,3vw,34px)}
+.panel-intro h2{margin:0;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:clamp(24px,3vw,34px);font-weight:500}
 .panel-intro>div>p{margin:0}
 .panel-intro>p{max-width:420px;margin:0;color:#c8d7e1;font-size:12.5px;line-height:1.7;text-align:right}
 
 .subpanel{min-width:0;margin-top:16px;padding:26px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.82);display:flex;flex-direction:column}
 .subpanel-heading{display:flex;align-items:baseline;justify-content:space-between;gap:24px;margin-bottom:16px}
-.subpanel h3{margin:0;color:var(--navy);font-family:Georgia,"Songti SC",serif;font-size:20px}
+.subpanel h3{margin:0;color:var(--navy);font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:20px;font-weight:500}
 .subpanel-heading span{color:var(--muted);font-size:11px;text-align:right}
 .two-column{display:grid;grid-template-columns:1fr 1fr;align-items:stretch;gap:16px}
 @media(max-width:900px){.two-column{grid-template-columns:1fr}}
@@ -113,7 +115,7 @@ button,input,select{font:inherit}
 
 .data-boundary{margin-top:4px;padding:24px 28px;color:#fff;border-radius:15px;background:var(--navy)}
 .data-boundary .eyebrow{color:#f0c977;font-size:11px;font-weight:700;letter-spacing:.1em}
-.data-boundary h3{margin:10px 0 8px;font-family:Georgia,"Songti SC",serif;font-size:20px;color:#fff}
+.data-boundary h3{margin:10px 0 8px;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:20px;color:#fff;font-weight:500}
 .data-boundary p{margin:0;color:#d6e1e8;font-size:12.5px;line-height:1.8}
 .data-boundary code{padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.12);font-size:11.5px}
 
