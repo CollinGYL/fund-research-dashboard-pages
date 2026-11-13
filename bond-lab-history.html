@@ -2,9 +2,7 @@
 <html lang="zh-CN"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>纯债基金久期高频拟合 · 卡尔曼版（仅观测净值）</title>
-<style>/* Fixed Manrope 500 face, used only by former Georgia rules. */
-@font-face{font-family:"Manrope Medium";font-style:normal;font-weight:500;font-display:swap;src:url("manrope-medium.ttf") format("truetype")}
-
+<style>
 :root{--ink:#122235;--muted:#67788b;--line:#dce5ea;--paper:#f4f7f5;--white:#fff;--navy:#102c45;
 --teal:#0a7c78;--gold:#c69a4b;--shadow:0 18px 50px rgba(18,43,64,.09)}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
@@ -12,13 +10,13 @@ body{margin:0;overflow-x:hidden;color:var(--ink);background:radial-gradient(circ
 a{color:inherit;text-decoration:none}
 .site-header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;min-height:74px;padding:0 5vw;border-bottom:1px solid rgba(220,229,234,.85);background:rgba(244,247,245,.88);backdrop-filter:blur(18px)}
 .brand{display:flex;align-items:center;gap:12px}
-.brand-mark{display:grid;width:40px;height:40px;place-items:center;color:#fff;border-radius:11px;background:var(--navy);font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:19px;font-weight:500}
+.brand-mark{display:grid;width:40px;height:40px;place-items:center;color:#fff;border-radius:11px;background:var(--navy);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:19px;font-weight:500}
 .brand strong,.brand small{display:block}.brand small{margin-top:2px;color:var(--muted);font-size:10px;letter-spacing:.11em}
 nav{display:flex;gap:26px;color:#435568;font-size:13.5px}nav a:hover{color:var(--teal)}
 .shell{width:min(1180px,90vw);margin-inline:auto}
 .hero{display:grid;grid-template-columns:1.08fr .92fr;gap:56px;align-items:center;min-height:440px;padding-block:60px 30px}
 .eyebrow{margin:0 0 12px;color:var(--teal);font-size:12px;font-weight:700;letter-spacing:.16em}
-h1{max-width:640px;margin:0;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:clamp(38px,4.8vw,58px);line-height:1.12;letter-spacing:-.04em;font-weight:500}
+h1{max-width:640px;margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:clamp(38px,4.8vw,58px);line-height:1.12;letter-spacing:-.04em;font-weight:500}
 .hero-text{max-width:620px;margin:24px 0 0;color:#516477;font-size:17px;line-height:1.85}
 .hero-panel{padding:25px;border:1px solid rgba(255,255,255,.7);border-radius:20px;background:rgba(255,255,255,.72);box-shadow:var(--shadow)}
 .panel-topline{display:flex;justify-content:space-between;margin-bottom:18px;color:var(--muted);font-size:12px}
@@ -26,14 +24,14 @@ h1{max-width:640px;margin:0;font-family:"Manrope Medium","Hiragino Sans GB","Pin
 .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .mcard{min-height:128px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--white)}
 .mcard span,.mcard small{display:block;color:var(--muted);font-size:12px}
-.mcard strong{display:block;margin:14px 0 8px;color:var(--navy);font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:29px;font-weight:500}
+.mcard strong{display:block;margin:14px 0 8px;color:var(--navy);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:29px;font-weight:500}
 .mcard.accent{color:#fff;border-color:transparent;background:var(--teal)}
 .mcard.accent span,.mcard.accent small,.mcard.accent strong{color:#fff}
 .block{padding-block:64px}
 .shead{display:flex;align-items:end;justify-content:space-between;gap:36px;margin-bottom:24px}
-.shead h2{margin:0;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:clamp(27px,3.4vw,40px);letter-spacing:-.03em;font-weight:500}
+.shead h2{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:clamp(27px,3.4vw,40px);letter-spacing:-.03em;font-weight:500}
 .shead>p{max-width:520px;margin:0;color:var(--muted);font-size:13px;line-height:1.75}
-.step{display:inline-block;margin-right:12px;color:var(--gold);font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-weight:500}
+.step{display:inline-block;margin-right:12px;color:var(--gold);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-weight:500}
 .panel{margin-top:16px;padding:26px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.8)}
 .panel h4{margin:20px 0 0;font-size:14px;color:var(--navy)}
 pre.fml{margin:12px 0 0;padding:16px 18px;border:1px solid var(--line);border-radius:10px;background:#f7f9f8;color:#2c3e50;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;line-height:1.75;overflow-x:auto;white-space:pre}
@@ -42,22 +40,22 @@ pre.fml b{color:#b35342;font-weight:700}
 .eqhead{margin:0 0 8px;font-family:Inter,"PingFang SC",sans-serif;font-size:12px;font-weight:700;color:var(--navy);letter-spacing:.02em}
 .eqrow{display:flex;align-items:baseline;flex-wrap:wrap;gap:.18em;padding:4px 0;font-size:14.5px}
 .eqrow .tag{flex:0 0 100px;font-family:Inter,"PingFang SC",sans-serif;font-size:11.5px;font-weight:700;color:var(--teal);letter-spacing:.02em}
-.eqline .ev{font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-style:italic;color:var(--ink);font-weight:500}
+.eqline .ev{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-style:italic;color:var(--ink);font-weight:500}
 .eqline .eo{font-style:normal;color:var(--muted);padding:0 .15em}
 .eqline .note2{margin-left:auto;padding-left:1.2em;font-family:Inter,"PingFang SC",sans-serif;font-size:11.5px;color:var(--muted);white-space:nowrap}
-.frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .3em;font-size:.82em;line-height:1.35;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-style:italic;font-weight:500}
+.frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 .3em;font-size:.82em;line-height:1.35;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-style:italic;font-weight:500}
 .frac .n{padding:0 .2em 2px;border-bottom:1.2px solid var(--ink)}
 .frac .d{padding:2px .2em 0}
-.sumlim{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1;margin:0 .2em;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-style:normal;color:var(--ink);font-weight:500}
+.sumlim{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1;margin:0 .2em;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-style:normal;color:var(--ink);font-weight:500}
 .sumlim .sup,.sumlim .sub{font-size:.52em;font-style:italic}
 .sumlim .sigma{font-size:1.3em;margin:-1px 0}
 .eqline .ev sub,.eqline .ev sup{font-style:italic}
-.fnn{fill:var(--navy);font-size:11px;font-weight:500;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif}
+.fnn{fill:var(--navy);font-size:11px;font-weight:500;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
 .fnd{fill:#b35342;font-size:10px;font-family:Inter,sans-serif}
-.panel h3{margin:0 0 12px;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:20px;color:var(--navy);font-weight:500}
+.panel h3{margin:0 0 12px;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:20px;color:var(--navy);font-weight:500}
 .mb-group{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
   margin:34px 0 2px;padding:12px 4px 10px;border-top:2px solid var(--navy);
-  font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:19px;font-weight:500;color:var(--navy)}
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:19px;font-weight:500;color:var(--navy)}
 .mb-group i{font-style:normal;font-family:-apple-system,"Microsoft YaHei",sans-serif;
   font-size:12px;font-weight:400;color:var(--muted)}
 
@@ -80,8 +78,8 @@ table.rt tbody tr:last-child td{border-bottom:0}table.rt td{color:#44596b}table.
 .fgrid>*{min-width:0}
 .fund-card{padding:20px;border:1px solid var(--line);border-radius:14px;background:var(--white)}
 .fc-head{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-bottom:12px;flex-wrap:wrap}
-.fc-head b{font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;color:var(--navy);font-weight:500}
-.fc-mae{color:var(--muted);font-size:11.5px}.fc-mae strong{color:var(--navy);font-size:15px;font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-weight:500}
+.fc-head b{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;color:var(--navy);font-weight:500}
+.fc-mae{color:var(--muted);font-size:11.5px}.fc-mae strong{color:var(--navy);font-size:15px;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-weight:500}
 .pill{padding:4px 9px;border-radius:999px;font-size:10.5px;font-weight:700}
 .pill.ok{color:#285f5a;background:#e1f1ed}.pill.mid{color:#815d22;background:#f8edd5}.pill.bad{color:#914f42;background:#f8e5e1}
 .ch{display:block;width:100%;min-width:0;height:auto}
@@ -151,7 +149,7 @@ table.mini th{color:var(--muted);font-weight:600}table.mini tbody tr:last-child 
 .chain{display:grid;grid-template-columns:repeat(4,1fr);margin-top:16px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--white)}
 .chain-step{padding:22px 20px;border-right:1px solid var(--line)}
 .chain-step:last-child{border-right:0;background:#f7faf9}
-.cs-n{color:var(--gold);font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:12px;font-weight:500}
+.cs-n{color:var(--gold);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:12px;font-weight:500}
 .chain-step h4{margin:6px 0 8px;font-size:14px;color:var(--navy)}
 .chain-step p{margin:0 0 10px;color:var(--muted);font-size:12px;line-height:1.7}
 .cs-freq{display:inline-block;padding:3px 9px;border-radius:999px;border:1px solid #cfe0dd;background:#eef8f5;color:#3d6b64;font-size:10px}
@@ -189,7 +187,7 @@ footer{display:flex;justify-content:space-between;gap:10px;padding:24px 5vw;colo
 .tr-bar{height:7px;border-radius:4px;background:#eef2f4;overflow:hidden}
 .tr-bar i{display:block;height:100%;background:var(--teal);opacity:.75}
 .tr-row.tr-no .tr-bar i{background:#b0bcc7}
-.tr-pc{color:var(--navy);font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:11.5px;text-align:right;font-weight:500}
+.tr-pc{color:var(--navy);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:11.5px;text-align:right;font-weight:500}
 .tg{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;white-space:nowrap}
 .tg-ok{background:#e1f1ed;color:#285f5a}
 .tg-all{background:var(--navy);color:#fff}
@@ -222,7 +220,7 @@ footer{display:flex;justify-content:space-between;gap:10px;padding:24px 5vw;colo
   background: rgba(255,255,255,.96); backdrop-filter: blur(6px); }
 #outline .ol-head { display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
   padding: 16px 14px 12px 18px; border-bottom: 1px solid var(--line); }
-#outline .ol-title { flex: 1; color: var(--navy); font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;
+#outline .ol-title { flex: 1; color: var(--navy); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
   font-size: 15px; font-weight:500; letter-spacing: .04em; }
 #outline .ol-btn { display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
   border: 1px solid var(--line); border-radius: 7px; background: #fff; color: #506578;
@@ -306,7 +304,7 @@ footer{display:flex;justify-content:space-between;gap:10px;padding:24px 5vw;colo
 <style>
 /* ↓ 自 纯债基金-市场生态统计.html 原样搬入，供上述两模块使用 */
 .subpanel { margin-top: 18px; padding: 27px; border: 1px solid var(--line); border-radius: 15px; background: rgba(255,255,255,.8); min-width: 0; }
-.subpanel h3 { margin: 0 0 20px; color: var(--navy); font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif; font-size: 21px;;font-weight:500}
+.subpanel h3 { margin: 0 0 20px; color: var(--navy); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; font-size: 21px;;font-weight:500}
 .subpanel-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .subpanel-heading h3 { margin-bottom: 14px; }
 .subpanel-heading span { color: var(--muted); font-size: 11px; text-align: right; }
@@ -337,7 +335,7 @@ footer{display:flex;justify-content:space-between;gap:10px;padding:24px 5vw;colo
 .research-table th { color: var(--muted); background: #f7f9f8; font-weight: 650; white-space: nowrap; }
 .research-table tbody tr:last-child td { border-bottom: 0; }
 .research-table td { color: #44596b; }
-.research-table td:first-child { color: var(--navy); font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;;font-weight:500}
+.research-table td:first-child { color: var(--navy); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;;font-weight:500}
 .research-table tr:hover td { background: #fafcfb; }
 .provenance { margin-top: 16px; padding: 12px 15px; border-left: 3px solid var(--teal); border-radius: 0 8px 8px 0; background: #f5f9f8; color: #4f6473; font-size: 11px; line-height: 1.8; }
 .provenance b { color: var(--navy); }

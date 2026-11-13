@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-13T11:52:29+08:00",
+  "generatedAt": "2026-11-13T13:16:39+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -57,16 +57,16 @@
       "sha256": "e4c876c6a8decf30adffc2c7d642322e3e3676c7b44feb4e37d97ad7e3c49e2d"
     },
     "bond-lab-history.html": {
-      "size": 4981271,
-      "sha256": "5cf3cd13e52d1a78dfe8eba8749201cbf2435eddcd0c20b5f4fb9a68d189a345"
+      "size": 4981388,
+      "sha256": "639059b606fa56fd1c6bd2bb0da281e06359208b5ac0e89dd53531afb88cbf80"
     },
     "bond-lab-pit.html": {
-      "size": 12410011,
-      "sha256": "f918cd238772ef9b8e6c65de3e1f25c1f8c255edc9bc1b3b261a823f3fac23d1"
+      "size": 12410128,
+      "sha256": "ee1034c4adfb65fc6a9aa37d0c6f4a700c209d9bd459d04f75910c2f57c1369c"
     },
     "bond-lab-threshold.html": {
-      "size": 53753,
-      "sha256": "8a986ef16ed45fb97d959f9b253d47fc1378e480cd0e08697a6d1f767d5c3e5a"
+      "size": 53834,
+      "sha256": "15f461e3978165e1ae41f8373e329bcd4d3ea5b1a53783fe3d61b4cc8cdb973c"
     },
     "bond-market-comparison.css": {
       "size": 5453,
@@ -85,8 +85,8 @@
       "sha256": "6e3ef82465285a0bb5e8a9bef789a584de30fd6bf73bbb8d38b5545bb0f04392"
     },
     "bond-original-hybrid.html": {
-      "size": 2827434,
-      "sha256": "e5ecc57fdb9fb7a6b9b3849cff42b1b349fb0072cfa9b7036a2b1469705513b5"
+      "size": 2827335,
+      "sha256": "608f7099b46f326ba268d17f14a0a98037ed3fb1ef4c6aa8c20de09e07b2a398"
     },
     "bond-original-single.html": {
       "size": 729730,
@@ -94,15 +94,15 @@
     },
     "bond-research.html": {
       "size": 6193,
-      "sha256": "aeb99c8c643e13e4d7e108f72fcb08db337b389b038a7bd577d0d4a940874bff"
+      "sha256": "7378a836299441bda7d2b5f74cd14f696f8105ea685f713e9738dda6bb6a9f20"
     },
     "changes.html": {
       "size": 2215,
-      "sha256": "fd8c97a08767c0b743c32cc5872a8ab49e1b2e7e7f39c715fb85276db50dd238"
+      "sha256": "34ce06de229886cc8752e930cd197bb9db7cad4d4dc8766d872639264d26f8a9"
     },
     "compare.html": {
       "size": 4798,
-      "sha256": "9ae5985392d47c619b3b41ec7da0be1b5934fb4fcded9108225b4dd87592d31c"
+      "sha256": "17aec635bae08e783725636bff7c2a0fecca3e88fb4574141701ac9acb7d2c9f"
     },
     "compare.js": {
       "size": 9845,
@@ -142,7 +142,7 @@
     },
     "fund.html": {
       "size": 5815,
-      "sha256": "71d61b951e2bc86508a85c1e881b4a470b6a32a91f181eec4ea37b53cb0bbd67"
+      "sha256": "c2caf3531ad4f71d83f3b5dace33401c3985fbc3598b95d6a28089aee4832948"
     },
     "fund.js": {
       "size": 670348,
@@ -150,7 +150,7 @@
     },
     "index.html": {
       "size": 14161,
-      "sha256": "2b4af1375076c36f4323d5813237fa5c6a6a33981e36b14ba0adf8c36948e7ca"
+      "sha256": "d628faf04cb279ece8918e3da34c8071d6de02aaed99fcd68b973a4f598d5df0"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -165,8 +165,8 @@
       "sha256": "9de56d3b5560d81a588d0224d2dfd3590bafbe2c5c38061bd661f6d48145acb7"
     },
     "pure-bond-reference.css": {
-      "size": 23241,
-      "sha256": "4019ed228a240cd2125cca3e44ebb800f79c4705343708be0f8d8fa0ee91ff39"
+      "size": 23178,
+      "sha256": "7caca2c1b4c0c4a42c3accbd43ceae235d99d5a4cffb1aef2266ff3305557d78"
     },
     "pure-bond-reference.js": {
       "size": 132165,
@@ -181,8 +181,8 @@
       "sha256": "4b3f9264673a86c7eb3ec0a83ab764a61077992f482ccbf718f00486b74c6aed"
     },
     "review.css": {
-      "size": 30651,
-      "sha256": "95003d73d3dd95ae60c7f55c9c3ad741aac6c1490692b52c88110bc5dfb8e889"
+      "size": 30480,
+      "sha256": "742b9bae87976550a63c6cdad5d30cda5a90a933a45f94e8cae1df3e7142ec0b"
     },
     "robots.txt": {
       "size": 26,
@@ -197,8 +197,8 @@
       "sha256": "5e28a93ac905253f80fe002e2636ad8954daab47c79d75a0f6e19052fdc4552f"
     },
     "styles.css": {
-      "size": 230236,
-      "sha256": "ac1a0ffb6dff0b3b076444f4a6a4b6938c6d31d1f6d1e9328094165517d4f3e6"
+      "size": 230713,
+      "sha256": "24b8cce6c34896fe6e2adaf62369e281e60b596d0c3a60d9ffcce1050f74abdc"
     },
     "ui-integration.css": {
       "size": 7943,
@@ -233,8 +233,8 @@
       "sha256": "7f82db5fa514bd397a77f67dbf11e1cb31e9f3d0d538ca2d55d65ec6d3dde8e6"
     },
     "bond-fixed-plus.css": {
-      "size": 3325,
-      "sha256": "020b23b1e82ea76fcce5f2f43c819678fab73961a39b0fedd1e586b96b4b9137"
+      "size": 3136,
+      "sha256": "f834c3e0b2c0eda491430d5c26eeadf0aa78b9067f0e57e02e87ea66f6127e85"
     },
     "manrope-medium.ttf": {
       "size": 96300,

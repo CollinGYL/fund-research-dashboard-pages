@@ -1,12 +1,10 @@
-/* Fixed Manrope 500 face, used only by former Georgia rules. */
-@font-face{font-family:"Manrope Medium";font-style:normal;font-weight:500;font-display:swap;src:url("manrope-medium.ttf") format("truetype")}
 .fixed-plus-current{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0;background:#f8fbfa}
 .fixed-plus-title{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;font-size:12px;color:var(--muted)}
 .fixed-plus-title strong{color:var(--navy);font-size:14px}
 .fixed-plus-label{padding:5px 10px;border-radius:16px;color:white;font-weight:700;font-size:13px}
 .fixed-plus-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0}
 .fixed-plus-metrics span{display:block;font-size:11px;color:var(--muted);margin-bottom:6px}
-.fixed-plus-metrics b{font-family:"Manrope Medium","Hiragino Sans GB","PingFang SC","Microsoft YaHei",sans-serif;font-size:22px;color:var(--navy);font-variant-numeric:tabular-nums;font-weight:500}
+.fixed-plus-metrics b{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:22px;color:var(--navy);font-variant-numeric:tabular-nums;font-weight:500}
 .fixed-plus-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:12px}
 .fixed-plus-controls input[type=date],.fixed-plus-controls button{padding:6px 9px;border:1px solid var(--line);border-radius:6px;background:white;color:var(--navy);font:inherit}
 .fixed-plus-controls button{cursor:pointer}
