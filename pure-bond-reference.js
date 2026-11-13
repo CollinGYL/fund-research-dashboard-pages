@@ -876,10 +876,9 @@ function peerRankBlock(d){
    口径全部在 _metrics.py::_seg_return_mdd,与 _cfg.perf_metrics 一致
    (收益按日历年化CAGR、波动按实际观测频率年化 opy=min(n/yrs,252))。
    短窗口(<300自然日,即近1月/3月/6月/今年以来)的 年化收益/Sharpe/Calmar 是外推值,
-   按用户要求照算但标灰(.stage-extrap)并在表下注明,不做静默隐藏。 */
+   沿用原计算口径并直接展示数值。 */
 function stageTable(rows){
   if(!rows.length)return `<div class="method-note">阶段表现数据未生成（需重跑 build.py）。</div>`;
-  const dim=(s,html)=>s.short&&!s.incomplete?`<details class="stage-extrap"><summary>辅助</summary>${html}</details>`:html;
   let tbl=`<div class="rt-wrap"><table class="rt stage-tbl"><thead><tr>
       <th>阶段</th><th>区间</th><th>累计收益</th><th>年化收益</th><th>年化波动</th>
       <th>最大回撤</th><th>Sharpe</th><th>Calmar</th></tr></thead><tbody>`;
@@ -887,11 +886,11 @@ function stageTable(rows){
     tbl+=`<tr><td>${esc(s.stage)}</td>
       <td>${s.d0?`<span class="pr-range">${esc(s.d0)} ~ ${esc(s.d1)}</span><br><span class="pr-dim">${s.n} 个净值日</span>`:"—"}</td>
       <td class="${pcls(s.cum)}"><strong>${P(s.cum)}</strong></td>
-      <td>${dim(s,P(s.ann))}</td>
+      <td>${P(s.ann)}</td>
       <td>${P(s.vol)}</td>
       <td class="${s.mdd!=null?"value-negative":""}">${P(s.mdd,2,{preserveSmall:true})}</td>
-      <td>${dim(s,NN(s.sharpe))}</td>
-      <td>${dim(s,NN(s.calmar))}</td></tr>`;
+      <td>${NN(s.sharpe)}</td>
+      <td>${NN(s.calmar)}</td></tr>`;
   });
   tbl+=`</tbody></table></div><p class="method-note">本表Sharpe：Rf=1.5%/年；通用业绩表Rf=0%/年，不能直接横比。不足年限的收益保留在可得历史；短期年化指标仅作辅助。</p>`;
   return tbl;

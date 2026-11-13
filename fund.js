@@ -868,7 +868,6 @@ function renderPerformanceMetricCards(range, points, includeRelative = false, re
   const stats = performanceStats(points);
   const relative = includeRelative ? relativePerformanceStats(relativePoints) : null;
   const dateNote = points?.length ? `${points[0].date}—${points.at(-1).date}` : '';
-  const short = points?.length && Date.parse(points.at(-1).date) - Date.parse(points[0].date) < 365.25 * 86400000;
   const primary = [
     metric(label === '所选区间' ? '区间收益' : `${label}收益`, stats ? pct(stats.cumulative, 2, true) : '—', dateNote),
     metric('最大回撤', stats ? pct(stats.maxDrawdown, 2, false, {preserveSmall:true}) : '—'),
@@ -880,7 +879,7 @@ function renderPerformanceMetricCards(range, points, includeRelative = false, re
     metric('Calmar', stats ? num(stats.calmar, 2) : '—'),
   ];
   if (includeRelative) auxiliary.push(metric('年化超额', relative ? pct(relative.annualizedExcess, 2, true) : '—'), metric('信息比率', relative ? num(relative.informationRatio, 2) : '—'));
-  primary.push(short ? `<details class="performance-auxiliary" style="grid-column:1/-1"><summary>短期年化指标（辅助）</summary><div class="research-metric-grid metric-three">${auxiliary.join('')}</div></details>` : auxiliary.join(''));
+  primary.push(auxiliary.join(''));
   return primary.join('');
 }
 
@@ -4030,16 +4029,14 @@ function genericRiskStatsRows(navPoints) {
   };
   const row = (label, points) => {
     const stats = performanceStats(points);
-    const short = points.length > 1 && Date.parse(points.at(-1).date) - Date.parse(points[0].date) < 365.25 * 86400000;
-    const auxiliary = value => short ? `<details><summary>辅助</summary>${value}</details>` : value;
     return [
       escapeHTML(label) + (points.length ? `<small>${points[0].date}—${points.at(-1).date}</small>` : ''),
       stats ? `<strong class="${stats.cumulative >= 0 ? "value-positive" : "value-negative"}">${pct(stats.cumulative, 2, true)}</strong>` : "—",
-      auxiliary(stats ? pct(stats.annualizedReturn, 2, true) : "—"),
+      stats ? pct(stats.annualizedReturn, 2, true) : "—",
       stats ? pct(stats.volatility, 2) : "—",
       stats ? pct(stats.maxDrawdown, 2, false, {preserveSmall:true}) : "—",
-      auxiliary(stats ? num(stats.sharpe, 2) : "—"),
-      auxiliary(stats ? num(stats.calmar, 2) : "—"),
+      stats ? num(stats.sharpe, 2) : "—",
+      stats ? num(stats.calmar, 2) : "—",
     ];
   };
   return [["近1月", 1], ["近3月", 3], ["近6月", 6], ["今年以来", "ytd"], ["近1年", 12], ["近3年", 36], ["近5年", 60], ["可得历史", "all"]].map(([label, range]) => {
