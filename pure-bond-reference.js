@@ -1470,7 +1470,7 @@ function renderCampisi(d){
   const ts=c.peer_beta_ts;
   let pctlBlock;
   if(!ts||!ts.dt||!ts.dt.length){
-    pctlBlock=sub("同类百分位定位","",`<div class="method-note">暂无同类分位数据。</div>`);
+    pctlBlock=sub("因子敏感度在同类中的位置","",`<div class="method-note">暂无同类分位数据。</div>`);
   }else{
     const T=ts.dt.length;
     if(curPeerIdx==null||curPeerIdx<0||curPeerIdx>=T)curPeerIdx=T-1;   // 默认停在最新净值日
@@ -1481,12 +1481,12 @@ function renderCampisi(d){
     const c2=peerBetaChart(ts,curPeerFac);const id2=lineChart.lastId;
     peerChartIds=[id1,id2];
     setTimeout(()=>{wirePeerCursor([id1,id2],ts);linkChartsMulti([id1,id2]);},0);
-    pctlBlock=sub("同类百分位定位",
+    pctlBlock=sub("因子敏感度在同类中的位置",
       `日频 · 60交易日滚动窗 · vs ${ts.sector==="2001010302000000"?"短期纯债":"中长期纯债"}同类（${esc(ts.dt[0])} ~ ${esc(ts.dt[T-1])}，共 ${T} 个交易日锚点）`,
       `<div class="subpanel-note">五因子同类分位
         <span class="fac-chips" id="peerPctlChips">${peerPctlChips()}</span></div>`+
       `<div id="peerPctlWrap">${c1}</div>`+
-      `<div class="subpanel-note" style="margin-top:18px">因子暴露与同类分布
+      `<div class="subpanel-note" style="margin-top:18px">因子敏感度（β）与同类分布
         <select class="period" id="peerFacSel" style="margin-left:10px" data-pb-onchange="switchPeerFac(this.value)">${facOpts}</select></div>`+
       `<div id="peerBetaWrap">${c2}</div>`+
       `<div class="peer-cursor" id="peerCursorLabel">定位到 <b>${esc(cur.dt)}</b>（当日同类 <b>n=${cur.n}</b> · 产品口径）</div>`+
@@ -1496,7 +1496,7 @@ function renderCampisi(d){
   }
 
   setTimeout(wireCmpBox,0);
-  return `<p class="tab-lead">五因子净值归因 · 画像总结 / 五因子含义 / 收益贡献分解 / 同类百分位定位 / 基金对比</p>`+
+  return `<p class="tab-lead">五因子净值归因 · 画像总结 / 五因子含义 / 收益贡献分解 / 因子敏感度在同类中的位置 / 基金对比</p>`+
     winSelectorBlock+campisiDateNote(d,fr,`${FAC_WIN_LABEL[curFacWin]||"可得历史"}五因子回归`)+profileBlock+factorGlossary+alphaGlossary+contribBlock+pctlBlock+comparePanel(d);
 }
 

@@ -72,7 +72,7 @@
    `<div class="research-metric-grid metric-two">${metric('买入成本',moneyCny(t.buy_cost_cny))}${metric('卖出收入',moneyCny(t.sale_proceeds_cny))}</div><p class="method-note">金额按报告原值展示；卖出收入包含本金，盈利与打新收益另需交易成本资料。</p>`);
  }
  function styleMetrics(s){
-  const names={market_cap:'A股市值中位数',pe:'正PE中位数',pb:'正PB中位数',roe:'ROE中位数',growth:'净利润增长中位数'};
+  const names={market_cap:'A股市值中位数',pe:'正市盈率股票的加权中位数',pb:'正PB中位数',roe:'ROE中位数',growth:'净利润增长中位数'};
   const rows=Object.entries(names).map(([k,label])=>{
    const m=s.style.fields[k]||{},unit=k==='market_cap'?'亿元':k==='pe'||k==='pb'?'倍':'%';
    const value=m.status==='available'&&finite(m.value)?fmt(m.value)+(unit==='%'?'%':unit):'—';
@@ -87,11 +87,11 @@
   const c=s.concentration,r=s.persistence;
   const reconciliation=s.coverage_status==='needs_reconciliation'?`<p class="disclosure-status" role="status"><strong>股票明细待核对</strong> · 覆盖 ${percent(s.disclosure_coverage)}，与同日资产表相差 ${fmt(Math.abs(s.rounding_gap_nav)*100,4)} 个百分点；以下指标按已有明细展示。</p>`:'';
   return dates(s)+reconciliation+`<div class="research-metric-grid metric-four">${metric('股票占基金净值',percent(s.stock_weight_nav))}${metric('披露股票权重',percent(s.disclosed_stock_weight_nav),`${s.holdings.length}只`)}${metric('A股占基金净值',percent(s.A_weight_nav))}${metric('港股占基金净值',percent(s.HK_weight_nav))}</div>`+
-   section('持仓集中度','全部直接股票与净资产分母分别列示',`<div class="research-metric-grid metric-four">${metric('前十大占净值',percent(c.top10_nav?.value))}${metric('前十大占全部股票',percent(c.top10_equity_sleeve?.value))}${metric('披露股票HHI',fmt(c.hhi_disclosed_equity?.value,4))}${metric('披露股票只数',finite(c.stock_count?.value)?String(c.stock_count.value):'—')}</div><p class="method-note">披露覆盖 ${percent(s.disclosure_coverage,2)}；${s.holdings_precision?.startsWith('original')?'持仓权重按原报告市值÷基金净资产计算，含原表显示0.00%的非零持股。':'行权重按0.01个百分点精度保留。'}与资产表差 ${(Math.abs(s.rounding_gap_nav)*100).toFixed(4)} 个百分点。</p>`)+
-   styleMetrics(s)+section('持有延续性',`上期完整披露 ${r.previous_report_date||'暂无'} → ${s.report_date}`,r.status==='available'?`<div class="research-metric-grid metric-four">${metric('归一权重重合',percent(r.weighted_overlap,1))}${metric('名单重合',percent(r.jaccard_by_security,1))}${metric('上期股票保留比例',percent(r.prior_security_retention,1))}${metric('本期延续股票权重',percent(r.current_weight_in_retained_names,1))}</div><p class="method-note">权重重合分别以两期已披露股票为分母；持仓变化包括价格和净资产变化。</p>`:empty('该报告期缺少可比的上期完整股票持仓。'));
+   section('持仓集中度','全部直接股票与净资产分母分别列示',`<div class="research-metric-grid metric-four">${metric('前十大占净值',percent(c.top10_nav?.value))}${metric('前十大占全部股票',percent(c.top10_equity_sleeve?.value))}${metric('已披露股票持仓集中指数（HHI）',fmt(c.hhi_disclosed_equity?.value,4))}${metric('披露股票只数',finite(c.stock_count?.value)?String(c.stock_count.value):'—')}</div><p class="method-note">披露覆盖 ${percent(s.disclosure_coverage,2)}；${s.holdings_precision?.startsWith('original')?'持仓权重按原报告市值÷基金净资产计算，含原表显示0.00%的非零持股。':'行权重按0.01个百分点精度保留。'}与资产表差 ${(Math.abs(s.rounding_gap_nav)*100).toFixed(4)} 个百分点。</p>`)+
+   styleMetrics(s)+section('持有延续性',`上期完整披露 ${r.previous_report_date||'暂无'} → ${s.report_date}`,r.status==='available'?`<div class="research-metric-grid metric-four">${metric('两期股票持仓权重重合度',percent(r.weighted_overlap,1))}${metric('两期股票名单重合度',percent(r.jaccard_by_security,1))}${metric('上期股票仍持有的只数占比',percent(r.prior_security_retention,1))}${metric('本期股票中上期已持有部分占比',percent(r.current_weight_in_retained_names,1))}</div><p class="method-note">权重重合分别以两期已披露股票为分母；持仓变化包括价格和净资产变化。</p>`:empty('该报告期缺少可比的上期完整股票持仓。'));
  }
  function historyChart(p,key='pe'){
-  const names={market_cap:'A股市值中位数（亿元）',pe:'正PE中位数（倍）',pb:'正PB中位数（倍）',roe:'ROE中位数（%）'};
+  const names={market_cap:'A股市值中位数（亿元）',pe:'正市盈率股票的加权中位数（倍）',pb:'正PB中位数（倍）',roe:'ROE中位数（%）'};
   const points=history(p).map(s=>({report_date:s.report_date,value:s.style.fields[key]?.status==='available'?s.style.fields[key].value:null}));
   if(!points.some(x=>finite(x.value)))return empty('该历史指标尚无足够覆盖的有效值。');
   return renderMiniLineChart(points,[{key:'value',label:names[key],format:'number',color:'#B01625',width:2.5}],names[key]+'完整持仓历史');
@@ -105,7 +105,7 @@
   if(!p)return section('权益画像','直接股票披露',empty('该基金的权益画像适配尚未覆盖；行业分析和持股分析仍保留原有披露功能。'));
   const nonzero=history(p).some(s=>s.status==='available');
   return `<div class="panel-intro"><div><h2>直接股票画像</h2></div><p>按完整报告展示直接股票特征；转债对应正股见“转债穿透”。</p></div><label class="fusion-control">完整报告期<select data-equity-profile-date>${history(p).slice().reverse().map(s=>`<option value="${s.report_date}">${s.report_date}</option>`).join('')}</select></label><div data-equity-profile-output>${profileSnapshot(p.direct_equity)}</div>`+
-   (nonzero?section('股票风格历史','仅比较半年报／年报完整持仓',`<label class="fusion-control">历史指标<select data-equity-history-metric><option value="pe">正PE中位数</option><option value="pb">正PB中位数</option><option value="market_cap">A股市值中位数</option><option value="roe">ROE中位数</option></select></label><div data-equity-history-output>${historyChart(p)}</div>`):'')+transactions(p)+managerPanel(p)+evidence(p);
+   (nonzero?section('股票风格历史','仅比较半年报／年报完整持仓',`<label class="fusion-control">历史指标<select data-equity-history-metric><option value="pe">正市盈率股票的加权中位数</option><option value="pb">正PB中位数</option><option value="market_cap">A股市值中位数</option><option value="roe">ROE中位数</option></select></label><div data-equity-history-output>${historyChart(p)}</div>`):'')+transactions(p)+managerPanel(p)+evidence(p);
  }
  function holdingHistory(p,original){
   const full=history(p).map(s=>{
@@ -138,7 +138,7 @@
   const kinds={retained:'继续持有',entry:'本期新增披露',exit:'本期未持有',increase:'权重上升',decrease:'权重下降',unchanged:'权重不变'};
   const rows=c.rows.slice().sort((a,b)=>Math.abs(b.change_nav)-Math.abs(a.change_nav)).map(h=>[`${esc(names.get(h.stock_code)||h.stock_code)}<small>${esc(h.stock_code)}</small>`,percent(h.previous_weight_nav),percent(h.current_weight_nav),finite(h.change_nav)?(h.change_nav>0?'+':'')+(h.change_nav*100).toFixed(2)+'个百分点':'—',esc(kinds[h.change_type]||h.change_type)]);
   return dates(s)+`<p class="method-note">${esc(c.previous_report_date)} → ${esc(s.report_date)} · 两期完整披露。差额包含交易、价格与净资产变化。</p>`+(rows.length?table(['股票','上期占净值','本期占净值','披露权重变化','状态'],rows):empty('两期完整披露均无股票持仓。'))+
-   (r.status==='available'?`<div class="research-metric-grid metric-two">${metric('归一权重重合',percent(r.weighted_overlap,1))}${metric('名单重合',percent(r.jaccard_by_security,1))}</div>`:'');
+   (r.status==='available'?`<div class="research-metric-grid metric-two">${metric('两期股票持仓权重重合度',percent(r.weighted_overlap,1))}${metric('两期股票名单重合度',percent(r.jaccard_by_security,1))}</div>`:'');
  }
  function changesPanel(p){return section('披露持仓变化','仅比较相邻两次完整披露',`<label class="fusion-control">结束报告期<select data-equity-changes-date>${history(p).slice().reverse().map(s=>`<option value="${s.report_date}">${s.report_date}</option>`).join('')}</select></label><div data-equity-changes-output>${changesSnapshot(p,p.direct_equity)}</div>`)+transactions(p);}
  function cbIndustry(p,level='level1'){

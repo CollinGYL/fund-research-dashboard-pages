@@ -18,7 +18,7 @@
   const dated=!!current.feature_observation_dates;
   const rows=Object.entries(current.features||{}).map(([key,x])=>{const row=[esc(x.label),field(x),esc(unit(x.unit)),pct(x.coverage_disclosed),pct(x.coverage_all_CB)];if(dated){const ds=ok(x.value)?(current.feature_observation_dates[key]||[]):[];row.push(esc(ds.length===1?ds[0]:ds.length?ds[0]+' ～ '+ds.at(-1):'—'));}return row;});
   const under=Object.values(current.underlying||{}).map(x=>[esc(x.label),field(x),esc(unit(x.unit)),pct(x.coverage_disclosed),pct(x.coverage_all_CB)]);
-  return section('转债高级特征',controls+note(dates)+note(`披露转债占净资产 ${pct(current.disclosed_cb_weight_nav)}；资产表全部转债 ${pct(current.asset_cb_weight_nav)}；可定价权重覆盖 ${pct(current.priced_weight_coverage)}。`)+table(['特征','市值加权均值','单位','占披露转债有效覆盖','占全部转债有效覆盖',...(dated?['实际行情日']:[])],rows))+section('转债对应正股特征',table(['特征','市值加权均值','单位','占披露转债有效覆盖','占全部转债有效覆盖'],under))+note('直接股票、转债名义正股映射和Delta敞口分别处理；无Delta输入，不生成股票等价仓位。同事BS边界参数与可复算隐波分列；条款和映射的完整历史生效版本尚未核实。');
+  return section('转债高级特征',controls+note(dates)+note(`披露转债占净资产 ${pct(current.disclosed_cb_weight_nav)}；资产表全部转债 ${pct(current.asset_cb_weight_nav)}；可定价权重覆盖 ${pct(current.priced_weight_coverage)}。`)+table(['特征','市值加权均值','单位','有该项数据的转债占已披露转债比例','有该项数据的转债占全部转债比例',...(dated?['实际行情日']:[])],rows))+section('转债对应正股特征',table(['特征','市值加权均值','单位','有该项数据的转债占已披露转债比例','有该项数据的转债占全部转债比例'],under))+note('直接股票、转债名义正股映射和Delta敞口分别处理；无Delta输入，不生成股票等价仓位。同事BS边界参数与可复算隐波分列；条款和映射的完整历史生效版本尚未核实。');
  }
  function ownFunds(p,selection){
   const all=p.periods||[],selected=all.find(x=>x.report_date===selection)||all.at(-1);const periods=all.slice().reverse().map(x=>`<option value="${x.report_date}"${x===selected?' selected':''}>${x.report_date}</option>`).join('');

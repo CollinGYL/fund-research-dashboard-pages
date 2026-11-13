@@ -22,7 +22,7 @@
  }
  function featurePoint(item,date){return item?.points?.find(x=>x[0]===date)||[date,null,null];}
  function fieldTable(features,date){
-  return table(['指标','该期加权均值','占披露转债的有效覆盖','占资产表转债总仓的有效覆盖'],Object.entries(features||{}).map(([key,item])=>{const row=featurePoint(item,date),whole=item.points_total_cb_coverage?.find(x=>x[0]===date)?.[1];return [esc(item.label)+(fieldUnits[key]?`<small>${esc(fieldUnits[key])}</small>`:''),formatField(key,row[1]),pct(row[2]),pct(whole)];}));
+  return table(['指标','该期加权均值','有该项数据的转债占已披露转债比例','有该项数据的转债占全部转债比例'],Object.entries(features||{}).map(([key,item])=>{const row=featurePoint(item,date),whole=item.points_total_cb_coverage?.find(x=>x[0]===date)?.[1];return [esc(item.label)+(fieldUnits[key]?`<small>${esc(fieldUnits[key])}</small>`:''),formatField(key,row[1]),pct(row[2]),pct(whole)];}));
  }
  function withAssetVersions(p,detail){
   const fund=detail?.fund || {code:p.code},phaseRows=rows=>root.FundResearch.selectReportVersions(rows).map(row=>({...row,history_phase:root.FundResearch.assetPhase(fund,row.date || row.report_date)}));
@@ -40,7 +40,7 @@
  }
  function assetPanel(p){
   const rows=root.FundResearch.selectReportVersions(p.metrics.position||[]);
-  return section('转债仓位与四季度波动',`<div class="bc-position-pair"><div><h4>转债占净资产（%）</h4>${line(rows.map(x=>[x.report_date,finite(x.convertible_weight_nav)?x.convertible_weight_nav*100:null]),'转债占净资产（%）')}</div><div><h4>仓位波动（四季度变异系数）</h4>${line(rows.map(x=>[x.report_date,x.cb_position_cv_4q]),'仓位变异系数')}</div></div>`+note('按同一资产版本的四个连续季度计算；缺失不作零。报告序列不是每日持仓估计。')+`<details><summary>历史仓位与变异系数（${rows.length}期）</summary>${table(['报告期','股票/NAV','普通债/NAV','转债/NAV','总资产/NAV','转债仓位CV（4季度）'],rows.slice().reverse().map(x=>[esc(x.report_date),pct(x.stock_weight_nav),pct(x.ordinary_bond_weight_nav),pct(x.convertible_weight_nav),finite(x.gross_assets_to_nav)?num(x.gross_assets_to_nav,3)+'倍':'—',num(x.cb_position_cv_4q)]))}</details>`);
+  return section('转债仓位与四季度波动',`<div class="bc-position-pair"><div><h4>转债占净资产（%）</h4>${line(rows.map(x=>[x.report_date,finite(x.convertible_weight_nav)?x.convertible_weight_nav*100:null]),'转债占净资产（%）')}</div><div><h4>近4季度转债仓位波动系数</h4>${line(rows.map(x=>[x.report_date,x.cb_position_cv_4q]),'近4季度转债仓位波动系数')}</div></div>`+note('按同一资产版本的四个连续季度计算；缺失不作零。报告序列不是每日持仓估计。')+`<details><summary>历史仓位与变异系数（${rows.length}期）</summary>${table(['报告期','股票/NAV','普通债/NAV','转债/NAV','总资产/NAV','近4季度转债仓位波动系数'],rows.slice().reverse().map(x=>[esc(x.report_date),pct(x.stock_weight_nav),pct(x.ordinary_bond_weight_nav),pct(x.convertible_weight_nav),finite(x.gross_assets_to_nav)?num(x.gross_assets_to_nav,3)+'倍':'—',num(x.cb_position_cv_4q)]))}</details>`);
  }
  function featurePair(features,date,key,control){
   const entries=Object.entries(features||{});if(!features?.[key])key=entries[0]?.[0];

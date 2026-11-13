@@ -401,10 +401,10 @@ function activeEquityProfileCell(fund) {
     return `<td class="fund-profile-cell pending-cell"><strong>${status}</strong><small>${escapeHtml(availability.reason)}</small></td>`;
   }
   return `<td class="fund-profile-cell"><div class="fund-profile-chip-grid">
-    <span title="调仓活跃度同类分位 ${profilePercentile(percentiles.turnover_activity)}"><b>调仓</b>${escapeHtml(groups.turnover_activity || "—")}</span>
+    <span title="相对不调仓情形的持仓变化幅度 · 同类分位 ${profilePercentile(percentiles.turnover_activity)}"><b>调仓</b>${escapeHtml(groups.turnover_activity || "—")}</span>
     <span title="持仓集中度同类分位 ${profilePercentile(percentiles.concentration)}"><b>集中</b>${escapeHtml(groups.concentration || "—")}</span>
-    <span title="持股延续性同类分位 ${profilePercentile(percentiles.holding_persistence)}"><b>延续</b>${escapeHtml(groups.holding_persistence || "—")}</span>
-    <span title="二级行业稳定性同类分位 ${profilePercentile(percentiles.industry_stability)}"><b>行业</b>${escapeHtml(groups.industry_stability || "—")}</span>
+    <span title="上期持股本期仍持有的比例 · 同类分位 ${profilePercentile(percentiles.holding_persistence)}"><b>延续</b>${escapeHtml(groups.holding_persistence || "—")}</span>
+    <span title="二级行业配置稳定程度 · 同类分位 ${profilePercentile(percentiles.industry_stability)}"><b>行业</b>${escapeHtml(groups.industry_stability || "—")}</span>
   </div><small>${status} · ${profilePercentile(percentiles.turnover_activity)}调仓</small></td>`;
 }
 
