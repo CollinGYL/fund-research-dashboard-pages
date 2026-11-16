@@ -2958,7 +2958,7 @@ function renderFlows(analysis) {
 
 function effectCell(value) {
   const className = Number(value) >= 0 ? "value-positive" : "value-negative";
-  return `<span class="${className}">${pct(value, 2, true)}</span>`;
+  return `<span class="${className}">${pct(value, 2, true, {preserveSmall:true})}</span>`;
 }
 
 const BRINSON_SECTOR_BY_LEVEL1 = {
@@ -3020,10 +3020,10 @@ function renderBrinsonRange(brinson, startDate, endDate, dimension = "level1") {
   ]);
   return `<div class="research-metric-grid metric-six brinson-period-metrics">
     ${metric("按披露持仓不变估算的A股收益", pct(result.portfolioReturn, 2, true))}${metric("基准收益", pct(result.benchmarkReturn, 2, true))}${metric("估算A股组合较基准收益差", pct(result.activeReturn, 2, true))}
-    ${metric("期间配置贡献", pct(result.allocation, 2, true))}${metric("期间个股贡献", pct(result.selection, 2, true), "含交互")}${metric("有价格数据的A股平均仓位", pct(result.pricedWeight, 1))}
+    ${metric("期间配置贡献", pct(result.allocation, 2, true, {preserveSmall:true}))}${metric("期间选股贡献", pct(result.selection, 2, true, {preserveSmall:true}), "含交互")}${metric("有价格数据的A股平均仓位", pct(result.pricedWeight, 1))}
   </div>
   <div class="subpanel-heading brinson-period-heading"><h4>${escapeHTML(result.periods[0].period_start)} → ${escapeHTML(result.periods.at(-1).period_end)}</h4><span>${result.periods.length}个半年期 · 期间经过Carino处理的收益归因</span></div>
-  ${renderTable([dimension === "sector" ? "板块" : "中信一级", "平均期初基金权重", "平均期初基准权重", "期间配置贡献", "期间个股贡献", "主动贡献"], rows, "brinson-industry-scroll")}
+  ${renderTable([dimension === "sector" ? "板块" : "中信一级", "平均期初基金权重", "平均期初基准权重", "期间配置贡献", "期间选股贡献", "主动贡献"], rows, "brinson-industry-scroll")}
   <p class="method-note">每个半年期使用期初半年报/年报完整持仓，不采用期初期末平均持仓；期内按静态持有估算，多个半年期再用Carino系数链接。季度前十大不参与完整组合归因。</p>`;
 }
 
@@ -3034,7 +3034,9 @@ function renderBrinsonAttribution(brinson) {
   const latest = brinson.periods.at(-1);
   const startOptions = brinson.periods.map((period, index) => `<option value="${escapeHTML(period.period_start)}"${index === 0 ? " selected" : ""}>${escapeHTML(period.period_start)}</option>`).join("");
   const endOptions = brinson.periods.map((period, index) => `<option value="${escapeHTML(period.period_end)}"${index === brinson.periods.length - 1 ? " selected" : ""}>${escapeHTML(period.period_end)}</option>`).join("");
+  const refreshNote=summary.update_status==='pending'?`更新待补齐：${escapeHTML(summary.update_reason||'归因输入尚未齐全')}；现有归因仍截至 ${escapeHTML(summary.evaluation_end)}。`:`归因估算截至 ${escapeHTML(summary.evaluation_end)}${summary.latest_holding_date?`，最新一段沿用 ${escapeHTML(summary.latest_holding_date)} 完整披露持仓静态估算。`:"。"}`;
   return `<div class="panel-intro"><div><p class="eyebrow">MANAGER-TENURE BRINSON</p><h2>现任经理任期股票归因</h2></div><p>${escapeHTML(summary.manager_names)}自${escapeHTML(summary.manager_start)}任职；受完整持仓披露限制，归因自${escapeHTML(summary.attribution_start)}开始。</p></div>
+    <p class="method-note" data-brinson-freshness>${refreshNote}</p>
     <div class="calibration-note"><strong>归因边界</strong><p>起点权重只来自半年报/年报完整持仓；季度前十大用于跟踪，不冒充完整组合。最新完整持仓尚未披露时，最后一期可用最近完整持仓静态估算至区间末日，并在下方标注。</p></div>
     <article class="subpanel brinson-period-panel">
       <div class="subpanel-heading brinson-range-heading"><div><h3>可选期间收益归因</h3><span>两个日期分别控制起点与终点</span></div><div class="brinson-range-controls"><label><span>起点</span><select id="brinson-range-start">${startOptions}</select></label><span class="brinson-range-arrow">→</span><label><span>终点</span><select id="brinson-range-end">${endOptions}</select></label></div></div>
