@@ -938,14 +938,62 @@ function performanceNavAxis(points, visible = { fund: true, benchmark: true }) {
   return FundResearch.displayAxis(values);
 }
 
-function renderNavChart(points, fundName, benchmarkName, visible = { fund: true, benchmark: true }) {
+// Presentation only: domains, data and performance calculations stay unchanged.
+function performanceNeatTicks(min, max, target = 5) {
+  const span = max - min;
+  if (!(span > 0)) return { ticks: [min], step: 1 };
+  const power = Math.floor(Math.log10(span / Math.max(1, target - 1))), options = [];
+  for (let exponent = power - 2; exponent <= power + 2; exponent++) for (const multiple of [1, 5]) {
+    const step = multiple * 10 ** exponent, ticks = [];
+    for (let i = Math.ceil((min - step * 1e-8) / step); i * step <= max + step * 1e-8; i++) {
+      if (ticks.length > 100) break;
+      ticks.push(Number((i * step).toPrecision(12)));
+    }
+    if (ticks.length >= 2 && ticks.length <= 8) options.push({ ticks, step, score: Math.abs(ticks.length - target) + (ticks.length > 7 ? 2 : 0) });
+  }
+  options.sort((a, b) => a.score - b.score || b.step - a.step);
+  return options[0] || { ticks: [min, max], step: span };
+}
+function performanceTickLabel(value) {
+  const number = Number(Number(value).toPrecision(12));
+  return String(Object.is(number, -0) ? 0 : number);
+}
+function performanceHalfYearTicks(first, last, width = 800) {
+  const t0 = Date.parse(first), t1 = Date.parse(last), all = [];
+  if (!Number.isFinite(t0) || !Number.isFinite(t1) || t1 <= t0) return all;
+  for (let year = new Date(t0).getUTCFullYear(); year <= new Date(t1).getUTCFullYear(); year++) for (const suffix of ['06-30', '12-31']) {
+    const date = `${year}-${suffix}`, time = Date.parse(date);
+    if (time >= t0 && time <= t1) all.push({ date, time });
+  }
+  const stride = Math.max(1, Math.ceil(all.length / Math.max(2, Math.floor(width / 90))));
+  return all.map((tick, i) => ({ ...tick, label: i % stride === 0 }));
+}
+function performanceSliderTicks(points) {
+  if (points.length < 2) return '';
+  const first = Number(points[0].date.slice(0, 4)), last = Number(points.at(-1).date.slice(0, 4)), years = [];
+  for (let year = first + 1; year <= last; year++) {
+    const index = points.findIndex(p => p.date >= `${year}-01-01`);
+    if (index >= 0) years.push({year, position:index / (points.length - 1) * 100});
+  }
+  const every = Math.max(1, Math.ceil(years.length / 7));
+  return `<div class="performance-slider-years" aria-hidden="true">${years.filter((p,i)=>i % every === 0 && p.position > 2 && p.position < 98).map(p=>`<span style="left:${p.position}%">${p.year}</span>`).join('')}${years.map(p=>`<i style="left:${p.position}%"></i>`).join('')}</div>`;
+}
+function performanceChartAxis(points, visible, offset = 0) {
+  const raw = offset ? points.map(p=>({...p,fund:isFiniteValue(p.fund)?p.fund-offset:null,benchmark:isFiniteValue(p.benchmark)?p.benchmark-offset:null})) : points;
+  const axis = performanceNavAxis(raw, visible);
+  return {...axis,min:axis.min+offset,max:axis.max+offset};
+}
+
+function renderNavChart(points, fundName, benchmarkName, visible = { fund: true, benchmark: true }, display = {}) {
   if (!points || points.length < 2) return '<p class="empty-copy">净值序列不足。</p>';
-  const width = 920;
-  const height = 330;
-  const margin = { top: 28, right: 54, bottom: 42, left: 58 };
-  const axis = performanceNavAxis(points, visible);
+  const width = Math.max(240, Number(display.width) || 920);
+  const height = width < 560 ? 280 : 326;
+  const margin = { top: 12, right: width < 400 ? 43 : 52, bottom: 36, left: width < 400 ? 43 : 48 };
+  const axis = performanceChartAxis(points, visible, Number(display.axisOffset) || 0);
   const {min,max} = axis;
-  const x = (index) => margin.left + (index / (points.length - 1)) * (width - margin.left - margin.right);
+  const firstTime = Date.parse(points[0].date), lastTime = Date.parse(points.at(-1).date);
+  const xTime = time => margin.left + (time-firstTime) / Math.max(1,lastTime-firstTime) * (width-margin.left-margin.right);
+  const x = index => xTime(Date.parse(points[index].date));
   const y = (value) => margin.top + ((max - value) / (max - min)) * (height - margin.top - margin.bottom);
   const lines = (key, className) => {
     const segments = [];
@@ -962,7 +1010,7 @@ function renderNavChart(points, fundName, benchmarkName, visible = { fund: true,
     if (current.length) segments.push(current);
     return segments.filter((segment) => segment.length >= 2).map((segment) => `<polyline points="${segment.join(" ")}" class="${className}"/>`).join("");
   };
-  const ticks = [...axis.ticks].reverse();
+  const ticks = performanceNeatTicks(min, max, width < 420 ? 4 : 5).ticks.slice().reverse();
   let peak = -Infinity;
   const drawdowns = points.map((point) => {
     peak = Math.max(peak, point.fund);
@@ -970,21 +1018,21 @@ function renderNavChart(points, fundName, benchmarkName, visible = { fund: true,
   });
   const minDrawdown = Math.min(...drawdowns, -0.000001);
   const shadowY = (value) => margin.top + (Math.abs(value) / Math.abs(minDrawdown)) * (height - margin.top - margin.bottom);
-  const drawdownTicks = Array.from({ length: 5 }, (_, index) => minDrawdown * index / 4);
+  const drawdownTicks = performanceNeatTicks(minDrawdown, 0).ticks.slice().reverse();
   const shadow = [
     `${x(0).toFixed(1)},${margin.top}`,
     ...drawdowns.map((value, index) => `${x(index).toFixed(1)},${shadowY(value).toFixed(1)}`),
     `${x(points.length - 1).toFixed(1)},${margin.top}`,
   ].join(" ");
-  const dateIndexes = [...new Set(Array.from({ length: 7 }, (_, index) => Math.round(index * (points.length - 1) / 6)))];
+  const dateTicks = performanceHalfYearTicks(points[0].date, points.at(-1).date, width-margin.left-margin.right);
   return `
     <div class="chart-legend performance-legend"><button type="button" class="legend-fund" data-nav-series="fund" aria-pressed="${visible.fund !== false}">${escapeHTML(fundName)}</button>${points.some(p=>isFiniteValue(p.benchmark))?`<button type="button" class="legend-benchmark" data-nav-series="benchmark" aria-pressed="${visible.benchmark !== false}">${escapeHTML(benchmarkName)}</button>`:""}<span class="legend-drawdown">基金回撤阴影（独立右轴）</span></div>
     <p class="method-note nav-display-range">实际绘图区间 ${escapeHTML(points[0].date)} — ${escapeHTML(points.at(-1).date)}；基金以区间首日归一为1，回撤从该日起算；基准缺失日断线，基金净值保留。${visible.benchmark !== false && points[0].benchmarkBaseDate && points[0].benchmarkBaseDate !== points[0].date ? ` 基准自 ${escapeHTML(points[0].benchmarkBaseDate)} 归一为1；两条曲线起点不同，不作同起点收益比较。` : ""}</p>
     <div class="nav-chart-wrap performance-chart-wrap">
-      <svg class="nav-chart" data-nav-min="${min}" data-nav-max="${max}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(fundName)}与${escapeHTML(benchmarkName)}日频归一化净值及回撤阴影">
-        ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 10}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${tick.toFixed(axis.digits)}</text>`).join("")}
-        ${drawdownTicks.map((tick) => `<text x="${width - margin.right + 9}" y="${shadowY(tick) + 4}" class="chart-axis-label">${navPercentLabel(tick, navPercentDigits(minDrawdown / 4))}</text>`).join("")}
-        ${dateIndexes.map((index) => `<text x="${x(index)}" y="${height - 13}" class="chart-axis-label" text-anchor="${index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"}">${ReviewCore.dateLabel(points[index].date,(Date.parse(points.at(-1).date)-Date.parse(points[0].date))/86400000)}</text>`).join("")}
+      <svg class="nav-chart" data-nav-min="${min}" data-nav-max="${max}" data-nav-width="${width}" data-nav-height="${height}" data-nav-left="${margin.left}" data-nav-right="${margin.right}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(fundName)}与${escapeHTML(benchmarkName)}日频归一化净值及回撤阴影">
+        ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 10}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${performanceTickLabel(tick)}</text>`).join("")}
+        ${drawdownTicks.map((tick) => `<text x="${width - margin.right + 9}" y="${shadowY(tick) + 4}" class="chart-axis-label">${performanceTickLabel(tick * 100)}%</text>`).join("")}
+        ${dateTicks.map(tick => `<line x1="${xTime(tick.time)}" x2="${xTime(tick.time)}" y1="${height-margin.bottom}" y2="${height-margin.bottom+4}" class="chart-grid-line"/>${tick.label?`<text x="${xTime(tick.time)}" y="${height-10}" class="chart-axis-label performance-date-tick" data-date="${tick.date}" text-anchor="middle">${tick.date}</text>`:""}`).join("")}
         <polygon points="${shadow}" class="drawdown-shadow"/>
         ${visible.benchmark !== false ? lines("benchmark", "chart-line chart-line-benchmark") : ""}
         ${visible.fund !== false ? lines("fund", "chart-line chart-line-fund") : ""}
@@ -999,22 +1047,24 @@ function renderNavChart(points, fundName, benchmarkName, visible = { fund: true,
     <div class="chart-end-values"><span>${escapeHTML(fundName)}：<strong>${Number(points.at(-1).fund).toFixed(2)}</strong> <small>${escapeHTML(points.at(-1).date)}</small></span>${(() => { const latest = points.slice().reverse().find((point) => point.benchmark !== null && isFiniteValue(point.benchmark)); return latest ? `<span>${escapeHTML(benchmarkName)}：<strong>${Number(latest.benchmark).toFixed(2)}</strong> <small>${escapeHTML(latest.date)}</small></span>` : ""; })()}</div>`;
 }
 
-function renderZoomableNavChart(points, fundName, benchmarkName) {
+function renderZoomableNavChart(points, fundName, benchmarkName, options = {}) {
   if (!points || points.length < 2) return '<p class="empty-copy">净值序列不足。</p>';
-  const lastIndex = points.length - 1;
-  const startDate = points[0].date;
-  const endDate = points[lastIndex].date;
-  return `
-    <div class="nav-zoom-shell">
-      <div class="nav-zoom-plot">${renderNavChart(rebaseNavPoints(points), fundName, benchmarkName)}</div>
-      <div class="nav-zoom-heading nav-zoom-single-heading"><div><strong>图表缩放</strong><span>拖动横条中段可平移，拖动两端可缩放</span></div><button type="button" class="nav-zoom-reset">重置全部</button></div>
-      <div class="dual-range-control nav-dual-range" style="--range-start:0%;--range-end:100%" aria-label="净值图缩放区间">
-        <div class="dual-range-track"><span></span></div>
-        <input class="nav-zoom-start dual-range-start" type="range" min="0" max="${lastIndex}" value="0" step="1" aria-label="净值图起始日期">
-        <input class="nav-zoom-end dual-range-end" type="range" min="0" max="${lastIndex}" value="${lastIndex}" step="1" aria-label="净值图结束日期">
-        <div class="dual-range-labels"><span class="nav-zoom-start-date">${escapeHTML(startDate)}</span><small>拖动横条中段可平移，拖动两端可缩放</small><span class="nav-zoom-end-date">${escapeHTML(endDate)}</span></div>
-      </div>
-    </div>`;
+  const lastIndex=points.length-1;
+  let start=options.range?points.findIndex(p=>p.date>=options.range.start):0;
+  let end=options.range?points.findLastIndex(p=>p.date<=options.range.end):lastIndex;
+  if(start<0||end<=start){start=0;end=lastIndex;}
+  const selected=points.slice(start,end+1),offset=Number(options.axisOffset)||0;
+  return `<div class="nav-zoom-shell unified-performance-chart" data-axis-offset="${offset}">
+    <div class="performance-date-range"><label>起始<input type="date" class="nav-window-start" aria-label="净值区间起始日期" min="${points[0].date}" max="${points.at(-1).date}" value="${points[start].date}"></label><span>—</span><label>结束<input type="date" class="nav-window-end" aria-label="净值区间结束日期" min="${points[0].date}" max="${points.at(-1).date}" value="${points[end].date}"></label><button type="button" class="nav-zoom-reset">全部区间</button></div>
+    <div class="nav-zoom-plot">${renderNavChart(rebaseNavPoints(selected),fundName,benchmarkName,undefined,{axisOffset:offset})}</div>
+    ${performanceSliderTicks(points)}
+    <div class="dual-range-control nav-dual-range" style="--range-start:${start/lastIndex*100}%;--range-end:${end/lastIndex*100}%" aria-label="净值图缩放区间">
+      <div class="dual-range-track"><span></span></div>
+      <input class="nav-zoom-start dual-range-start" type="range" min="0" max="${lastIndex}" value="${start}" step="1" aria-label="净值图起始日期">
+      <input class="nav-zoom-end dual-range-end" type="range" min="0" max="${lastIndex}" value="${end}" step="1" aria-label="净值图结束日期">
+      <div class="dual-range-labels"><span class="nav-zoom-start-date">${points[start].date}</span><small>拖动横条中段可平移，拖动两端可缩放</small><span class="nav-zoom-end-date">${points[end].date}</span></div>
+    </div>
+  </div>`;
 }
 
 function bindNavChartZoom(points, fundName, benchmarkName, root = document, onRangeChange = null) {
@@ -1033,7 +1083,9 @@ function bindNavChartZoom(points, fundName, benchmarkName, root = document, onRa
   let renderedStart = -1;
   let renderedEnd = -1;
   const visible = { fund: true, benchmark: true };
-  let renderedVisibility = "";
+  let renderedVisibility = "", renderedWidth = 0;
+  let observer = null;
+  const dateStart=shell.querySelector(".nav-window-start"), dateEnd=shell.querySelector(".nav-window-end");
   const updateRange = (changed = "") => {
     let start = Number(startInput.value);
     let end = Number(endInput.value);
@@ -1050,26 +1102,31 @@ function bindNavChartZoom(points, fundName, benchmarkName, root = document, onRa
     }
     if (startDate) startDate.textContent = points[start].date;
     if (endDate) endDate.textContent = points[end].date;
+    if(dateStart)dateStart.value=points[start].date;
+    if(dateEnd)dateEnd.value=points[end].date;
   };
   const draw = () => {
     pendingFrame = null;
-    if (shell.isConnected === false) return;
+    if (shell.isConnected === false) { observer?.disconnect(); return; }
     const start = Number(startInput.value);
     const end = Number(endInput.value);
     const visibilityKey = `${visible.fund}:${visible.benchmark}`;
-    if (start === renderedStart && end === renderedEnd && visibilityKey === renderedVisibility) return;
+    const width=Math.max(240,plot.clientWidth || 920);
+    if (start === renderedStart && end === renderedEnd && visibilityKey === renderedVisibility && width === renderedWidth) return;
     // Normalize the selected range once so the chart and hover use identical values.
     const selected = rebaseNavPoints(points.slice(start, end + 1), visible);
-    plot.innerHTML = renderNavChart(selected, fundName, benchmarkName, visible);
+    plot.innerHTML = renderNavChart(selected, fundName, benchmarkName, visible, {width,axisOffset:Number(shell.dataset.axisOffset)||0});
     bindPerformanceChartHover(selected, fundName, benchmarkName, plot, visible);
     plot.querySelectorAll("[data-nav-series]").forEach((button) => button.addEventListener("click", () => {
-      visible[button.dataset.navSeries] = !visible[button.dataset.navSeries];
+      const key=button.dataset.navSeries,other=key==="fund"?"benchmark":"fund";
+      if(visible[key] && (visible[other]===false || (other==="benchmark"&&!points.some(p=>isFiniteValue(p.benchmark)))))return;
+      visible[key] = !visible[key];
       draw();
     }));
     if (onRangeChange) onRangeChange(points[start].date, points[end].date);
     renderedStart = start;
     renderedEnd = end;
-    renderedVisibility = visibilityKey;
+    renderedVisibility = visibilityKey; renderedWidth=width;
   };
   const scheduleDraw = (changed = "") => {
     updateRange(changed);
@@ -1114,6 +1171,14 @@ function bindNavChartZoom(points, fundName, benchmarkName, root = document, onRa
     endInput.value = String(points.length - 1);
     flushDraw();
   });
+  const dateChange=changed=>{
+    const a=points.findIndex(p=>p.date>=dateStart.value),b=points.findLastIndex(p=>p.date<=dateEnd.value);
+    if(a<0||b<=a){updateRange();return;}
+    startInput.value=String(a);endInput.value=String(b);flushDraw(changed);
+  };
+  dateStart?.addEventListener('change',()=>dateChange('start'));
+  dateEnd?.addEventListener('change',()=>dateChange('end'));
+  if(typeof ResizeObserver!=='undefined'){observer=new ResizeObserver(()=>scheduleDraw());observer.observe(plot);}
   flushDraw();
 }
 
@@ -1127,12 +1192,13 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
   const drawdownDot = svg?.querySelector(".performance-hover-drawdown");
   const card = wrap?.querySelector(".performance-hover-card");
   if (!svg || !target || !crosshair || !fundDot || !benchmarkDot || !drawdownDot || !card || points.length < 2) return;
-  const width = 920;
-  const height = 330;
-  const margin = { top: 28, right: 54, bottom: 42, left: 58 };
+  const width=Number(svg.dataset.navWidth)||920;
+  const height=Number(svg.dataset.navHeight)||330;
+  const margin={top:12,right:Number(svg.dataset.navRight)||52,bottom:36,left:Number(svg.dataset.navLeft)||48};
   // Read the rendered domain once; pointer movement must never change the axis.
   const min = Number(svg.dataset.navMin), max = Number(svg.dataset.navMax);
-  const x = (index) => margin.left + (index / (points.length - 1)) * (width - margin.left - margin.right);
+  const firstTime=Date.parse(points[0].date),lastTime=Date.parse(points.at(-1).date);
+  const x=index=>margin.left+(Date.parse(points[index].date)-firstTime)/Math.max(1,lastTime-firstTime)*(width-margin.left-margin.right);
   const y = (value) => margin.top + ((max - value) / (max - min)) * (height - margin.top - margin.bottom);
   let peak = -Infinity;
   const drawdowns = points.map((point) => {
@@ -1157,7 +1223,9 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
     try { local = cursor.matrixTransform(matrix.inverse()); } catch { return; }
     if (!Number.isFinite(local.x)) return;
     const rawX = Math.min(width - margin.right, Math.max(margin.left, local.x));
-    const index = Math.max(0, Math.min(points.length - 1, Math.round((rawX - margin.left) / (width - margin.left - margin.right) * (points.length - 1))));
+    const time=firstTime+(rawX-margin.left)/(width-margin.left-margin.right)*(lastTime-firstTime);
+    let index=points.findIndex(p=>Date.parse(p.date)>=time);if(index<0)index=points.length-1;
+    if(index>0&&Math.abs(Date.parse(points[index-1].date)-time)<Math.abs(Date.parse(points[index].date)-time))index--;
     const point = points[index];
     const exactX = x(index);
     setVisible(true);
@@ -5421,11 +5489,11 @@ function genericPerformancePanel(fund, detail, brinson) {
   const benchmarkLatest = (benchmark.series || []).filter(([, value]) => isFiniteValue(value)).at(-1)?.[0] || "—";
   const contractBenchmark = fund.benchmark || "现有目录未记录";
   return `
-    <div class="panel-intro warm-performance-heading"><div><p class="eyebrow">01 / PERFORMANCE</p><h2>业绩表现</h2></div><div class="chart-controls" aria-label="净值区间"><button data-generic-nav-range="ytd">今年以来</button><button data-generic-nav-range="12">近1年</button><button data-generic-nav-range="36">近3年</button><button data-generic-nav-range="60">${FundLifecycle.windowValidity(navPoints[0]?.date, navPoints.at(-1)?.date, 60, fund.inception_date).label}</button><button data-generic-nav-range="all" class="active">可得历史</button></div></div>
+    <div class="panel-intro warm-performance-heading"><div><p class="eyebrow">01 / PERFORMANCE</p><h2>业绩表现</h2></div></div><article class="subpanel chart-subpanel unified-performance-panel"><div class="subpanel-heading"><div><h3>净值走势与区间回撤</h3><span>基金净值截至 ${escapeHTML(navPoints.at(-1)?.date || "—")} · 图中比较截至 ${escapeHTML(benchmarkLatest)}</span></div></div><div class="chart-controls performance-presets" aria-label="净值区间"><span class="performance-control-label">区间</span><button data-generic-nav-range="all" class="active">全部</button><button data-generic-nav-range="ytd">今年以来</button><button data-generic-nav-range="1">近1月</button><button data-generic-nav-range="12">近1年</button><button data-generic-nav-range="36">近3年</button><button data-generic-nav-range="60">${FundLifecycle.windowValidity(navPoints[0]?.date, navPoints.at(-1)?.date, 60, fund.inception_date).label}</button></div>
     ${WarmPerformance.controls(fund, navPoints)}
     <p id="warm-range-note" class="warm-range-note" aria-live="polite"></p>
     <div class="research-metric-grid metric-six" id="generic-performance-range-metrics" aria-live="polite">${renderPerformanceMetricCards("all", navPoints)}</div>
-    <article class="subpanel chart-subpanel"><div class="subpanel-heading"><div><h3>复权净值与回撤</h3><span>基金净值截至 ${escapeHTML(navPoints.at(-1)?.date || "—")} · 图中比较截至 ${escapeHTML(benchmarkLatest)}</span></div></div><div id="generic-nav-chart-output">${chartPoints.length ? renderZoomableNavChart(chartPoints, fund.name, benchmark.name) : '<p class="empty-copy">比较基准序列不足，暂显示下方收益回撤表。</p>'}</div><details class="warm-method"><summary>基准与图表口径</summary><p>合同基准：${escapeHTML(contractBenchmark)}。${benchmark.role === "contract" ? "已核验合同基准行情。" : "暂缺可靠合同基准行情；图中为研究参照，不能代表合同基准。"}图中比较：${escapeHTML(benchmark.name)}。基金从所选区间首日归一，基准从区间首个有效日归一；如首日基准缺失，图上标明起点不同，不作同起点收益比较。基准线截至自身最新日期，缺失日断线。右轴显示完整所选区间的基金回撤。</p></details></article>
+    <div id="generic-nav-chart-output">${chartPoints.length ? renderZoomableNavChart(chartPoints, fund.name, benchmark.name) : '<p class="empty-copy">比较基准序列不足，暂显示下方收益回撤表。</p>'}</div><details class="warm-method"><summary>基准与图表口径</summary><p>合同基准：${escapeHTML(contractBenchmark)}。${benchmark.role === "contract" ? "已核验合同基准行情。" : "暂缺可靠合同基准行情；图中为研究参照，不能代表合同基准。"}图中比较：${escapeHTML(benchmark.name)}。基金从所选区间首日归一，基准从区间首个有效日归一；如首日基准缺失，图上标明起点不同，不作同起点收益比较。基准线截至自身最新日期，缺失日断线。右轴显示完整所选区间的基金回撤。</p></details></article>
     ${WarmPerformance.summary(fund, navPoints, calendarRows)}
     <article class="subpanel performance-table-panel"><div class="subpanel-heading"><div><p class="eyebrow">04 / PERIOD RETURNS</p><h3>阶段表现</h3></div><span>累计收益 · 波动 · 回撤</span></div>${horizonRows.length ? renderTable(["阶段", "累计收益", "年化收益", "年化波动", "最大回撤", "Sharpe", "Calmar"], horizonRows) : '<p class="empty-copy">净值历史不足。</p>'}</article>
     ${WarmPerformance.tenureTable(fund, navPoints)}

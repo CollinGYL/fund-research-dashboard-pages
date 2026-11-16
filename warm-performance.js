@@ -58,9 +58,21 @@
     return [...indiv,...segments(c.managers,first,last).reverse()];
   }
   function controls(fund, nav) {
-    const rs=ranges(fund,nav);
-    return `<div class="warm-tenure"><label for="warm-tenure-select">按经理任期</label><select id="warm-tenure-select"><option value="">选择任职区间</option>${rs.map((r,i)=>`<option value="${i}">${esc(r.label)} ｜ ${r.s} — ${r.e}</option>`).join('')}</select><span>${rs.length?'独任、共管与代管分段展示':'现有资料未记录任职日期'}</span></div>`;
+    const rs=ranges(fund,nav),history=rs.map((r,index)=>({...r,index})).filter(r=>!r.current).sort((a,b)=>a.s.localeCompare(b.s));
+    const managerButton=r=>{
+      const kind=r.note?'代管':r.label.split(' · ').at(-1),names=r.label.split(' · ')[0],days=Math.round((Date.parse(r.e)-Date.parse(r.s))/86400000);
+      return `<button type="button" class="performance-manager" data-warm-tenure="${r.index}" data-manager-kind="${esc(kind)}" aria-pressed="false" title="${esc(r.s+' — '+r.e+(r.note?' · '+r.note:''))}"><span>${esc(names)}</span><small>${esc(kind)} · ${days}天</small></button>`;
+    };
+    const current=rs.map((r,index)=>({...r,index})).filter(r=>r.current);
+    return `<div class="warm-tenure unified-performance-tenure"><span class="performance-control-label">按任期<small>独任 / 共管 / 代管</small></span><div class="performance-tenure-body">
+      ${current.length?`<div class="performance-current-tenures">${current.map(r=>`<button type="button" data-warm-tenure="${r.index}" aria-pressed="false">${esc(r.label)}</button>`).join('')}</div>`:''}
+      <div class="performance-manager-list">${history.slice(-3).map(managerButton).join('')}</div>
+      ${history.length>3?`<details class="performance-manager-more"><summary>更早任期（${history.length-3}段）</summary><div class="performance-manager-list">${history.slice(0,-3).map(managerButton).join('')}</div></details>`:''}
+      ${!rs.length?'<span>现有资料未记录任职日期</span>':''}
+      <select id="warm-tenure-select" hidden aria-label="经理任期原始区间"><option value="">选择任职区间</option>${rs.map((r,i)=>`<option value="${i}">${esc(r.label)} ｜ ${r.s} — ${r.e}</option>`).join('')}</select>
+    </div></div>`;
   }
+
   function annual(nav) {
     return [...new Set(nav.map(p=>p.date.slice(0,4)))].sort().map(year => {
       const points=nav.filter(p=>p.date.startsWith(year)),prior=nav.filter(p=>p.date<year+'-01-01').at(-1);
@@ -102,25 +114,29 @@
   function bind(points, fund, benchmarkName, nav) {
     const buttons=[...document.querySelectorAll('[data-generic-nav-range]')],output=document.querySelector('#generic-nav-chart-output'),metrics=document.querySelector('#generic-performance-range-metrics'),select=document.querySelector('#warm-tenure-select'),note=document.querySelector('#warm-range-note');
     if(!output)return;
+    const currentButtons=document.querySelector('.performance-current-tenures'),presets=document.querySelector('.performance-presets');
+    if(currentButtons&&presets){while(currentButtons.firstChild)presets.appendChild(currentButtons.firstChild);currentButtons.remove();}
     const rs=ranges(fund,nav);
     const metricDraw=(p,label)=>{if(metrics)metrics.innerHTML=renderPerformanceMetricCards('custom',p,false);if(note)note.textContent=`${label} · ${p[0]?.date || '—'} — ${p.at(-1)?.date || '—'} · ${p.length}个净值日`;};
     const draw=(selected,label)=>{
       const chartMap=new Map(points.map(p=>[p.date,p]));
-      const display=selected.map(p=>({...p,benchmark:chartMap.get(p.date)?.benchmark ?? null}));
-      output.innerHTML=renderZoomableNavChart(display,fund.name,benchmarkName);
+      const display=nav.map(p=>({...p,benchmark:chartMap.get(p.date)?.benchmark ?? null}));
+      const range=selected.length?{start:selected[0].date,end:selected.at(-1).date}:null;
+      output.innerHTML=selected.length>=2?renderZoomableNavChart(display,fund.name,benchmarkName,{range}):'<p class="empty-copy">所选区间净值不足。</p>';
       metricDraw(selected,label);
       let initial=true;
-      if(display.length>=2)bindNavChartZoom(display,fund.name,benchmarkName,output,(start,end)=>{if(initial){initial=false;return;}metricDraw(selected.filter(p=>p.date>=start && p.date<=end),label);});
+      if(selected.length>=2)bindNavChartZoom(display,fund.name,benchmarkName,output,(start,end)=>{if(initial){initial=false;return;}metricDraw(nav.filter(p=>p.date>=start && p.date<=end),label);});
     };
     const windowInfo=months=>window.FundLifecycle?.windowValidity?.(nav[0]?.date,nav.at(-1)?.date,months,fund.inception_date);
     buttons.forEach(b=>{const months=Number(b.dataset.genericNavRange);if(!Number.isFinite(months)||months<=0)return;const validity=windowInfo(months);if(validity)b.textContent=validity.label;});
     buttons.forEach(b=>b.addEventListener('click',()=>{
-      buttons.forEach(x=>x.classList.toggle('active',x===b));if(select)select.value='';
+      buttons.forEach(x=>x.classList.toggle('active',x===b));if(select)select.value='';document.querySelectorAll('[data-warm-tenure]').forEach(x=>x.setAttribute('aria-pressed','false'));
       const range=b.dataset.genericNavRange,months=Number(range),validity=Number.isFinite(months)?windowInfo(months):null;
       const label=validity&&!validity.complete?`${validity.label} · 可得历史`:b.textContent;
       draw(selectPerformanceRange(nav,range),label);
     }));
-    select?.addEventListener('change',()=>{if(select.value==='')return;const r=rs[Number(select.value)];if(!r)return;buttons.forEach(b=>b.classList.remove('active'));draw(nav.filter(p=>p.date>=r.s && p.date<=r.e),r.label);});
+    select?.addEventListener('change',()=>{if(select.value==='')return;const r=rs[Number(select.value)];if(!r)return;buttons.forEach(b=>b.classList.remove('active'));document.querySelectorAll('[data-warm-tenure]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.warmTenure===select.value)));draw(nav.filter(p=>p.date>=r.s && p.date<=r.e),r.label);});
+    document.querySelectorAll('[data-warm-tenure]').forEach(b=>b.addEventListener('click',()=>{if(!select)return;select.value=b.dataset.warmTenure;select.dispatchEvent(new Event('change',{bubbles:true}));}));
     draw(nav,'可得历史');
   }
   window.WarmPerformance={load,loadContext,context,segments,ranges,controls,annual,annualChart,peer,summary,tenureTable,bind};

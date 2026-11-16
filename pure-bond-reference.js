@@ -85,19 +85,19 @@ function lineChart(series,opt={}){
   if(opt.integerTicks){ymin=0;ymax=Math.max(4,Math.ceil(ymax/4)*4);}
   const navAxis=opt.navDisplay?performanceNavAxis(all.map(fund=>({fund}))):null;
   if(navAxis){ymin=navAxis.min;ymax=navAxis.max;}
-  const leftTicks=navAxis?navAxis.ticks:Array.from({length:5},(_,i)=>ymin+(ymax-ymin)*i/4);
+  const leftTicks=navAxis?performanceNeatTicks(ymin,ymax).ticks:Array.from({length:5},(_,i)=>ymin+(ymax-ymin)*i/4);
   const allx=clipped.flatMap(s=>s.points.map(p=>+new Date(p[0]))).concat(clippedRight.flatMap(s=>s.points.map(p=>+new Date(p[0]))));
   const x0f=x0!=null?x0:Math.min(...allx),x1f=x1!=null?x1:Math.max(...allx);
   const X=t=>pl+(x1f===x0f?pw/2:(t-x0f)/(x1f-x0f)*pw),Y=v=>pt+ph-(v-ymin)/(ymax-ymin)*ph;
   const rAll=clippedRight.flatMap(s=>s.points.map(p=>p[1]));
   const rMin=rAll.length?Math.min(0,...rAll,opt.navDisplay?-0.000001:-0.0001):-0.0001;   // 右轴永远以0为天花板,不留padding
   const YR=v=>pt+(Math.abs(v)/Math.abs(rMin))*ph;
-  let svg=`<svg viewBox="0 0 ${w} ${h}" id="svg_${id}">`;
-  for(const v of leftTicks){const y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${opt.navDisplay?navPercentLabel(v,navPercentDigits(navAxis.step)):opt.pctY?P(v,1):NN(v,opt.dp??2)}</text>`;}
+  let svg=`<svg class="${opt.navDisplay?"unified-performance-comparison":""}" viewBox="0 0 ${w} ${h}" id="svg_${id}">`;
+  for(const v of leftTicks){const y=Y(v);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="#e1e8ec"/><text x="${pl-5}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="11" fill="#7b8a98">${opt.navDisplay?performanceTickLabel(1+v):opt.pctY?P(v,1):NN(v,opt.dp??2)}</text>`;}
   if(ymin<0&&ymax>0){const y=Y(0);svg+=`<line x1="${pl}" y1="${y}" x2="${w-pr}" y2="${y}" stroke="#aeb9c2"/>`;}
   if(opt.refLine!=null){const y=Y(opt.refLine);svg+=`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${w-pr}" y2="${y.toFixed(1)}" stroke="${opt.refLineColor||"#c0392b"}" stroke-width="1.4" stroke-dasharray="5,4"/>`;}
   const navDates=opt.navDisplay?[...new Set(allx)].sort((a,b)=>a-b):[];
-  const dateTicks=opt.navDisplay?[...new Set(Array.from({length:Math.min(7,navDates.length)},(_,i)=>Math.round(i*(navDates.length-1)/Math.max(1,Math.min(7,navDates.length)-1))))].map(i=>{const dt=new Date(navDates[i]).toISOString().slice(0,10);return [dt,dt];}):xTicks(x0f,x1f);
+  const dateTicks=opt.navDisplay?performanceHalfYearTicks(new Date(x0f).toISOString().slice(0,10),new Date(x1f).toISOString().slice(0,10),pw).filter(t=>t.label).map(t=>[t.date,t.date]):xTicks(x0f,x1f);
   dateTicks.forEach(([dt,lb])=>{const x=X(+new Date(dt));svg+=`<text x="${x.toFixed(1)}" y="${h-7}" text-anchor="middle" font-size="11" fill="#7b8a98">${lb}</text>`;});
   // 区间带画在最底层(网格之上、折线之下),上沿沿hi正向走、下沿沿lo逆向回来,闭合成多边形
   bands.forEach(b=>{
@@ -153,6 +153,7 @@ function lineChart(series,opt={}){
   CHART_GEOM[id]={pl,pr,pt,pb,pw,ph,x0:x0f,x1:x1f};
   lineChart.lastId=id;
   setTimeout(()=>{
+    if(opt.navDisplay){const svg=document.getElementById('svg_'+id);if(svg){const scale=svg.getBoundingClientRect().width/w;if(scale>0)svg.querySelectorAll('text').forEach(t=>t.setAttribute('font-size',12/scale));}}
     wireLineChart(id,clipped.concat(clippedRight),{pl,pr,pt,pb,pw,ph,x0:x0f,x1:x1f,pctY:opt.pctY,dp:opt.dp,navDisplay:opt.navDisplay});
     if(opt.slider)wireZoomSlider(id,opt.slider.fullX0,opt.slider.fullX1,opt.slider.onChange);
   },0);
@@ -184,7 +185,7 @@ function wireLineChart(id,series,g){
         const p=s.points[i];if(p[1]==null)continue;
         const dd=Math.abs(s._ts[i]-t);if(dd<bd){bd=dd;b=p;}
       }
-      if(b){if(bd<bestDist){bestDist=bd;bestDate=b[0];}lines.push(`<span style="color:${s.color}">●</span> ${esc(s.name)}: <b>${g.navDisplay?navPercentLabel(b[1],4):g.pctY?P(b[1],1):NN(b[1],g.dp||2)}</b>`);}
+      if(b){if(bd<bestDist){bestDist=bd;bestDate=b[0];}lines.push(`<span style="color:${s.color}">●</span> ${esc(s.name)}: <b>${g.navDisplay?(s.rightAxis?navPercentLabel(b[1],4):Number(1+b[1]).toFixed(4)):g.pctY?P(b[1],1):NN(b[1],g.dp||2)}</b>`);}
     });
     showTT(`<div style="opacity:.75">${esc(bestDate)}</div>${lines.join("<br>")}`,ev);
   });
@@ -564,6 +565,7 @@ function navRangeBar(d){
   const presets=[
     ["全部",first,last],
     ["今年以来",`${asof.getFullYear()}-01-01`,last],
+    ["近1月",FundResearch.monthStart(last,1),last],
     ["近1年",back(1),last],
     ["近3年",back(3),last],
     ["近5年",back(5),last],
@@ -578,23 +580,24 @@ function navRangeBar(d){
       data-pb-onclick="setNavRange('cur','${s}','${last}')" title="${esc(nm)} 自 ${s} 起">现任经理任职以来<small>${esc(nm)}</small></button>`;
   }
   const segs=managerSegments(d);
-  const segBtns=segs.map((g,i)=>{
+  const segButtons=segs.map((g,i)=>{
     const k="seg"+i;
     const who=g.who.join("、");
     const cls=g.kind==="共管"?"rng-co":(g.kind==="代管"?"rng-esc":"");
     const tip=g.kind==="代管"?`代管期 · ${esc(g.escNote.join("；"))} · ${g.s} ~ ${g.e} · ${g.days}天`
                              :`${g.kind} · ${esc(who)} · ${g.s} ~ ${g.e} · ${g.days}天`;
-    return `<button type="button" class="rng-btn rng-seg ${cls}${navRangeKey===k?" on":""}"
+    return `<button type="button" class="rng-btn rng-seg performance-manager ${cls}${navRangeKey===k?" on":""}"
       data-pb-onclick="setNavRange('${k}','${g.s}','${g.e}')" title="${tip}">
       ${esc(who)}<small>${g.kind}·${g.days}天</small></button>`;
-  }).join("");
-  return `<div class="rng-bar">
+  });
+  const segBtns=`<div class="performance-manager-list">${segButtons.slice(-3).join("")}</div>${segButtons.length>3?`<details class="performance-manager-more"><summary>更早任期（${segButtons.length-3}段）</summary><div class="performance-manager-list">${segButtons.slice(0,-3).join("")}</div></details>`:""}`;
+  return `<div class="rng-bar performance-presets">
       <span class="rng-lab">区间</span>
       ${presets.map(([lb,a,b])=>`<button type="button" class="rng-btn${navRangeKey===lb?" on":""}" data-pb-onclick="setNavRange('${lb}','${a}','${b}')">${lb}</button>`).join("")}
       ${curBtn}
     </div>`+
-    (segs.length?`<div class="rng-bar rng-bar2">
-      <span class="rng-lab">按任期<small>按任职变动分段，含共管与代管</small></span>${segBtns}
+    (segs.length?`<div class="rng-bar rng-bar2 unified-performance-tenure">
+      <span class="rng-lab performance-control-label">按任期<small>独任 / 共管 / 代管</small></span><div class="performance-tenure-body">${segBtns}</div>
     </div>`:
     // ★全市场纯债有 51 只基金 Wind 无经理记录 —— 必须说明是"没数据"而不是功能坏了
     `<div class="rng-bar rng-bar2"><span class="rng-lab">按任期</span>
@@ -610,16 +613,22 @@ function setNavRange(key,s,e){
 function navPerfChart(d){
   const navPts=(d.perf.curve.nav||[]).filter(p=>p[1]!=null);
   if(!navPts.length)return `<div class="method-note">无数据</div>`;
-  const fullX0=+new Date(navPts[0][0]),fullX1=+new Date(navPts[navPts.length-1][0]);
   const selected=navWindowReturns(navPts,navZoom);
-  const actual=selected.nav.length?{x0:+new Date(selected.nav[0][0]),x1:+new Date(selected.nav.at(-1)[0])}:navZoom;
-  const resetBtn=navZoom?`<button type="button" class="zoom-reset" data-pb-onclick="resetNavZoom()">↺ 重置缩放</button>`:"";
-  const note=selected.nav.length?`<div class="method-note">实际区间 ${esc(selected.nav[0][0])} — ${esc(selected.nav.at(-1)[0])}；首日收益归一为0%，回撤从该日起算。全日频数据计算量程和回撤，绘图保留极值。</div>`:`<div class="method-note">所选区间无有效净值</div>`;
-  return navRangeBar(d)+resetBtn+note+lineChart([
-    {name:"区间累计收益",color:"var(--teal)",points:selected.nav,fill:"var(--teal)",sw:3},
-    {name:"区间动态回撤",color:"#c06a58",points:selected.dd,rightAxis:true}
-  ],{h:220,pctY:true,navDisplay:true,forceX:actual,slider:{fullX0,fullX1,onChange:zoomNavPerf}});
+  const points=navPts.filter(p=>1+Number(p[1])>0).map(([date,value])=>({date,fund:1+Number(value),benchmark:null}));
+  if(selected.nav.length<2)return navRangeBar(d)+'<p class="method-note">所选区间净值不足。</p>';
+  const range={start:selected.nav[0][0],end:selected.nav.at(-1)[0]};
+  setTimeout(()=>{
+    const host=document.getElementById('navPerfWrap');if(!host)return;
+    let initial=true;
+    bindNavChartZoom(points,d.head.name,'',host,(start,end)=>{
+      if(initial){initial=false;return;}
+      navZoom={x0:Date.parse(start),x1:Date.parse(end)};navRangeKey=null;
+      host.querySelectorAll('.rng-btn.on').forEach(b=>b.classList.remove('on'));
+    });
+  },0);
+  return navRangeBar(d)+renderZoomableNavChart(points,d.head.name,'',{range,axisOffset:1});
 }
+
 function zoomNavPerf(t0,t1){
   navZoom={x0:t0,x1:t1};
   navRangeKey=null;            // 手动拖过之后不再高亮任何预设按钮
@@ -939,7 +948,7 @@ function renderPerf(d){
           白空 217px;而 ⑤同类排名 7列×4行、内容高 265px 却独占整行 1180px,又宽又扁。
           改成:①独占整行(净值图 528→1126 宽,13年走势看得清)、②与⑤并排(256 vs 265 天然等高)。
           ③阶段表现(8列)/④月度表现(14列热力图) 压到半幅必横滚,仍保持整行不动。 */""}
-    ${sub("净值走势 & 动态回撤","累计收益 + 回撤",navChart)}
+    ${sub("净值走势与区间回撤","区间首日净值 = 1",navChart).replace('class="subpanel"','class="subpanel unified-performance-panel"')}
     <div class="two-column">
       ${sub("年度表现","分年度收益率",annBar+annNote)}
       ${sub("同类排名","当前同类产品 · 相同净值截止日",peerRankBlock(d))}

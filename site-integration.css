@@ -167,3 +167,85 @@ body.workbench.warm-workbench .holding-stability-metrics .research-metric strong
  body.workbench.warm-workbench .holding-stability-metrics .research-metric {padding-left:0;padding-right:0;border-right:0;}
  body.workbench.warm-workbench .holding-stability-metrics .research-metric>span {min-height:0;}
 }
+
+/* Approved performance presentation, scoped to the NAV panel and controls. */
+body.workbench.warm-workbench :is([data-panel="performance"],[data-panel="perf"] .pb-scope) {font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+body.workbench.warm-workbench .unified-performance-panel {--up-paper:#fff;--up-ink:#403b34;--up-title:#253247;--up-muted:#817769;--up-border:#e2dcd3;--up-red:#9c4a3d;--up-soft:#f6f3ee;--up-track:#e7dfd2;padding:22px;}
+body.workbench.warm-workbench .unified-performance-panel>.subpanel-heading h3 {font-family:system-ui,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;font-size:22px;font-weight:500;}
+body.workbench.warm-workbench .performance-presets {display:flex;align-items:center;flex-wrap:wrap;gap:5px 12px;margin:0;padding:12px 0;border-top:1px solid var(--up-border,#e2dcd3);}
+body.workbench.warm-workbench .performance-control-label,body.workbench.warm-workbench .performance-presets>.rng-lab {flex:0 0 85px;color:var(--up-muted,#817769);font-size:13px;font-weight:500;white-space:nowrap;}
+body.workbench.warm-workbench .performance-control-label small {display:block;margin-top:5px;color:inherit;font-size:11px;font-weight:400;}
+body.workbench.warm-workbench .performance-presets button,body.workbench.warm-workbench .performance-current-tenures button {position:relative;display:inline-flex;align-items:center;min-height:34px;padding:5px 5px 8px;border:0!important;border-radius:0!important;background:transparent!important;color:var(--up-muted,#817769)!important;font-family:inherit;font-size:13px;font-weight:400;box-shadow:none!important;}
+body.workbench.warm-workbench .performance-presets button:is(.active,.on,[aria-pressed="true"]),body.workbench.warm-workbench .performance-current-tenures button[aria-pressed="true"] {background:transparent!important;color:var(--up-red,#9c4a3d)!important;font-weight:500;}
+body.workbench.warm-workbench .performance-presets button:is(.active,.on,[aria-pressed="true"])::after,body.workbench.warm-workbench .performance-current-tenures button[aria-pressed="true"]::after {position:absolute;content:"";left:28%;right:28%;bottom:0;height:2px;background:currentColor;}
+body.workbench.warm-workbench .performance-presets button:hover,body.workbench.warm-workbench .performance-current-tenures button:hover {background:transparent!important;color:var(--up-red,#9c4a3d)!important;}
+body.workbench.warm-workbench .performance-presets .rng-cur small {display:none;}
+body.workbench.warm-workbench .unified-performance-tenure {display:grid;grid-template-columns:85px minmax(0,1fr);gap:13px;align-items:start;margin:0;padding:13px 0;border-top:1px solid var(--up-border,#e2dcd3);border-bottom:0;}
+body.workbench.warm-workbench .unified-performance-tenure>.performance-control-label {padding-top:7px;}
+body.workbench.warm-workbench .performance-tenure-body {min-width:0;}
+body.workbench.warm-workbench .performance-current-tenures {display:flex;flex-wrap:wrap;gap:5px 12px;margin-bottom:8px;}
+body.workbench.warm-workbench .performance-manager-list {display:flex;flex-wrap:wrap;gap:8px;}
+body.workbench.warm-workbench .performance-manager {display:flex;flex:1 1 145px;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;max-width:260px;min-width:0;min-height:58px;padding:9px 12px;border:1px solid var(--up-border,#e2dcd3)!important;border-radius:3px!important;background:#fff!important;color:var(--up-title,#253247)!important;box-shadow:none!important;font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;font-size:13px;font-weight:500;text-align:left;line-height:1.45;}
+body.workbench.warm-workbench .performance-manager small {display:block;color:var(--up-muted,#817769)!important;font-family:inherit;font-size:11px;font-weight:400;}
+body.workbench.warm-workbench .performance-manager:is([data-manager-kind="共管"],.rng-co) {border-style:dashed!important;}
+body.workbench.warm-workbench .performance-manager:is([aria-pressed="true"],.on),body.workbench.warm-workbench .performance-manager:hover {border-color:var(--up-red,#9c4a3d)!important;background:var(--up-soft,#f6f3ee)!important;color:var(--up-title,#253247)!important;}
+body.workbench.warm-workbench .performance-manager-more {margin-top:8px;color:var(--up-muted,#817769);font-size:12px;}
+body.workbench.warm-workbench .performance-manager-more>summary {padding:4px 0;cursor:pointer;}
+body.workbench.warm-workbench .performance-manager-more[open]>summary {margin-bottom:7px;}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 20px;margin:10px 0 20px;}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric {min-width:0;padding:0 12px 0 3px;border:0;border-right:1px solid var(--up-border,#e2dcd3);background:transparent;box-shadow:none;}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric>span {color:var(--up-muted,#817769);font-size:12px;}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric>strong {color:var(--up-ink,#403b34);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:25px;font-weight:500;white-space:nowrap;}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric>small {display:block;min-height:16px;margin-top:4px;color:var(--up-muted,#817769);font-size:11px;}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric:nth-child(1){order:1}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric:nth-child(2){order:3;border-right:0}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric:nth-child(3){order:4}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric:nth-child(4){order:2}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric:nth-child(5){order:5}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric:nth-child(6){order:6;border-right:0}
+body.workbench.warm-workbench .unified-performance-panel #warm-range-note {margin:0 0 12px;color:var(--up-muted,#817769);font-size:12px;}
+body.workbench.warm-workbench .unified-performance-chart {min-width:0;font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;font-variant-numeric:tabular-nums;}
+body.workbench.warm-workbench .unified-performance-chart .performance-date-range {display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:0 0 14px;color:#817769;font-size:12px;}
+body.workbench.warm-workbench .unified-performance-chart .performance-date-range label {display:flex;align-items:center;gap:7px;min-width:0;}
+body.workbench.warm-workbench .unified-performance-chart .performance-date-range input {min-width:0;width:140px;min-height:32px;padding:4px 6px;border:1px solid #e2dcd3;border-radius:3px;background:#fff;color:#253247;font-family:inherit;font-size:12px;}
+body.workbench.warm-workbench .unified-performance-chart .nav-zoom-reset {min-height:32px;margin:0 0 0 auto;padding:4px 9px;border:1px solid #e2dcd3;border-radius:3px;background:#fff!important;color:#817769!important;font-family:inherit;font-size:12px;font-weight:400;}
+body.workbench.warm-workbench .unified-performance-chart .performance-chart-wrap {overflow:visible!important;}
+body.workbench.warm-workbench .unified-performance-chart .performance-chart-wrap::before {display:none!important;content:none!important;}
+body.workbench.warm-workbench .unified-performance-chart .nav-chart {width:100%!important;min-width:0!important;max-height:none!important;height:auto!important;}
+body.workbench.warm-workbench .unified-performance-chart .chart-axis-label {font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif!important;font-size:12px!important;font-weight:400!important;fill:#817769!important;}
+body.workbench.warm-workbench .unified-performance-chart .chart-line {vector-effect:non-scaling-stroke;stroke-width:2.2;}
+body.workbench.warm-workbench .unified-performance-chart .chart-line-fund {stroke:#9c4a3d;}
+body.workbench.warm-workbench .unified-performance-chart .chart-line-benchmark {stroke:#487b79;stroke-width:1.7;}
+body.workbench.warm-workbench .unified-performance-chart .drawdown-shadow {fill:#cb8e80;fill-opacity:.15;stroke:#cb8e80;stroke-opacity:.65;stroke-width:1;vector-effect:non-scaling-stroke;}
+body.workbench.warm-workbench .unified-performance-chart .performance-legend {gap:11px 23px;margin-bottom:12px;font-family:inherit;font-size:12px;}
+body.workbench.warm-workbench .unified-performance-chart .performance-legend :is(button,span) {font-family:inherit;font-size:12px;}
+body.workbench.warm-workbench .unified-performance-chart .nav-display-range {margin:0 0 10px;font-size:12px;}
+body.workbench.warm-workbench .unified-performance-chart .chart-end-values {margin:8px 0 15px;font-family:inherit;font-size:12px;}
+body.workbench.warm-workbench .unified-performance-chart .performance-slider-years {position:relative;height:22px;color:#817769;font-size:11px;}
+body.workbench.warm-workbench .unified-performance-chart .performance-slider-years>span {position:absolute;transform:translateX(-50%);white-space:nowrap;}
+body.workbench.warm-workbench .unified-performance-chart .nav-dual-range {min-height:58px;margin:0;}
+body.workbench.warm-workbench .unified-performance-chart .dual-range-track {top:0;height:28px;border:0;border-radius:3px;background:#f6f3ee;}
+body.workbench.warm-workbench .unified-performance-chart .dual-range-track span {top:0;bottom:0;border:0;border-radius:3px;background:#e7dfd2;}
+body.workbench.warm-workbench .unified-performance-chart .dual-range-control input[type="range"] {top:0;left:-6px;width:calc(100% + 12px);height:28px;}
+body.workbench.warm-workbench .unified-performance-chart .dual-range-control input[type="range"]::-webkit-slider-runnable-track {height:28px;}
+body.workbench.warm-workbench .unified-performance-chart .dual-range-control input[type="range"]::-webkit-slider-thumb {width:12px;height:28px;margin:0;border:4px solid #fff;border-radius:4px;background:#9c4a3d;box-shadow:none;}
+body.workbench.warm-workbench .unified-performance-chart .dual-range-control input[type="range"]::-moz-range-thumb {width:5px;height:20px;border:3px solid #fff;border-radius:4px;background:#9c4a3d;box-shadow:none;}
+body.workbench.warm-workbench .unified-performance-chart .dual-range-labels {top:35px;align-items:start;color:#817769;font-family:inherit;font-size:11px;}
+body.workbench.warm-workbench .unified-performance-chart .dual-range-labels small {font-size:11px;}
+body.workbench.warm-workbench .unified-performance-comparison {font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+@media(max-width:620px){body.workbench.warm-workbench .unified-performance-panel{padding:16px 12px}body.workbench.warm-workbench .unified-performance-tenure{grid-template-columns:1fr;gap:6px}body.workbench.warm-workbench .performance-control-label small{display:inline;margin-left:9px}body.workbench.warm-workbench .performance-presets>.performance-control-label,body.workbench.warm-workbench .performance-presets>.rng-lab{flex-basis:100%}body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics{gap:12px 9px}body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric{padding-right:5px}body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric>strong{font-size:20px}body.workbench.warm-workbench .unified-performance-chart .performance-date-range label{flex-direction:column;align-items:flex-start;gap:3px}body.workbench.warm-workbench .unified-performance-chart .performance-date-range input{width:122px}body.workbench.warm-workbench .unified-performance-chart .nav-zoom-reset{margin-left:0}body.workbench.warm-workbench .unified-performance-chart .dual-range-labels{grid-template-columns:1fr 1fr}body.workbench.warm-workbench .unified-performance-chart .dual-range-labels small{display:none}}
+
+/* Existing theme has a more specific red-fill rule; keep these panel controls quiet. */
+body.workbench.warm-workbench [data-panel] .unified-performance-panel .performance-presets button:is(.active,.on,[aria-pressed="true"]),
+body.workbench.warm-workbench [data-panel] .unified-performance-panel .performance-presets button:is(.active,.on,[aria-pressed="true"]):hover {background:transparent!important;color:#9c4a3d!important;border-color:transparent!important;}
+body.workbench.warm-workbench [data-panel] .unified-performance-panel button.performance-manager:is(.on,[aria-pressed="true"]),
+body.workbench.warm-workbench [data-panel] .unified-performance-panel button.performance-manager:is(.on,[aria-pressed="true"]):hover {background:#f6f3ee!important;color:#253247!important;border-color:#9c4a3d!important;}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric {min-height:0;}
+body.workbench.warm-workbench .unified-performance-panel #generic-performance-range-metrics>.research-metric>strong {margin-top:6px;line-height:1.2;}
+body.workbench.warm-workbench .unified-performance-chart .performance-slider-years i {position:absolute;top:22px;height:28px;width:1px;background:#d0c6b9;pointer-events:none;z-index:1;}
+
+body.workbench.warm-workbench .unified-performance-chart .drawdown-shadow {opacity:1!important;}
+body.workbench.warm-workbench .unified-performance-chart .chart-grid-line {stroke:#e8e4de;stroke-width:1;stroke-dasharray:none;vector-effect:non-scaling-stroke;}
+body.workbench.warm-workbench .unified-performance-chart .legend-fund::before {background:#9c4a3d!important;}
+body.workbench.warm-workbench .unified-performance-chart .legend-benchmark::before {background:#487b79!important;}
+body.workbench.warm-workbench .unified-performance-chart .legend-drawdown::before {background:#cb8e80!important;opacity:.48!important;}
