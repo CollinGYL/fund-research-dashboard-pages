@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-13T17:49:11+08:00",
+  "generatedAt": "2026-11-16T09:54:31+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -90,7 +90,7 @@
     },
     "bond-original-single.html": {
       "size": 729730,
-      "sha256": "4645bc97979d6b6890c4e029ed74df3822b9956b558665323f4a080394711bc5"
+      "sha256": "66a7a3832b2c1205345fcad25661e1b75f91b393d8a1430031b14e101c30884b"
     },
     "bond-research.html": {
       "size": 6193,
@@ -102,7 +102,7 @@
     },
     "compare.html": {
       "size": 4798,
-      "sha256": "0691799fa86ff8bec5a245d45991d0ee476e235bfb6ed944a91e0fdb5cba6b56"
+      "sha256": "af3585df89adfdd0ea35c184a19c425a56ee40fb5b435ecacf08975a5bb9103d"
     },
     "compare.js": {
       "size": 9845,
@@ -142,15 +142,15 @@
     },
     "fund.html": {
       "size": 5815,
-      "sha256": "8e6e4178231d5885390a8ddd7b7847efc631e08ad23076556c03ed678403a09f"
+      "sha256": "637687dedd59ae1b920c3b58c78e7c6f02a5b6cdea3848c9092dc133a4c00d49"
     },
     "fund.js": {
-      "size": 677863,
-      "sha256": "a0316315f50d87ecdda7afd570151c95c82e4ae6269496430d5c8a2ad7c5dfc6"
+      "size": 679186,
+      "sha256": "97e7bf6e4ea722f98395dc70a4c892077f1b1d54c9919dfd5b2738d9530ceff0"
     },
     "index.html": {
       "size": 14161,
-      "sha256": "312f437edd6108291fd55f403e09ec48f7533a8063ed5788e5be8ffe3cadffee"
+      "sha256": "f7723aa4b11723e6690d07199108df09a083d306eeb81e3859213cd65ff7cd83"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -189,8 +189,8 @@
       "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
     },
     "site-integration.css": {
-      "size": 21844,
-      "sha256": "e66f5898268c8746b46b6770dc36fd3a65163c06eb2b557d3681f46c6d275054"
+      "size": 23094,
+      "sha256": "b272fb860b639d14640888d71cdd1262df2f4e9b3e204f02cb7e62d6bb9e27f9"
     },
     "site-integration.js": {
       "size": 7811,

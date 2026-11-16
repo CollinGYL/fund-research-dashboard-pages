@@ -152,3 +152,18 @@ body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[ari
 body.workbench.warm-workbench .timeline-heatmap thead th button.heatmap-sort[aria-pressed="true"]::after {
  content:"";position:absolute;left:35%;right:35%;bottom:-4px;height:2px;background:currentColor;pointer-events:none;
 }
+
+/* Core holdings: use all three columns instead of inheriting the six-column summary. */
+body.workbench.warm-workbench .holding-stability-panel .holding-stability-metrics {
+ grid-template-columns:repeat(3,minmax(0,1fr));padding-left:0;padding-right:0;align-items:start;
+}
+body.workbench.warm-workbench .holding-stability-metrics .research-metric {padding-left:16px;padding-right:16px;}
+body.workbench.warm-workbench .holding-stability-metrics .research-metric:first-child {padding-left:0;}
+body.workbench.warm-workbench .holding-stability-metrics .research-metric:last-child {padding-right:0;}
+body.workbench.warm-workbench .holding-stability-metrics .research-metric>span {display:block;min-height:3em;line-height:1.5;}
+body.workbench.warm-workbench .holding-stability-metrics .research-metric strong {white-space:nowrap;overflow-wrap:normal;font-size:clamp(24px,2vw,28px);}
+@media(max-width:600px) {
+ body.workbench.warm-workbench .holding-stability-panel .holding-stability-metrics {grid-template-columns:1fr;row-gap:18px;}
+ body.workbench.warm-workbench .holding-stability-metrics .research-metric {padding-left:0;padding-right:0;border-right:0;}
+ body.workbench.warm-workbench .holding-stability-metrics .research-metric>span {min-height:0;}
+}
