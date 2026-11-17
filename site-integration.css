@@ -264,9 +264,9 @@ body.workbench.warm-workbench .cb-research-overview .research-overview-grid>.sub
 body.workbench.warm-workbench .cb-research-overview .research-chart .subpanel-heading {align-items:baseline;flex-wrap:wrap;gap:8px 16px;margin-bottom:16px;}
 body.workbench.warm-workbench .cb-research-overview .research-chart .subpanel-heading>span {font-size:11px;line-height:1.6;}
 body.workbench.warm-workbench .cb-research-overview .overview-nav>.period-switch {display:flex;flex-wrap:wrap;gap:6px;width:max-content;max-width:100%;padding:0;margin:0 0 14px;border:0;background:transparent;box-shadow:none;}
-body.workbench.warm-workbench .cb-research-overview .overview-nav>.period-switch>button {position:relative;min-width:60px;min-height:34px;padding:7px 12px;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;color:#817769!important;font-size:12px;font-weight:400;}
-body.workbench.warm-workbench .cb-research-overview .overview-nav>.period-switch>button:is(.active,[aria-pressed="true"]) {color:#9c4a3d!important;font-weight:600;}
-body.workbench.warm-workbench .cb-research-overview .overview-nav>.period-switch>button:is(.active,[aria-pressed="true"])::after {content:"";position:absolute;left:28%;right:28%;bottom:0;height:2px;background:currentColor;}
+body.workbench.warm-workbench #fund-page .cb-research-overview .overview-nav>.period-switch>button {position:relative;min-width:60px;min-height:34px;padding:7px 12px;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;color:#817769!important;font-size:12px;font-weight:400;}
+body.workbench.warm-workbench #fund-page .cb-research-overview .overview-nav>.period-switch>button:is(.active,[aria-pressed="true"]) {color:#9c4a3d!important;font-weight:600;}
+body.workbench.warm-workbench #fund-page .cb-research-overview .overview-nav>.period-switch>button:is(.active,[aria-pressed="true"])::after {content:"";position:absolute;left:28%;right:28%;bottom:0;height:2px;background:currentColor;}
 body.workbench.warm-workbench .cb-research-overview .performance-date-range {gap:10px 12px;margin-bottom:16px;padding-top:2px;}
 body.workbench.warm-workbench .cb-research-overview .performance-date-range label {gap:8px;}
 body.workbench.warm-workbench .cb-research-overview .research-chart .performance-legend {margin:2px 0 12px;gap:10px 20px;}
