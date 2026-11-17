@@ -36,7 +36,7 @@
   host.setAttribute('aria-busy','true');if(!host.hasChildNodes())host.innerHTML='<p class="method-note" data-advanced-loading>正在加载补充资料…</p>';
   try{
    const p=await payload(kinds[kind],code);if(!host.isConnected)return false;
-   host.innerHTML=root.BondAdvancedPack[kind](p);root.BondAdvancedPack.bind(host,p,kind);host.dataset.advancedReady=code+':'+kind;return true;
+   host.innerHTML=root.BondAdvancedPack[kind](p);root.BondAdvancedPack.bind(host,p,kind);host.dataset.advancedReady=code+':'+kind;if(kind==='ownFunds')host.parentElement?.querySelector?.('[data-bc-own-fallback]')?.remove?.();return true;
   }catch(e){
    if(host.isConnected){host.querySelector('[data-advanced-loading]')?.remove();let message=host.querySelector('[data-advanced-error]');if(!message){message=document.createElement('div');message.dataset.advancedError='';host.append(message);}message.innerHTML=`<p class="method-note">补充资料暂未加载：${esc(e.message)}</p><button type="button" data-advanced-retry>重试</button>`;message.querySelector('button').addEventListener('click',()=>{message.remove();void mount(host,kind,code);});}
    return false;

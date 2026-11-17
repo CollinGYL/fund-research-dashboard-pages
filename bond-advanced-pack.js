@@ -21,10 +21,22 @@
   return section('转债高级特征',controls+note(dates)+note(`披露转债占净资产 ${pct(current.disclosed_cb_weight_nav)}；资产表全部转债 ${pct(current.asset_cb_weight_nav)}；可定价权重覆盖 ${pct(current.priced_weight_coverage)}。`)+table(['特征','市值加权均值','单位','有该项数据的转债占已披露转债比例','有该项数据的转债占全部转债比例',...(dated?['实际行情日']:[])],rows))+section('转债对应正股特征',table(['特征','市值加权均值','单位','有该项数据的转债占已披露转债比例','有该项数据的转债占全部转债比例'],under))+note('直接股票、转债名义正股映射和Delta敞口分别处理；无Delta输入，不生成股票等价仓位。同事BS边界参数与可复算隐波分列；条款和映射的完整历史生效版本尚未核实。');
  }
  function ownFunds(p,selection){
-  const all=p.periods||[],selected=all.find(x=>x.report_date===selection)||all.at(-1);const periods=all.slice().reverse().map(x=>`<option value="${x.report_date}"${x===selected?' selected':''}>${x.report_date}</option>`).join('');
-  const intro=note(`最新资产表 ${p.latest_asset_date||'未知'}；最近明细 ${p.latest_details_date||'未匹配'}。明细期和资产期分别展示，不能把旧明细当最新。`);
-  if(!selected)return section('自身持基金/ETF明细',intro+note('原表未匹配到自身持基金记录；缺项保持未知，其他FOF持有本基金的记录不混入。'));
-  return section('自身持基金/ETF明细',intro+`<label>明细报告期<select data-bap-fund-period>${periods}</select></label>`+note(`明细 ${selected.report_date}；同日净资产 ${num(selected.nav_cny)}元；明细合计 ${num(selected.disclosed_value_cny)}元；资产表基金投资金额 ${num(selected.asset_fund_value_cny)}元；金额覆盖 ${pct(selected.coverage_of_asset_funds)}。`)+table(['被持有基金代码','名称','份额（份）','公允价值（元）','占基金净资产','管理人','运作方式/关联方'],selected.rows.map(r=>[esc(r.held_fund_code),esc(r.held_fund_name),num(r.quantity_shares),num(r.market_value_cny),pct(r.weight_nav),esc(r.held_fund_manager),esc(r.operation_type||'原报告待核')+' / '+(r.related_party==null?'原报告待核':esc(r.related_party))]))+note('被持有A/C或ETF份额保留实际披露代码，不直接穿透为股票或债券；基金运作方式和关联方关系不按名称猜测。'));
+  const all=p.periods||[],selected=all.find(x=>x.report_date===selection)||all.at(-1),history=p.asset_history||[],latest=history.at(-1);
+  const summary=latest?table(['最新资产报告期','基金投资金额（元）','占总资产','占净资产'],[[esc(latest.report_date),num(latest.fund_value_cny),pct(latest.fund_weight_total),pct(latest.fund_weight_nav)]]):note('尚无可核对的基金投资资产表。');
+  const trend=root.BondComplete?.line?root.BondComplete.line(history.map(x=>[x.report_date,ok(x.fund_weight_nav)?x.fund_weight_nav*100:null]),'基金投资占净资产',{suffix:'%',points:true}):'';
+  const historyTable=`<details class="bap-coverage"><summary>基金投资历史</summary>${table(['报告期','基金投资金额（元）','占总资产','占净资产'],history.slice().reverse().map(x=>[esc(x.report_date),num(x.fund_value_cny),pct(x.fund_weight_total),pct(x.fund_weight_nav)]))}</details>`;
+  let body=section('基金投资仓位',summary+trend+historyTable);
+  if(!selected)return body+section('持有基金／ETF明细',note('当前未取得可核对的明细；以资产表基金投资金额判断仓位，不能把缺明细当作零投资。'));
+  const opts=all.slice().reverse().map(x=>`<option value="${x.report_date}"${x===selected?' selected':''}>${x.report_date}${x.detail_scope==='all'?' · 全部':x.detail_scope==='top10'?' · 前十大':x.detail_scope==='aggregate_only'?' · 仅汇总':' · 已取得明细'}</option>`).join('');
+  const scope=selected.detail_scope==='all'?'全部明细':selected.detail_scope==='top10'?'前十大明细':'已取得明细';
+  const stale=p.latest_asset_date&&selected.report_date<p.latest_asset_date?note(`所选明细为${selected.report_date}，最新资产期为${p.latest_asset_date}。`):'';
+  const amount=ok(selected.asset_fund_value_cny)?`；基金投资总额 ${num(selected.asset_fund_value_cny)}元`:'';
+  const aggregateOnly=selected.details_status==='aggregate_only';
+  const content=`<label>明细报告期<select data-bap-fund-period>${opts}</select></label>`+stale+(aggregateOnly?note(`基金投资总额 ${num(selected.asset_fund_value_cny)}元。`):note(`${scope} ${selected.rows.length}项；明细合计 ${num(selected.disclosed_value_cny)}元${amount}；金额覆盖 ${pct(selected.coverage_of_asset_funds)}。`));
+  const related=x=>x===true?'是':x===false?'否':typeof x==='string'?esc(x):'—';
+  const rows=selected.rows.map(r=>[esc(r.held_fund_code),esc(r.held_fund_name),num(r.quantity_shares),num(r.market_value_cny),pct(r.weight_nav),esc(r.held_fund_manager||'—'),esc(r.operation_type||'—'),related(r.related_party)]);
+  const details=aggregateOnly?note('本期原报告只列出基金投资合计，未列逐只明细。'):selected.details_status==='confirmed_zero'?note('本期资产表可核对基金投资为零。'):table(['基金代码','名称','持有份额（份）','公允价值（元）','占净资产','管理人','运作方式','关联方基金'],rows);
+  return body+section('持有基金／ETF明细',content+details+(selected.source_pdf_url?`<p class="bap-note"><a href="${esc(selected.source_pdf_url)}" target="_blank" rel="noopener">查看本期原报告</a></p>`:''));
  }
  const lockLabel=x=>({'explicit_no_lock':'原文明确无锁定','explicit_locked_percentage':'原文明确锁定比例','duration_only; colleague_assumes_all_locked':'仅有锁定期限；情景按全部锁定','missing_lock_text; explicit10pct_scenario_only':'锁定文本缺失；情景假设10%','unrecognized_text; explicit10pct_scenario_only':'锁定文本待核；情景假设10%'}[x]||x);
  function ipo(p,mode='strict',limit=50){

@@ -211,7 +211,7 @@
    const p=withAssetVersions(await load(fund),detail);
    if(id==='funds'){
     const current=p;
-    host.innerHTML=fundPanel(current)+'<div data-bap-own-funds></div>';if(root.BondAdvancedUI)await root.BondAdvancedUI.mount(host.querySelector('[data-bap-own-funds]'),'ownFunds',fund.code);return;
+    host.innerHTML='<div data-bap-own-funds></div>';const ready=root.BondAdvancedUI&&await root.BondAdvancedUI.mount(host.querySelector('[data-bap-own-funds]'),'ownFunds',fund.code);if(!ready)host.insertAdjacentHTML('afterbegin','<div data-bc-own-fallback>'+fundPanel(current)+'</div>');return;
    }
    if(id==='correlation'){
     host.innerHTML=correlationPanel(p)+'<details class="bc-legacy-details"><summary>既有基金与代表指数相关性（原统计口径）</summary><div data-bc-market-correlation></div></details>';
