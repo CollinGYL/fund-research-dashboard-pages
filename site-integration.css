@@ -249,3 +249,53 @@ body.workbench.warm-workbench .unified-performance-chart .chart-grid-line {strok
 body.workbench.warm-workbench .unified-performance-chart .legend-fund::before {background:#9c4a3d!important;}
 body.workbench.warm-workbench .unified-performance-chart .legend-benchmark::before {background:#487b79!important;}
 body.workbench.warm-workbench .unified-performance-chart .legend-drawdown::before {background:#cb8e80!important;opacity:.48!important;}
+
+/* Convertible overview: keep long report notes and chart controls readable. */
+body.workbench.warm-workbench .cb-research-overview .research-conclusion {padding:12px 0 10px;}
+body.workbench.warm-workbench .cb-research-overview .research-conclusion p {line-height:1.8;}
+body.workbench.warm-workbench .cb-research-overview .research-freshness {gap:8px 22px;padding:12px 0;font-size:11px;line-height:1.7;}
+body.workbench.warm-workbench .cb-research-overview .research-decision-metrics {grid-template-columns:repeat(5,minmax(0,1fr));margin:4px 0 22px;padding:20px 0;}
+body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric {min-width:0;padding:0 20px;}
+body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric>span {min-height:20px;font-size:12px;line-height:1.6;}
+body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric>strong {font-size:clamp(25px,2vw,30px);line-height:1.3;margin:8px 0;white-space:nowrap;}
+body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric>small {font-size:11px;line-height:1.7;white-space:normal;overflow-wrap:break-word;}
+body.workbench.warm-workbench .cb-research-overview .research-overview-grid {grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:22px;align-items:start;}
+body.workbench.warm-workbench .cb-research-overview .research-overview-grid>.subpanel {padding:20px;min-width:0;}
+body.workbench.warm-workbench .cb-research-overview .research-chart .subpanel-heading {align-items:baseline;flex-wrap:wrap;gap:8px 16px;margin-bottom:16px;}
+body.workbench.warm-workbench .cb-research-overview .research-chart .subpanel-heading>span {font-size:11px;line-height:1.6;}
+body.workbench.warm-workbench .cb-research-overview .overview-nav>.period-switch {display:flex;flex-wrap:wrap;gap:6px;width:max-content;max-width:100%;padding:0;margin:0 0 14px;border:0;background:transparent;box-shadow:none;}
+body.workbench.warm-workbench .cb-research-overview .overview-nav>.period-switch>button {position:relative;min-width:60px;min-height:34px;padding:7px 12px;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;color:#817769!important;font-size:12px;font-weight:400;}
+body.workbench.warm-workbench .cb-research-overview .overview-nav>.period-switch>button:is(.active,[aria-pressed="true"]) {color:#9c4a3d!important;font-weight:600;}
+body.workbench.warm-workbench .cb-research-overview .overview-nav>.period-switch>button:is(.active,[aria-pressed="true"])::after {content:"";position:absolute;left:28%;right:28%;bottom:0;height:2px;background:currentColor;}
+body.workbench.warm-workbench .cb-research-overview .performance-date-range {gap:10px 12px;margin-bottom:16px;padding-top:2px;}
+body.workbench.warm-workbench .cb-research-overview .performance-date-range label {gap:8px;}
+body.workbench.warm-workbench .cb-research-overview .research-chart .performance-legend {margin:2px 0 12px;gap:10px 20px;}
+body.workbench.warm-workbench .cb-research-overview .research-chart .method-note {font-size:11px;line-height:1.75;margin:14px 0 0;}
+body.workbench.warm-workbench .cb-research-overview .research-changes h3 {margin-bottom:6px;}
+body.workbench.warm-workbench .cb-research-overview .research-signal {padding:18px 0;}
+body.workbench.warm-workbench .cb-research-overview .research-signal>span {font-size:12px;line-height:1.6;margin-bottom:7px;}
+body.workbench.warm-workbench .cb-research-overview .research-signal>strong {font-size:18px;line-height:1.55;}
+body.workbench.warm-workbench .cb-research-overview .research-signal>small {font-size:11px;line-height:1.8;margin-top:8px;white-space:normal;overflow-wrap:break-word;}
+body.workbench.warm-workbench .cb-research-overview .research-changes>.method-note {font-size:11px;line-height:1.8;margin-top:16px;}
+@media(max-width:1100px) {
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics {grid-template-columns:repeat(6,minmax(0,1fr));row-gap:20px;}
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric {grid-column:span 2;}
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric:nth-child(n+4) {grid-column:span 3;}
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric:nth-child(3) {border-right:0;}
+ body.workbench.warm-workbench .cb-research-overview .research-overview-grid {grid-template-columns:minmax(0,1fr);}
+ body.workbench.warm-workbench .cb-research-overview .research-changes {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 22px;}
+ body.workbench.warm-workbench .cb-research-overview .research-changes>h3,body.workbench.warm-workbench .cb-research-overview .research-changes>.method-note {grid-column:1/-1;}
+}
+@media(max-width:760px) {
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics {grid-template-columns:repeat(2,minmax(0,1fr));padding:16px 0;row-gap:18px;}
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric {grid-column:auto;padding:0 14px;}
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric:nth-child(n+4) {grid-column:auto;}
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric:last-child {grid-column:1/-1;border-right:0;}
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric:nth-child(3) {border-right:1px solid #ded9ce;}
+ body.workbench.warm-workbench .cb-research-overview .research-decision-metrics>.research-metric:nth-child(even) {border-right:0;}
+ body.workbench.warm-workbench .cb-research-overview .research-overview-grid>.subpanel {padding:16px 14px;}
+ body.workbench.warm-workbench .cb-research-overview .research-changes {grid-template-columns:minmax(0,1fr);gap:0;}
+ body.workbench.warm-workbench .cb-research-overview .performance-date-range {gap:10px 8px;}
+ body.workbench.warm-workbench .cb-research-overview .performance-date-range input {width:128px;}
+ body.workbench.warm-workbench .cb-research-overview .performance-date-range>.nav-zoom-reset {margin-left:0;}
+}
