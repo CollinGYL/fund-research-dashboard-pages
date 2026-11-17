@@ -15,7 +15,7 @@
  const formatField=(key,x)=>percentFields.has(key)?pct(x):nativePercentFields.has(key)?(finite(x)?num(x,2)+'%':'—'):num(x,key==='S_DQ_MV'||key==='BondYE'?2:4);
  const fieldUnits={BondClose:'元/百元面值（全价）',BondCZJZ:'元/百元面值',BondZHJZ:'元/百元面值',BondEndterm:'年',BondYE:'亿元',BondDLFactor:'价格+溢价百分点',S_DQ_MV:'亿元'};
  function line(points,label,options={}){
-  const valid=points.filter(x=>finite(x[1]));if(!valid.length)return note(options.notApplicableDates?.length?'近四季转债仓位均为0，波动系数不适用。':'暂无有效历史数据。');
+  const valid=points.filter(x=>finite(x[1]));if(!valid.length)return note(options.notApplicableDates?.length?'近四季均无转债持仓。':'暂无有效历史数据。');
   const dates=points.map(x=>Date.parse(x[0])),lo=Math.min(...valid.map(x=>x[1])),hi=Math.max(...valid.map(x=>x[1])),t0=Math.min(...dates),t1=Math.max(...dates);let path='',drawing=false;
   for(let i=0;i<points.length;i++){const v=points[i][1];if(!finite(v)){drawing=false;continue;}const x=40+(dates[i]-t0)/(t1-t0||1)*700,y=145-(v-lo)/(hi-lo||1)*118;path+=(drawing?'L':'M')+x.toFixed(2)+','+y.toFixed(2);drawing=true;}
   const excluded=new Set(options.notApplicableDates||[]),bands=[];
@@ -24,7 +24,7 @@
    const start=i;while(i+1<points.length&&excluded.has(points[i+1][0]))i++;
    const begin=start?(dates[start-1]+dates[start])/2:t0,end=i+1<points.length?(dates[i]+dates[i+1])/2:t1;
    const x=40+(begin-t0)/(t1-t0||1)*700,width=(end-begin)/(t1-t0||1)*700;
-   bands.push(`<g class="bc-cv-not-applicable"><title>${esc(points[start][0])}至${esc(points[i][0])}：近四季转债仓位均为0，波动系数不适用。</title><rect x="${x.toFixed(2)}" y="20" width="${width.toFixed(2)}" height="125" fill="#e9e5df" fill-opacity="0.65"/>${width>60?`<text x="${(x+width/2).toFixed(2)}" y="40" text-anchor="middle">不适用</text>`:''}</g>`);
+   bands.push(`<g class="bc-cv-not-applicable"><title>${esc(points[start][0])}至${esc(points[i][0])}：近四季均无转债持仓。</title><rect x="${x.toFixed(2)}" y="20" width="${width.toFixed(2)}" height="125" fill="#e9e5df" fill-opacity="0.65"/>${width>60?`<text x="${(x+width/2).toFixed(2)}" y="40" text-anchor="middle">近四季均无<tspan x="${(x+width/2).toFixed(2)}" dy="14">转债持仓</tspan></text>`:''}</g>`);
   }
   const dots=points.map((point,i)=>{
    if(!finite(point[1]))return '';
@@ -55,8 +55,8 @@
  function assetPanel(p){
   const rows=root.FundResearch.selectReportVersions(p.metrics.position||[]);
   const latest=rows.at(-1),lastCV=rows.filter(x=>finite(x.cb_position_cv_4q)).at(-1),missing=rows.slice(-4).filter(x=>!finite(x.convertible_weight_nav)).map(x=>x.report_date),notApplicableDates=rows.filter(x=>x.cv_status==='zero_mean_not_applicable').map(x=>x.report_date);
-  const status=!latest?'':finite(latest.cb_position_cv_4q)?`统计截至 ${latest.report_date}`:latest.cv_status==='zero_mean_not_applicable'?`截至 ${latest.report_date}，近四季转债仓位均为0，波动系数不适用。`:`最新四季数据尚未齐全${missing.length?'：'+missing.join('、'):''}。${lastCV?'最近可计算至 '+lastCV.report_date+'。':''}`;
-  return section('转债仓位与四季度波动',`<div class="bc-position-pair"><div><h4>转债占净资产（%）</h4>${line(rows.map(x=>[x.report_date,finite(x.convertible_weight_nav)?x.convertible_weight_nav*100:null]),'转债占净资产（%）',{points:true,suffix:'%'})}</div><div><h4>近4季度转债仓位波动系数</h4>${line(rows.map(x=>[x.report_date,x.cb_position_cv_4q]),'近4季度转债仓位波动系数',{points:true,notApplicableDates})}${note(status+(lastCV&&notApplicableDates.length?' 灰色区间：近四季转债仓位均为0，波动系数不适用。':''))}</div></div>`+note('按同一资产版本的四个连续季度计算；缺失不作零。报告序列不是每日持仓估计。')+`<details><summary>历史仓位与变异系数（${rows.length}期）</summary>${table(['报告期','股票/NAV','普通债/NAV','转债/NAV','总资产/NAV','近4季度转债仓位波动系数'],rows.slice().reverse().map(x=>[esc(x.report_date),pct(x.stock_weight_nav),pct(x.ordinary_bond_weight_nav),pct(x.convertible_weight_nav),finite(x.gross_assets_to_nav)?num(x.gross_assets_to_nav,3)+'倍':'—',x.cv_status==='zero_mean_not_applicable'?'不适用':num(x.cb_position_cv_4q)]))}</details>`);
+  const status=!latest?'':finite(latest.cb_position_cv_4q)?`统计截至 ${latest.report_date}`:latest.cv_status==='zero_mean_not_applicable'?`截至 ${latest.report_date}，近四季均无转债持仓。`:`最新四季数据尚未齐全${missing.length?'：'+missing.join('、'):''}。${lastCV?'最近可计算至 '+lastCV.report_date+'。':''}`;
+  return section('转债仓位与四季度波动',`<div class="bc-position-pair"><div><h4>转债占净资产（%）</h4>${line(rows.map(x=>[x.report_date,finite(x.convertible_weight_nav)?x.convertible_weight_nav*100:null]),'转债占净资产（%）',{points:true,suffix:'%'})}</div><div><h4>近4季度转债仓位波动系数</h4>${line(rows.map(x=>[x.report_date,x.cb_position_cv_4q]),'近4季度转债仓位波动系数',{points:true,notApplicableDates})}${note(status+(lastCV&&notApplicableDates.length?' 灰色区间：近四季均无转债持仓。':''))}</div></div>`+note('按同一资产版本的四个连续季度计算；缺失不作零。报告序列不是每日持仓估计。')+`<details><summary>历史仓位与变异系数（${rows.length}期）</summary>${table(['报告期','股票/NAV','普通债/NAV','转债/NAV','总资产/NAV','近4季度转债仓位波动系数'],rows.slice().reverse().map(x=>[esc(x.report_date),pct(x.stock_weight_nav),pct(x.ordinary_bond_weight_nav),pct(x.convertible_weight_nav),finite(x.gross_assets_to_nav)?num(x.gross_assets_to_nav,3)+'倍':'—',x.cv_status==='zero_mean_not_applicable'?'近四季均无转债持仓':num(x.cb_position_cv_4q)]))}</details>`);
  }
  function featurePair(features,date,key,control){
   const entries=Object.entries(features||{});if(!features?.[key])key=entries[0]?.[0];

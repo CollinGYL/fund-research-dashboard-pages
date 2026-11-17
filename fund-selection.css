@@ -2,7 +2,8 @@
 .fund-selection .selection-panel{padding:16px;border:1px solid var(--line);border-radius:12px;background:#fff}
 .fund-selection .method-note,.fund-selection .tab-lead{font-size:12px;line-height:1.7;color:var(--muted)}
 .fund-selection .selection-scatter{width:100%;overflow-x:auto}
-.fund-selection .selection-scatter svg{display:block;width:100%;min-width:560px;height:auto}
+.fund-selection .selection-scatter svg{display:block;width:100%;min-width:0;height:auto;font-variant-numeric:tabular-nums}
+body.workbench.warm-workbench .fund-selection .selection-scatter text{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif!important;font-size:12px;font-weight:400}
 .fund-selection .seg-dim{border:1px solid var(--line);background:white;color:var(--navy)}
 .fund-selection .seg-dim.active{background:var(--navy);color:white}
 .fund-selection button:focus-visible,.fund-selection input:focus-visible{outline:2px solid var(--teal);outline-offset:3px}

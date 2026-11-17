@@ -51,7 +51,9 @@ function updateSelectionRiskFree(input){
 }
 function selectionScatter(rows){
  if(!rows.length)return '<p class="method-note">当前类别／搜索条件下没有满足区间数据要求的基金。</p>';
- const p=library.windows[selectionWindow],id=__chartSeq++,w=920,h=460,pl=65,pr=22,pt=20,pb=48,pw=w-pl-pr,ph=h-pt-pb;
+ // Use screen-sized SVG units so a wide page does not enlarge the plot or its text.
+ const w=Math.max(300,Math.round(host.clientWidth?host.clientWidth-34:920)),h=Math.max(280,Math.min(360,Math.round((root.innerHeight||800)*.43)));
+ const p=library.windows[selectionWindow],id=__chartSeq++,pl=65,pr=22,pt=20,pb=48,pw=w-pl-pr,ph=h-pt-pb;
  const xs=rows.map(r=>r.ann),ys=rows.map(r=>r.vol);
  const xAxis=root.FundResearch.displayAxis(xs,{includeZero:true,steps:5}),yAxis=root.FundResearch.displayAxis(ys,{includeZero:true,floor:0,steps:5});
  const {min:xmin,max:xmax}=xAxis,{min:ymin,max:ymax}=yAxis;
@@ -141,7 +143,10 @@ function renderFundSelection(d){
  };
  const input=e=>{if(e.target.hasAttribute('data-selection-query'))searchSelectionFunds(e.target.value);else if(e.target.hasAttribute('data-selection-rf'))updateSelectionRiskFree(e.target);};
  host.addEventListener('click',click);host.addEventListener('input',input);
- return {destroy(){host.removeEventListener('click',click);host.removeEventListener('input',input);host.innerHTML='';},
+ let resizeFrame=0;
+ const resize=()=>{if(resizeFrame||!host.clientWidth)return;resizeFrame=root.requestAnimationFrame(()=>{resizeFrame=0;hideTT();refreshSelectionPlot();});};
+ root.addEventListener?.('resize',resize);
+ return {destroy(){host.removeEventListener('click',click);host.removeEventListener('input',input);root.removeEventListener?.('resize',resize);if(resizeFrame)root.cancelAnimationFrame(resizeFrame);host.innerHTML='';},
    rows:selectionRows,scatter:selectionScatter,setWindow:switchSelectionWindow,
    setQuery:searchSelectionFunds,setRiskFree:updateSelectionRiskFree,toggleSector:toggleSelectionSector,
    state:()=>({window:selectionWindow,query:selectionQuery,picked:selectionPicked,riskFree:selectionRiskFree,hidden:[...selectionHidden]})};
