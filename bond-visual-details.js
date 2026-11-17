@@ -20,12 +20,14 @@
  function stackChart(periods,basis='composition',all=false){
   const rows=classRows(periods,basis,all);if(!rows.length)return note('暂无券种金额序列。');
   const W=800,H=300,L=55,R=20,T=25,B=37,times=rows.map(r=>Date.parse(r.date)),x=i=>L+(times.at(-1)===times[0]?.5:(times[i]-times[0])/(times.at(-1)-times[0]))*(W-L-R),totals=rows.map(r=>r.values.filter(ok).reduce((s,v)=>s+v,0)),max=basis==='composition'?1:Math.max(1,Math.ceil(Math.max(...totals)*4)/4),y=v=>T+(1-v/max)*(H-T-B);const keys=groups(all),geometry=root.ReviewCore.stackAreas(rows.map(r=>r.date),rows.map(r=>r.values),{left:L,right:W-R,orderByCoverage:true});
-  const areas=geometry.segments.map(s=>s.bands.map(b=>{
-   const [key,label,color]=keys[b.layer],tag=`data-stack-layer="${key}" data-stack-start="${s.start}" data-stack-end="${s.end}" data-stack-mask="${s.signature}"`;
-   if(b.points.length===1){const p=b.points[0];if(p.value===0)return '';return `<circle data-stack-point ${tag} cx="${p.x}" cy="${y(p.upper)}" r="2.5" fill="${color}"><title>${p.date} · ${esc(label)} ${pct(p.value)}</title></circle>`;}
-   const points=[...b.points.map(p=>`${p.x},${y(p.upper)}`),...b.points.slice().reverse().map(p=>`${p.x},${y(p.lower)}`)].join(' ');
-   return `<polygon ${tag} points="${points}" fill="${color}" stroke="none"><title>${s.start} — ${s.end} · ${esc(label)}</title></polygon>`;
-  }).join('')).join('');
+  // Each disclosure is an independent stack; missing classes never cut a known class in another report.
+  const areas=geometry.reports.map((r,i)=>{
+   const start=i?(geometry.reports[i-1].center+r.center)/2:L,end=i+1<geometry.reports.length?(r.center+geometry.reports[i+1].center)/2:W-R;
+   return r.bands.filter(b=>b.value>0).map(b=>{
+    const [key,label,color]=keys[b.layer];
+    return `<rect data-stack-report="${r.date}" data-stack-layer="${key}" data-stack-start="${r.date}" data-stack-end="${r.date}" x="${start}" y="${y(b.upper)}" width="${end-start}" height="${y(b.lower)-y(b.upper)}" fill="${color}" shape-rendering="crispEdges"><title>${r.date} · ${esc(label)} ${pct(b.value)}</title></rect>`;
+   }).join('');
+  }).join('');
   const ticks=[...new Set([0,.25*max,.5*max,.75*max,max,1])].sort((a,b)=>a-b);
   return `<div class="bv-legend">${groups(all).map(([,label,color])=>`<span><i style="background:${color}"></i>${label}</span>`).join('')}</div><svg class="bv-stack" viewBox="0 0 ${W} ${H}" role="img" aria-label="${all?'债券':'一般债'}${basis==='composition'?'已取得金额构成百分比':'占净资产比例'}">${ticks.map(v=>`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="#e1e8ec"/><text x="${L-7}" y="${y(v)+4}" text-anchor="end">${number(v*100,0)}%</text>`).join('')}${areas}<line x1="${L}" x2="${W-R}" y1="${y(1)}" y2="${y(1)}" stroke="#9c695c" stroke-dasharray="4 4"/>${[0,Math.floor((rows.length-1)/2),rows.length-1].filter((i,j,a)=>a.indexOf(i)===j).map(i=>`<text x="${x(i)}" y="${H-10}" text-anchor="${i===0?'start':i===rows.length-1?'end':'middle'}">${rows[i].date}</text>`).join('')}</svg>`;
  }
@@ -36,7 +38,7 @@
  function mountStructure(host,periods,all=false){
   let basis='composition',date=periods.at(-1)?.date;
   host.innerHTML=`<div class="bc-stock-nav" role="group" aria-label="${all?'债券':'一般债'}券种显示口径"><button type="button" data-bv-basis="composition" aria-pressed="true">${all?'券种':'一般债券种'}构成（100%）</button><button type="button" data-bv-basis="nav" aria-pressed="false">${all?'债券':'一般债'}占净资产（原始比例）</button></div><p class="method-note" data-bv-note></p><div class="bv-structure-grid"><div data-bv-chart></div><div><label class="bc-control">报告期<select data-bv-class-date>${periods.slice().reverse().map(p=>`<option value="${p.date}">${p.date}</option>`).join('')}</select></label><div data-bv-snapshot></div></div></div>${all?'<details class="bc-legacy-details"><summary>按债券品种分类的债券投资组合</summary><div data-bv-raw></div></details>':''}`;
-  const draw=()=>{host.querySelectorAll('[data-bv-basis]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.bvBasis===basis)));host.querySelector('[data-bv-chart]').innerHTML=stackChart(periods,basis,all);host.querySelector('[data-bv-snapshot]').innerHTML=snapshot(periods.find(p=>p.date===date),basis,all);if(all)host.querySelector('[data-bv-raw]').innerHTML=classTable(periods.find(p=>p.date===date));host.querySelector('[data-bv-note]').textContent=(basis==='composition'?`已取得的${all?'九':'八'}类金额合计归一至100%；缺项不补零，归一化不代表完整覆盖。`:'已取得金额 ÷ 同期基金净资产，可超过100%。')+(all?'ABS单列，政策性金融债不重复堆叠。':'一般债八类不含转债与ABS。')+' 色带按实际可得报告连接，未补造缺失报告；覆盖期数多的券种放在下层；单项缺失不切断其下方已知色带。本层或下层缺项变化处保留断点；缺项见报告期明细。';};
+  const draw=()=>{host.querySelectorAll('[data-bv-basis]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.bvBasis===basis)));host.querySelector('[data-bv-chart]').innerHTML=stackChart(periods,basis,all);host.querySelector('[data-bv-snapshot]').innerHTML=snapshot(periods.find(p=>p.date===date),basis,all);if(all)host.querySelector('[data-bv-raw]').innerHTML=classTable(periods.find(p=>p.date===date));host.querySelector('[data-bv-note]').textContent=(basis==='composition'?`已取得的${all?'九':'八'}类金额合计归一至100%；缺项不补零，归一化不代表完整覆盖。`:'已取得金额 ÷ 同期基金净资产，可超过100%。')+(all?'ABS单列，政策性金融债不重复堆叠。':'一般债八类不含转债与ABS。')+' 按实际报告期独立堆叠，每期仅展示已取得分项；缺项见报告期明细。';};
   host.querySelectorAll('[data-bv-basis]').forEach(b=>b.addEventListener('click',()=>{basis=b.dataset.bvBasis;draw();}));host.querySelector('[data-bv-class-date]').addEventListener('change',e=>{date=e.target.value;draw();});draw();
  }
  function category(row,features={},date){
