@@ -241,3 +241,26 @@ body.desktop-home .metric-sort-controls {gap:5px;}
 body.desktop-home .metric-sort-controls button {font-size:12px;min-height:28px;padding:2px 4px;}
 
 body.desktop-home #locate-fund-status {padding:10px 12px;border:1px solid #d7cfc4;border-radius:4px;background:#fff;color:#253247;font-size:13px;line-height:1.65;}
+
+/* Category market overview stays open above the list; details retain full audit data. */
+body.desktop-home .home-market-research {padding:20px;margin-top:12px;scroll-margin-top:calc(var(--desktop-top-height,100px) + 12px);}
+body.desktop-home .home-market-heading {display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #e4ded4;padding-bottom:14px;}
+body.desktop-home .home-market-heading .eyebrow {margin:0 0 6px;font-size:11px;}
+body.desktop-home .home-market-heading h2 {margin:0;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:23px;font-weight:500;color:#253247;}
+body.desktop-home .home-market-list-link {flex:none;color:#9c4a3d;font-size:13px;text-decoration:none;border-bottom:1px solid currentColor;padding:6px 0;}
+body.desktop-home .home-market-date {margin:12px 0 16px;font-size:11px;line-height:1.8;color:#817769;}
+body.desktop-home #home-market-research :is(.bap-section,.subpanel) {min-width:0;}
+body.desktop-home #home-market-research .bap-section:first-child {margin-top:0;}
+body.desktop-home #home-market-research .market-overview>.section-heading {display:none;}
+body.desktop-home #home-market-research .market-reading-intro {margin:0 0 14px;font-size:14px;line-height:1.8;color:#51483f;}
+body.desktop-home #home-market-research .market-rate-facts {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:12px 0;}
+body.desktop-home #home-market-research .market-rate-facts>div {min-width:0;padding-right:18px;border-right:1px solid #ded8ce;}
+body.desktop-home #home-market-research .market-rate-facts>div:last-child {border:0;}
+body.desktop-home #home-market-research .market-rate-facts small {display:block;font-size:12px;color:#817769;line-height:1.6;}
+body.desktop-home #home-market-research .market-rate-facts strong {display:block;font:500 28px/1.5 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#534b41;white-space:nowrap;}
+body.desktop-home #home-market-research .market-rate-facts em {font-size:13px;font-style:normal;margin-left:4px;}
+body.desktop-home #home-market-research .market-rate-facts span {font-size:11px;color:#817769;}
+body.desktop-home #home-market-research .market-reading-guide {font-size:12px;color:#6e655b;line-height:1.8;margin:14px 0;max-width:1000px;}
+body.desktop-home #home-market-research .market-coverage {border-top:1px solid #e5dfd1;padding:12px 0;margin-bottom:14px;font-size:12px;}
+body.desktop-home #home-market-research .market-coverage summary {cursor:pointer;color:#634c35;}
+@media(max-width:760px){body.desktop-home .home-market-research{padding:16px 12px;margin-inline:16px}body.desktop-home .home-market-heading{align-items:flex-start;flex-wrap:wrap;gap:8px}body.desktop-home .home-market-heading h2{font-size:20px}body.desktop-home #home-market-research .market-rate-facts{grid-template-columns:1fr;gap:14px}body.desktop-home #home-market-research .market-rate-facts>div{border:0;padding:0}body.desktop-home #home-market-research .market-rate-facts strong{font-size:26px}}

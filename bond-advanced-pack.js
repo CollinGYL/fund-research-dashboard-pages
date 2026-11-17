@@ -78,7 +78,7 @@
  }
  function convertibleMarket(p,start,end,year){
   const dateInput=(key,label,value)=>`<label>${label}<input type="date" aria-label="${label}" data-bap-${key} value="${value}"></label>`;
-  return section('可转债市场',`<p class="bap-market-intro">可转债同时连接债券和股票。先看市场涨跌，再看价格与转股溢价，结合成交活跃度和赎回条款，了解当前的市场状态。</p><div class="bap-controls">${dateInput('a-start','观察开始',start)}${dateInput('a-end','观察结束',end)}<button type="button" data-bap-window-reset>近三个月</button></div><div data-bap-cb-summary>${convertibleSummary(p,start,end)}</div><div data-bap-market-a>${marketWindow(p,'convertible-bond',start,end,'当前观察区间',true)}</div><details class="bap-comparison"><summary>增加一个对比区间</summary><div class="bap-controls">${dateInput('b-start','对比开始',year)}${dateInput('b-end','对比结束',end)}</div><div data-bap-market-b>${marketWindow(p,'convertible-bond',year,end,'对比区间',true)}</div></details>`)+convertibleSample(p)+`<div data-bap-cb-beta>${convertibleBeta(p,start,end)}</div>`;
+  return section('可转债市场',`<p class="bap-market-intro">先看转债指数的涨跌，再看样本价格、转股溢价和成交集中度。转股溢价反映转债价格高于按当日条件转换成股票后价值的比例；样本范围和实际日期分别标明。</p><div class="bap-controls">${dateInput('a-start','观察开始',start)}${dateInput('a-end','观察结束',end)}<button type="button" data-bap-window-reset>近三个月</button></div><div data-bap-cb-summary>${convertibleSummary(p,start,end)}</div><div data-bap-market-a>${marketWindow(p,'convertible-bond',start,end,'当前观察区间',true)}</div><details class="bap-comparison"><summary>增加一个对比区间</summary><div class="bap-controls">${dateInput('b-start','对比开始',year)}${dateInput('b-end','对比结束',end)}</div><div data-bap-market-b>${marketWindow(p,'convertible-bond',year,end,'对比区间',true)}</div></details>`)+convertibleSample(p)+`<div data-bap-cb-beta>${convertibleBeta(p,start,end)}</div>`;
  }
  function convertibleBeta(p,start,end){
   const beta=p.convertible_stock_beta,points=(beta?.series||[]).filter(x=>ok(x[1])&&x[0]>=start&&x[0]<=end);
@@ -97,16 +97,29 @@
   });
  }
 
+ // Display the same window statistics already used by the index detail table.
+ function marketBrief(p,key,start,end){
+  if(!start||!end||start>end)return note('请选择有效起止日期。');
+  const selections={
+   'active-equity':[['000300.SH','沪深300 · 大盘股票'],['000905.SH','中证500 · 中盘股票'],['000852.SH','中证1000 · 小盘股票'],['000906.SH','中证800 · 沪深主要股票']],
+   'primary-bond':[['CBA00101.CS','中债综合 · 普通债'],['CBA00601.CS','中债国债 · 利率债'],['CBA02001.CS','中债企业债 · 信用债'],['000832.SH','中证转债 · 可转债']],
+   'secondary-bond':[['CBA00101.CS','中债综合 · 普通债'],['CBA02001.CS','中债企业债 · 信用债'],['000906.SH','中证800 · 股票'],['000832.SH','中证转债 · 可转债']]
+  };
+  const rows=(selections[key]||[]).map(([code,label])=>{const index=p.indices[code],stat=windowStats(index?.series||[],start,end);return {code,label,index,stat};});
+  return `<div class="bap-market-cards">${rows.map(({code,label,index,stat})=>`<div class="bap-market-card" data-market-brief-code="${esc(code)}"><span>${esc(label)} · 区间涨跌</span><strong>${pct(stat.value)}</strong><small>${index?.kind==='bond_wealth'?'含票息再投资':'价格回报'} · 最大回撤 ${pct(stat.maxDrawdown)}<br>${esc(stat.first||'—')} 至 ${esc(stat.last||'—')}</small></div>`).join('')}</div>`;
+ }
+ function marketReading(key){
+  return {
+   'active-equity':'先看大盘、中盘、小盘指数的涨跌，了解市场风格；再结合最大回撤，判断这段走势经历了多大波动。',
+   'primary-bond':'先看普通债与信用债的表现，再看转债带来的市场变化。债券财富指数包含票息再投资，转债指数展示价格回报；基金的实际表现还取决于仓位和持券。',
+   'secondary-bond':'把普通债、股票和转债分开观察，了解收益来自哪类市场。债券财富指数包含票息再投资，股票和转债展示价格回报；各基金的实际配置比例不同。'
+  }[key]||'';
+ }
  function market(p,key='active-equity'){
   const c=p.contexts[key];if(!c)return note('该类别暂无市场概览。');const end=p.latest_observation,dt=new Date(end+'T00:00:00Z'),prior=new Date(dt);prior.setUTCMonth(prior.getUTCMonth()-3);const start=prior.toISOString().slice(0,10),year=end.slice(0,4)+'-01-01';
   if(key==='convertible-bond')return convertibleMarket(p,start,end,year);
-  const control=(name,value)=>`<label>${name}<input type="date" data-bap-${name==='A开始'?'a-start':name==='A结束'?'a-end':name==='B开始'?'b-start':'b-end'} value="${value}"></label>`;
-  let html=section(c.name,note(c.scope+'。各指数按自身真实截至日展示；当前缓存最长观察日至'+end+'，不代表所有序列均已更新到该日。')+`<div class="bap-controls">${control('A开始',start)}${control('A结束',end)}${control('B开始',year)}${control('B结束',end)}<button type="button" data-bap-window-reset>重置</button></div><div class="bap-market-windows"><div data-bap-market-a>${marketWindow(p,key,start,end,'窗口A')}</div><div data-bap-market-b>${marketWindow(p,key,year,end,'窗口B')}</div></div>`);
-  if(key==='convertible-bond'){
-   const beta=p.convertible_stock_beta,points=beta.series.filter(x=>ok(x[1]));html+=section(beta.label,multiChart([{name:'60个共同观察日β',points:points.map(x=>[x[0],x[1]])}],'转债指数相对中证800历史β')+note('收益区间起止日期逐对一致；至少40个共同观察值。该β是指数收益关系，不是基金持仓、转债Delta或利率久期。'));
-   const s=p.convertible_sample_premium;html+=section(s.label,multiChart([{name:'固定可得样本溢价中位数（%）',points:s.series.map(x=>[x[0],x[1]*100])}],'固定样本转股溢价率')+note(`固定样本${s.sample_size}只，${s.dates}个日期；最新值在自身可得历史中的经验分位 ${pct(s.latest_percentile_in_own_sample_history)}。${s.scope}。`));
-  }
-  return html+section('数据覆盖与更新',note('无可靠成交额、指数估值或全市场转债溢价输入时保持缺项，不用基金池收益替代股票市场。新行情与报告到来后由原更新流程刷新。'));
+  const dateInput=(key,label,value)=>`<label>${label}<input type="date" aria-label="${label}" data-bap-${key} value="${value}"></label>`;
+  return section(c.name,`<p class="bap-market-intro">${esc(marketReading(key))}</p><div class="bap-controls">${dateInput('a-start','观察开始',start)}${dateInput('a-end','观察结束',end)}<button type="button" data-bap-window-reset>近三个月</button></div><div data-bap-market-brief>${marketBrief(p,key,start,end)}</div><p class="bap-market-readout">区间涨跌看这段时间涨了多少、跌了多少；最大回撤看期间从此前高点向下跌得最多的幅度。每项实际起止日期分别标明。</p><div data-bap-market-a>${marketWindow(p,key,start,end,'当前观察区间',true)}</div><details class="bap-comparison"><summary>增加一个对比区间</summary><div class="bap-controls">${dateInput('b-start','对比开始',year)}${dateInput('b-end','对比结束',end)}</div><div data-bap-market-b>${marketWindow(p,key,year,end,'对比区间',true)}</div></details>`)+`<details class="bap-coverage"><summary>指数范围、回报口径与数据覆盖</summary>${note(c.scope+'。各指数按自身真实截至日展示；当前缓存最长观察日至'+end+'，不代表所有序列均已更新到该日。')}${note('只对起止覆盖相近的序列绘制比较图；起止日期、观察数及覆盖状态见各图的区间数据。无可靠成交额、指数估值或全市场转债溢价输入时保持缺项；新行情与报告由原更新流程刷新。')}</details>`;
  }
  function bind(host,p,kind,key){
   if(kind==='features')host.querySelector('[data-bap-feature-period]')?.addEventListener('change',e=>{host.innerHTML=features(p,e.target.value);bind(host,p,kind,key);});
@@ -114,7 +127,7 @@
   if(kind==='ipo'){const draw=()=>{const mode=host.querySelector('[data-bap-ipo-mode]').value,limit=host.querySelector('[data-bap-ipo-count]').value;host.innerHTML=ipo(p,mode,limit);bind(host,p,kind,key);};host.querySelectorAll('[data-bap-ipo-mode],[data-bap-ipo-count]').forEach(x=>x.addEventListener('change',draw));}
   if(kind==='market'){
    bindMarketCharts(host);
-   const draw=()=>{const v=x=>host.querySelector(`[data-bap-${x}]`).value;host.querySelector('[data-bap-market-a]').innerHTML=marketWindow(p,key,v('a-start'),v('a-end'),'观察区间',key==='convertible-bond');host.querySelector('[data-bap-market-b]').innerHTML=marketWindow(p,key,v('b-start'),v('b-end'),'对比区间',key==='convertible-bond');if(key==='convertible-bond'){host.querySelector('[data-bap-cb-summary]').innerHTML=convertibleSummary(p,v('a-start'),v('a-end'));host.querySelector('[data-bap-cb-beta]').innerHTML=convertibleBeta(p,v('a-start'),v('a-end'));}bindMarketCharts(host);};
+   const draw=()=>{const v=x=>host.querySelector(`[data-bap-${x}]`).value;host.querySelector('[data-bap-market-a]').innerHTML=marketWindow(p,key,v('a-start'),v('a-end'),'当前观察区间',true);host.querySelector('[data-bap-market-b]').innerHTML=marketWindow(p,key,v('b-start'),v('b-end'),'对比区间',true);if(key!=='convertible-bond')host.querySelector('[data-bap-market-brief]').innerHTML=marketBrief(p,key,v('a-start'),v('a-end'));if(key==='convertible-bond'){host.querySelector('[data-bap-cb-summary]').innerHTML=convertibleSummary(p,v('a-start'),v('a-end'));host.querySelector('[data-bap-cb-beta]').innerHTML=convertibleBeta(p,v('a-start'),v('a-end'));}bindMarketCharts(host);};
    host.querySelectorAll('input[type=date]').forEach(x=>x.addEventListener('change',draw));host.querySelector('[data-bap-window-reset]')?.addEventListener('click',()=>{host.innerHTML=market(p,key);bind(host,p,kind,key);});
   }
  }

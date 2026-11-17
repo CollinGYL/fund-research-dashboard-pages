@@ -1086,7 +1086,7 @@ function updateListCopy() {
   const title = activeCategory === "all" ? label : `${label}列表`;
   if (dataNotes) dataNotes.hidden = activeCategory !== "all";
   if (dataNotesLink) dataNotesLink.hidden = activeCategory !== "all";
-  if (workspaceTitle) workspaceTitle.textContent = title;
+  if (workspaceTitle) workspaceTitle.textContent = label;
   if (listTitle) listTitle.textContent = title;
   if (listDescription) listDescription.textContent = activeCategory === "active-equity"
     ? `按基金主体合并份额，当前主动权益范围共 ${categoryFunds().length.toLocaleString("zh-CN")} 只；已移除量化策略产品。`
@@ -1329,6 +1329,8 @@ document.querySelectorAll("[data-category]").forEach((button) => button.addEvent
   updateListCopy();
   renderFunds();
 
+  const marketOverview = document.querySelector('#home-market-research');
+  if (marketOverview && !marketOverview.hidden) requestAnimationFrame(() => marketOverview.scrollIntoView({block:'start'}));
   if (activeCategory === "active-equity") {
     requestActiveEquityProfiles();
   }
@@ -1648,9 +1650,9 @@ function updateViewPanels(){
   if (disclosure) {
     disclosure.hidden = !['pure-bond','hybrid-bond','convertible-bond','active-equity'].includes(activeCategory);
     if (!disclosure.hidden && disclosure.dataset.category !== marketKey) {
-      disclosure.dataset.category = marketKey; disclosure.open = false;
+      disclosure.dataset.category = marketKey;
       const title = activeCategory === 'hybrid-bond' && filter.value === 'all' ? '混合债基市场（一级 / 二级）' : marketKey === 'primary-bond' ? '一级债基市场' : marketKey === 'secondary-bond' ? '二级债基市场' : `${CATEGORY_LABELS[activeCategory]}市场`;
-      document.querySelector('#home-market-summary').textContent = `${title} · 展开研究图表`;
+      document.querySelector('#home-market-summary').textContent = `${title}概览`;
       const status = document.querySelector('#home-market-date');
       status.replaceChildren(document.createElement('span'));
       if (window.FundMarketStatus) void FundMarketStatus.mount(status.firstChild, marketKey);
