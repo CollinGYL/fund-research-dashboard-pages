@@ -110,16 +110,16 @@
  }
  function marketReading(key){
   return {
-   'active-equity':'先看大盘、中盘、小盘指数的涨跌，了解市场风格；再结合最大回撤，判断这段走势经历了多大波动。',
+   'active-equity':'先看大盘、中盘、小盘指数的涨跌，了解市场风格；再看最大回撤，了解期间曾经历多深的下跌。',
    'primary-bond':'先看普通债与信用债的表现，再看转债带来的市场变化。债券财富指数包含票息再投资，转债指数展示价格回报；基金的实际表现还取决于仓位和持券。',
-   'secondary-bond':'把普通债、股票和转债分开观察，了解收益来自哪类市场。债券财富指数包含票息再投资，股票和转债展示价格回报；各基金的实际配置比例不同。'
+   'secondary-bond':'把普通债、股票和转债分开观察，了解各类市场的涨跌。债券财富指数包含票息再投资，股票和转债展示价格回报；各基金的实际配置比例不同。'
   }[key]||'';
  }
  function market(p,key='active-equity'){
   const c=p.contexts[key];if(!c)return note('该类别暂无市场概览。');const end=p.latest_observation,dt=new Date(end+'T00:00:00Z'),prior=new Date(dt);prior.setUTCMonth(prior.getUTCMonth()-3);const start=prior.toISOString().slice(0,10),year=end.slice(0,4)+'-01-01';
   if(key==='convertible-bond')return convertibleMarket(p,start,end,year);
   const dateInput=(key,label,value)=>`<label>${label}<input type="date" aria-label="${label}" data-bap-${key} value="${value}"></label>`;
-  return section(c.name,`<p class="bap-market-intro">${esc(marketReading(key))}</p><div class="bap-controls">${dateInput('a-start','观察开始',start)}${dateInput('a-end','观察结束',end)}<button type="button" data-bap-window-reset>近三个月</button></div><div data-bap-market-brief>${marketBrief(p,key,start,end)}</div><p class="bap-market-readout">区间涨跌看这段时间涨了多少、跌了多少；最大回撤看期间从此前高点向下跌得最多的幅度。每项实际起止日期分别标明。</p><div data-bap-market-a>${marketWindow(p,key,start,end,'当前观察区间',true)}</div><details class="bap-comparison"><summary>增加一个对比区间</summary><div class="bap-controls">${dateInput('b-start','对比开始',year)}${dateInput('b-end','对比结束',end)}</div><div data-bap-market-b>${marketWindow(p,key,year,end,'对比区间',true)}</div></details>`)+`<details class="bap-coverage"><summary>指数范围、回报口径与数据覆盖</summary>${note(c.scope+'。各指数按自身真实截至日展示；当前缓存最长观察日至'+end+'，不代表所有序列均已更新到该日。')}${note('只对起止覆盖相近的序列绘制比较图；起止日期、观察数及覆盖状态见各图的区间数据。无可靠成交额、指数估值或全市场转债溢价输入时保持缺项；新行情与报告由原更新流程刷新。')}</details>`;
+  return section(c.name,`<p class="bap-market-intro">${esc(marketReading(key))}</p><div class="bap-controls">${dateInput('a-start','观察开始',start)}${dateInput('a-end','观察结束',end)}<button type="button" data-bap-window-reset>近三个月</button></div><div data-bap-market-brief>${marketBrief(p,key,start,end)}</div><p class="bap-market-readout">区间涨跌看这段时间涨了多少、跌了多少；最大回撤看期间从此前高点向下跌得最多的幅度。每项实际起止日期分别标明。</p><div data-bap-market-a>${marketWindow(p,key,start,end,'当前观察区间',true)}</div><details class="bap-comparison"><summary>增加一个对比区间</summary><div class="bap-controls">${dateInput('b-start','对比开始',year)}${dateInput('b-end','对比结束',end)}</div><div data-bap-market-b>${marketWindow(p,key,year,end,'对比区间',true)}</div></details>`)+`<details class="bap-coverage"><summary>指数范围、回报口径与数据覆盖</summary>${note(c.scope+'。各指数按自身真实截至日展示；当前缓存最长观察日至'+end+'，不代表所有序列均已更新到该日。')}${note('只对起止覆盖相近的序列绘制比较图；起止日期、观察数及覆盖状态见各图的区间数据。无可靠成交额、指数估值或全市场转债溢价输入时保持缺项；新行情与报告由原更新流程刷新。')}${note('价格与财富回报口径分别标明，不据此宣称同风险收益排名。历史指数回看不是完整成分股PIT。')}</details>`;
  }
  function bind(host,p,kind,key){
   if(kind==='features')host.querySelector('[data-bap-feature-period]')?.addEventListener('change',e=>{host.innerHTML=features(p,e.target.value);bind(host,p,kind,key);});

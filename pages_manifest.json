@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-17T18:49:33+08:00",
+  "generatedAt": "2026-11-17T19:01:49+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -121,8 +121,8 @@
       "sha256": "e411ae6613f96e6e81f4675c08cc7c1f98cfbfeeb97864dce1c05f7cbc8d9ae6"
     },
     "desktop-home.css": {
-      "size": 22497,
-      "sha256": "ba75e0f5bccc12827d11e198a45cc03f36323637d674aecddd26fef5e6e46021"
+      "size": 22676,
+      "sha256": "0842ee4862dbe80f89e335223a6a338a55c4058acb3289201a57522512aa6635"
     },
     "desktop-home.js": {
       "size": 6139,
@@ -142,7 +142,7 @@
     },
     "fund.html": {
       "size": 5815,
-      "sha256": "a31b7e32493b2b3efad244e106b4371b3fe2a3592c75674094a2ca64476373ff"
+      "sha256": "9a2ba984ecd8ef8d76101e7c5c813d4b3e98dde558dc64693f6eeb3fe34d705d"
     },
     "fund.js": {
       "size": 685665,
@@ -150,7 +150,7 @@
     },
     "index.html": {
       "size": 14341,
-      "sha256": "5c3f01899f7a64ae912b6f1a15680cc9e16ff110e65b6533b4ea0ad5096b6002"
+      "sha256": "56c5c72619719347fe974e950381c60401aa8448524a3f222ce6ee0bef6905c5"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -213,16 +213,16 @@
       "sha256": "d8ab36c33a2667ca1bac29d3183cbd3c01c91d0d7514090d1ba379f0eeaf7d8b"
     },
     "bond-advanced-pack.js": {
-      "size": 29097,
-      "sha256": "bbef3a414239daec66cd96a54b30b5563c22804da87a96ef2c0cab1393d00f7c"
+      "size": 29225,
+      "sha256": "f189ee5ac0144c152fdfe5f484bf1ea55e557d62988d4fa483a23e3513eb6ba4"
     },
     "bond-advanced-pack.css": {
       "size": 6124,
       "sha256": "eb187fcac89dbdf68128ee83b4e789dc6a3970627146f109a2433525abe4652e"
     },
     "bond-advanced-integration.js": {
-      "size": 5375,
-      "sha256": "1ed82880acb4ba9cb08495114a3924d5bfbda7dae8f592cdab834839d5ddecaf"
+      "size": 5504,
+      "sha256": "4a597f08f709eb5e54dfc9c43cd7f7af4132880a31a27a6258bb5f1356a73497"
     },
     "fund-benchmarks.js": {
       "size": 2938,
