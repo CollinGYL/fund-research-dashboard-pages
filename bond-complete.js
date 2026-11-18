@@ -190,8 +190,13 @@
    return originalRender(fund,...args);
   };
  }
- const historical=()=>/^\d{4}-\d{2}-\d{2}$/.test(new URLSearchParams(root.OFFLINE_PAGE_SEARCH??root.location?.search??'').get('navDate')||'');
- const frozenNote=()=>note('当前查看历史净值。新增债券专题为已保存的披露/行情快照，暂不回填到历史视图；切换“最新”查看完整专题。');
+ const historical=()=>{const q=new URLSearchParams(root.OFFLINE_PAGE_SEARCH??root.location?.search??'');return /^\d{4}-\d{2}-\d{2}$/.test(q.get('navDate')||new URLSearchParams(q.get('list')||'').get('navDate')||'');};
+ const frozenNote=()=>{
+  const q=new URLSearchParams(root.location.search),list=new URLSearchParams(q.get('list')||'');
+  const date=q.get('navDate')||list.get('navDate');
+  q.set('returnNavDate',date);q.set('navDate','latest');
+  return note('当前按 '+esc(date)+' 回看净值，此专题仅提供最新披露。')+'<p><a href="fund.html?'+esc(q.toString())+'">打开最新披露 →</a></p>';
+ };
  createGenericTabLoader=function(fund,detail){
   const base=originalLoader(fund,detail);if(!eligible(fund))return base;
   const done=new Set(),pending=new Map();

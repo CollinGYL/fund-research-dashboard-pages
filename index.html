@@ -8,7 +8,7 @@
     <meta name="referrer" content="no-referrer" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'" />
     <title>财富产品部-基金研究系统看板</title>
-    <link rel="stylesheet" href="styles.css?v=24b8cce6c348" />
+    <link rel="stylesheet" href="styles.css?v=8986fd80984f" />
     <link rel="stylesheet" href="review.css?v=742b9bae8797" />
     <script src="review-core.js?v=eb92f645380f" defer></script>
     <link rel="stylesheet" href="fund-lifecycle.css?v=0650bd1ceefa">
@@ -82,9 +82,12 @@
 
       <section id="home-market-research" class="section-shell home-market-research" hidden aria-labelledby="home-market-summary">
         <div class="home-market-heading"><div><p class="eyebrow">分类市场研究</p><h2 id="home-market-summary">市场概览</h2></div><a class="home-market-list-link" href="#samples">查看基金列表 ↓</a></div>
+        <div id="category-market-content" aria-live="polite"></div>
+        <details id="market-specialist"><summary>更多行情、研究指标与自定义区间</summary>
         <p id="home-market-date" class="home-market-date" role="status">实际数据日期加载中</p>
         <section id="applicable-market-overview" hidden aria-label="分类市场概览"></section>
         <section id="bond-market-overview" class="section-block" hidden></section>
+        </details>
       </section>
 
       <section id="samples" class="section-shell section-block">
@@ -102,6 +105,7 @@
           <span class="toolbar-label">指标视图</span>
           <div class="period-switch decision-view-switch" aria-label="指标视图">
             <button data-view="complete" class="active" aria-pressed="true">完整指标</button>
+            <button data-view="performance" aria-pressed="false">收益与风险</button>
             <button data-view="portfolio" aria-pressed="false">基金最新披露权重</button>
             <button data-view="changes" aria-pressed="false">基金较上期变化</button>
           </div>
@@ -150,7 +154,7 @@
         </div>
 
         <p id="historical-date-note" class="method-note historical-date-note" role="status" hidden></p>
-        <p class="table-scroll-hint">左右滚动查看完整指标 <span aria-hidden="true">↔</span></p>
+        <p class="table-scroll-hint"><span class="hint-desktop">左右滚动查看完整指标</span><span class="hint-mobile">点基金卡片的「更多」查看其余指标</span> <span aria-hidden="true">↔</span></p>
         <div id="table-top-scroll" class="table-top-scroll" tabindex="0" role="region" aria-label="表格顶部横向滚动"><div></div></div>
         <div class="fund-list-wrap" aria-live="polite" tabindex="0" role="region" aria-label="基金指标表，左右滚动查看全部列">
           <table class="fund-list-table">
@@ -196,12 +200,13 @@
     <noscript><p class="section-shell loading-state">请启用 JavaScript 以搜索基金和查看研究数据。</p></noscript>
     <script src="bond-market-comparison.js?v=1988206a24e7" defer></script>
     <script src="research-core.js?v=655e1a9d247c" defer></script>
-    <script src="bond-advanced-pack.js?v=f189ee5ac014" defer></script>
+    <script src="bond-advanced-pack.js?v=1959299b74c4" defer></script>
     <script src="bond-advanced-integration.js?v=4a597f08f709" defer></script>
     <script src="industry-bars.js?v=d7e2104c05da" defer></script>
     <script src="desktop-nav.js?v=9bf2f577b735" defer></script>
     <script src="integration-bootstrap.js?v=6d7b58bcb074" defer></script>
-    <script src="app.js?v=7b173cdb6b6d" defer></script>
+    <script src="category-market.js?v=5ef09c1faf20" defer></script>
+    <script src="app.js?v=b7f708f95874" defer></script>
     <script src="desktop-home.js?v=d46e675f0c53" defer></script>
   <script src="site-integration.js?v=5e28a93ac905" defer></script>
 <script src="profile-integration.js?v=9de56d3b5560" defer></script>

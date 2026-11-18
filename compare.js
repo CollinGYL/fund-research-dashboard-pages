@@ -27,6 +27,17 @@
   const latest=[...dates,...(limit?[limit]:[])].sort()[0],period=$('#compare-period').value;
   return ReviewCore.compare(details,period==='all'?'0000-01-01':FundResearch.monthStart(latest,Number(period)),latest);
  }
+ function disclosureTable(){
+  const limit=cutoff();
+  const value=(n,unit)=>Number.isFinite(n)?(unit==='%'?(100*n).toFixed(2):n.toFixed(2))+unit:'—';
+  const rows=current.map(detail=>{
+    const f=detail.fund, a=(detail.asset_history||[]).filter(row=>!limit || (row.announcement_date && row.announcement_date<=limit && (row.available_at||row.announcement_date).slice(0,10)<=limit)).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
+    const d=f.duration;
+    const canShowDuration=!limit || (d?.report_date && d.report_date<=limit && (detail.asset_history||[]).some(row=>row.date===d.report_date && row.announcement_date && row.announcement_date<=limit && (row.available_at||row.announcement_date).slice(0,10)<=limit));
+    return '<tr><td>'+esc(f.name)+'</td><td>'+esc(a?.date||'—')+'<br><small>公告 '+esc(a?.announcement_date||'—')+'</small></td><td>'+value(a?.stock,'%')+'</td><td>'+value(a?.convertible_bond,'%')+'</td><td>'+value(a?.leverage,' 倍')+'</td><td>'+(canShowDuration?value(d?.value,' 年'):'—')+'<br><small>'+esc(canShowDuration?d?.report_date||'—':'历史可用日未核实')+'</small></td></tr>';
+  });
+  return '<article class="subpanel"><h3>持仓与杠杆披露</h3><p class="method-note">股票和转债占基金净资产。配置与久期分别标明报告期；滑动净值区间只改变收益和回撤。</p><div class="table-scroll"><table class="data-table"><thead><tr><th>基金</th><th>资产报告期</th><th>股票</th><th>转债</th><th>杠杆</th><th>披露久期</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div></article>';
+ }
  function draw(result){
   if(current.length<2)return false;
   result ??= comparison(current);
@@ -51,7 +62,7 @@
       <input id="comparison-start" class="dual-range-start" type="range" min="0" max="${last}" step="1" aria-label="比较区间起点">
       <input id="comparison-end" class="dual-range-end" type="range" min="0" max="${last}" step="1" aria-label="比较区间终点">
       <div class="dual-range-labels"><span data-range-start></span><small>拖动横条中段可平移，拖动两端可缩放</small><span data-range-end></span></div>
-    </div></article><article class="subpanel"><h3>收益相关性</h3><div class="table-scroll" data-comparison-correlation></div>
+    </div></article>${disclosureTable()}<article class="subpanel"><h3>收益相关性</h3><div class="table-scroll" data-comparison-correlation></div>
     <p class="method-note">按两只基金原始净值相邻日期形成收益，仅配对起止日期均相同的区间；至少${ReviewCore.MIN_CORRELATION_RETURNS}个有效配对收益观测。每格 n 为实际收益样本数。</p></article>`;
   const dateStart=$('.nav-window-start'),dateEnd=$('.nav-window-end'),startInput=$('#comparison-start'),endInput=$('#comparison-end');
   const range=$('.nav-dual-range'),track=range.querySelector('.dual-range-track'),handle=track.querySelector('span'),message=$('[data-range-message]');

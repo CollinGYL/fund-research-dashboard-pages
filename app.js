@@ -1037,7 +1037,7 @@ function restoreListQuery() {
   for (const code of (q.get('compare') || '').split(',').slice(0,4)) {
     if (/^\d{6}\.(OF|SH|SZ)$/.test(code) && funds.some(fund => fund.code === code) && FundLifecycle.currentCompareEligible(code)) selectedComparisonCodes.add(code);
   }
-  if (['performance','portfolio','changes','complete'].includes(q.get('view'))) listView=q.get('view')==='performance'?'complete':q.get('view');
+  if (['performance','portfolio','changes','complete'].includes(q.get('view'))) listView=q.get('view');
   if ([10,25,50].includes(Number(q.get('perPage')))) PAGE_SIZE=Number(q.get('perPage'));
   hiddenDecisionColumns=new Set((q.get('columns')||'').split(',').filter(x=>Object.values(DECISION_COLUMNS).flat().some(c=>c[0]===x)));
   if (['1','3','5'].includes(q.get('age'))) ageFilter=q.get('age');
@@ -1377,11 +1377,14 @@ function renderCoverageDates(sourceFunds) {
 function initializeCatalog() {
   if (catalogPromise) return catalogPromise;
   resultCount.textContent = '正在加载基金目录…';
-  const catalogLoading = Promise.all([loadCatalog(), Promise.resolve(window.FundIntegrationReady).then(()=>Promise.resolve(window.FundRankReady).then(()=>FundLifecycle.loadRanks()).catch(error=>{
+  const catalogLoading = Promise.all([loadCatalog(), window.FundIntegrationReady, ensureHomepageHelpers()]).then(([value]) => value);
+  Promise.resolve(window.FundRankReady).then(()=>FundLifecycle.loadRanks()).then(()=>{
+    if(catalog && funds.length) renderFunds();
+  }).catch(error=>{
     console.warn('同类排名暂未载入：'+error.message);
     const slot=document.querySelector('#rank-load-state')||document.createElement('p');slot.id='rank-load-state';slot.className='method-note';slot.textContent='同类排名暂未载入，净值与基金数据照常展示。 ';
     const retry=document.createElement('button');retry.type='button';retry.textContent='重试排名';retry.addEventListener('click',()=>FundLifecycle.loadRanks().then(()=>{slot.remove();renderFunds();}).catch(e=>{slot.firstChild.textContent='同类排名暂未载入：'+e.message+' ';}));slot.append(retry);document.querySelector('.list-toolbar')?.insertAdjacentElement('afterend',slot);
-  })), ensureHomepageHelpers()]).then(([value]) => value);
+  });
   requestClassificationSummary();
   catalogPromise = catalogLoading.then((catalogData) => {
     catalog = catalogData;
@@ -1420,7 +1423,7 @@ function initializeCatalog() {
 initializeCatalog();
 
 const DECISION_COLUMNS = {
-  performance: [['1y','近1年 / 同类位置','return'], ['current_drawdown','当前回撤','decision'], ['risk1y','近1年最大回撤','decision'], ['size','合计规模','decision']],
+  performance: [['1y','近1年 / 同类位置','return'], ['risk1y','近1年最大回撤','decision'], ['size','合计规模','decision'], ['risk_exposure','主要风险暴露']],
   portfolio: [['size','合计规模','decision'], ['exposure','股票 / 转债'], ['industry','主要行业'], ['concentration','前十大 / 杠杆'], ['duration','久期 / 持仓日期']],
   changes: [['size_change','规模变化','decision'], ['stock_change','仓位变化','decision'], ['industry_change','行业变化','decision'], ['entries','完整持仓名单变化']],
 };
@@ -1458,6 +1461,7 @@ function decisionFundRow(fund) {
     current_drawdown: cell(formatPercent(s?.current_drawdown, 2, false, {preserveSmall:true}), FundResearch.finite(s?.current_drawdown) ? (s.current_drawdown < -1e-8 ? `未修复 · 距高点${s.underwater_days}天` : '已修复 / 新高') : '—'),
     risk1y: cell(formatPercent(performanceMetric(fund, '1y', 'drawdown'), 2, false, {preserveSmall:true}), FundResearch.finite(s?.drawdown_top_pct) ? `损失较小前${Math.max(1, Math.ceil(s.drawdown_top_pct * 100))}%` : isHistoricalDate() ? '历史同类排名 —' : '排名待计算'),
     size: cell(formatMoney(a.net_asset), a.report_date || '暂无披露'),
+    risk_exposure: fund.category==='pure-bond' ? cell(FundResearch.finite(fund.duration?.value) ? Number(fund.duration.value).toFixed(2)+' 年' : '—', '披露久期 · '+(fund.duration?.report_date || '—')) : cell(fund.category==='active-equity'?('股票 '+formatPercent(a.stock_weight)):('股票 '+formatPercent(a.stock_weight)+' / 转债 '+formatPercent(a.convertible_bond_weight)), (a.report_date||'—')+' · 占净值'),
     exposure: cell(fund.category==='active-equity'?formatPercent(a.stock_weight):`${formatPercent(a.stock_weight)} / ${formatPercent(a.convertible_bond_weight)}`, `${a.report_date || '—'} · 占净值`),
     industry: IndustryBars.placeholder(fund),
     bond_structure: cell(bondStructureCell(a),`${a.report_date||'—'} · 占净值`),
@@ -1645,10 +1649,17 @@ function managerDates(fund){
 }
 let viewMetricsPromise=null,viewMetricsError=null;
 function updateViewPanels(){
-  const marketKey = activeCategory === 'hybrid-bond' ? (filter.value === 'primary_bond' ? 'primary-bond' : 'secondary-bond') : activeCategory;
+  const marketKey = activeCategory === 'hybrid-bond' ? (filter.value === 'primary_bond' ? 'primary-bond' : filter.value === 'secondary_bond' ? 'secondary-bond' : 'hybrid-bond') : activeCategory;
   const disclosure = document.querySelector('#home-market-research');
   if (disclosure) {
     disclosure.hidden = !['pure-bond','hybrid-bond','convertible-bond','active-equity'].includes(activeCategory);
+    const context = document.querySelector('#category-market-content');
+    if (context && !disclosure.hidden) CategoryMarket.update(context, marketKey, isHistoricalDate() ? chosenNavDate() : '', catalog?.generated_at, value => {
+      filter.value = value;
+      filter.dispatchEvent(new Event('change', {bubbles:true}));
+    });
+    const more = document.querySelector('#market-specialist');
+    if(more) more.hidden = marketKey === 'hybrid-bond' || isHistoricalDate();
     if (!disclosure.hidden && disclosure.dataset.category !== marketKey) {
       disclosure.dataset.category = marketKey;
       const title = activeCategory === 'hybrid-bond' && filter.value === 'all' ? '混合债基市场（一级 / 二级）' : marketKey === 'primary-bond' ? '一级债基市场' : marketKey === 'secondary-bond' ? '二级债基市场' : `${CATEGORY_LABELS[activeCategory]}市场`;
@@ -1668,7 +1679,16 @@ function updateViewPanels(){
 
 function bindFundComparisonSelection() {
   const toolbar=document.querySelector('#pagination-comparison-slot');if(!toolbar)return;
-  for (const code of selectedComparisonCodes) if (!FundLifecycle.currentCompareEligible(code)) selectedComparisonCodes.delete(code);
+  if(activeCategory==='all'){
+    selectedComparisonCodes.clear();
+    toolbar.replaceChildren();
+    grid.querySelectorAll('.fund-compare-select').forEach(label=>label.remove());
+    saveListQuery();return;
+  }
+  for (const code of selectedComparisonCodes) {
+    const fund=funds.find(item=>item.code===code);
+    if(fund?.category!==activeCategory || !FundLifecycle.currentCompareEligible(code)) selectedComparisonCodes.delete(code);
+  }
   if(!toolbar.querySelector('[data-list-compare]')){
     toolbar.insertAdjacentHTML('beforeend','<span class="list-compare-actions" data-list-compare hidden><button type="button" data-list-compare-run disabled>比较已选</button><button type="button" data-list-compare-clear>清空选择</button><span data-list-compare-status role="status"></span></span>');
     toolbar.querySelector('[data-list-compare-run]').addEventListener('click',()=>{if(selectedComparisonCodes.size>=2){const saved=new URLSearchParams(window.location.search);saved.set('scroll',String(Math.round(window.scrollY)));window.location.href='compare.html?codes='+encodeURIComponent([...selectedComparisonCodes].join(','))+'&navDate='+encodeURIComponent(chosenNavDate())+'&list='+encodeURIComponent(saved.toString());}});
@@ -1677,7 +1697,7 @@ function bindFundComparisonSelection() {
   saveListQuery();
   const box=toolbar.querySelector('[data-list-compare]');box.hidden=!selectedComparisonCodes.size;
   const run=box.querySelector('[data-list-compare-run]');run.disabled=selectedComparisonCodes.size<2;run.textContent=`比较已选（${selectedComparisonCodes.size}）`;
-  box.querySelector('[data-list-compare-status]').textContent=selectedComparisonCodes.size===1?'再选1只':selectedComparisonCodes.size===4?'最多4只':'';
+  box.querySelector('[data-list-compare-status]').textContent=[...selectedComparisonCodes].map(code=>funds.find(f=>f.code===code)?.name||code).join('、')+(selectedComparisonCodes.size===1?' · 再选1只':'');
   grid.querySelectorAll('tr[data-fund-code]').forEach(row=>{
     let input=row.querySelector('[data-compare-select]');
     if(!input){

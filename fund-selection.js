@@ -22,6 +22,10 @@ function create(host,library,options={}){
 /* 六类基金风险收益截面，原生SVG，无在线依赖。 */
 let selectionWindow="1y",selectionQuery="",selectionPicked=null,selectionRiskFree=0;
 const selectionHidden=new Set();
+if(root.matchMedia?.('(max-width: 760px)').matches){
+ const own=library.windows[selectionWindow]?.rows.find(row=>row.code===CURRENT.code);
+ if(own) for(const key of Object.keys(library.sectors)) if(key!==own.sector) selectionHidden.add(key);
+}
 const SELECTION_COLORS={"2001010201":"#b85b50","2001010202":"#b89a59","2001010203":"#2c7376","2001010204":"#b5c1ca","2001010303":"#1c3a50","2001010304":"#8ca9a5"};
 function selectionRows(){
  const lib=library;if(!lib)return [];
@@ -74,9 +78,10 @@ function selectionScatter(rows){
  const sharpeVisible=sharpeEnd>sharpeStart;
  if(sharpeVisible)svg+='<line data-selection-sharpe="1" data-risk-free="'+selectionRiskFree+'" data-return-start="'+sharpeStart+'" data-return-end="'+sharpeEnd+'" data-vol-start="'+(sharpeStart-selectionRiskFree)+'" data-vol-end="'+(sharpeEnd-selectionRiskFree)+'" x1="'+X(sharpeStart)+'" y1="'+Y(sharpeStart-selectionRiskFree)+'" x2="'+X(sharpeEnd)+'" y2="'+Y(sharpeEnd-selectionRiskFree)+'" stroke="var(--gold)" stroke-width="2" stroke-dasharray="8 5" pointer-events="none"><title>夏普 = 1；年化无风险利率 '+P(selectionRiskFree,2)+'</title></line>';
  const ordered=[...rows.filter(r=>r.code!==current&&r.code!==selectionPicked),...rows.filter(r=>r.code===current||r.code===selectionPicked)];
+ const tabCode=[selectionPicked,current].find(code=>rows.some(r=>r.code===code))||ordered[0]?.code;
  for(const r of ordered){
   const highlight=r.code===current||r.code===selectionPicked,selected=r.code===selectionPicked;
-  svg+='<circle data-selection-code="'+esc(r.code)+'" data-sector="'+r.sector+'" cx="'+X(r.ann).toFixed(2)+'" cy="'+Y(r.vol).toFixed(2)+'" r="'+(highlight?6:3.4)+'" fill="'+SELECTION_COLORS[r.sector]+'" fill-opacity="'+(highlight?1:.6)+'" stroke="'+(highlight?(selected?'#a43d30':'var(--navy)'):'none')+'" stroke-width="2" tabindex="0" role="button" aria-label="'+esc(r.name+' '+r.code+'，年化收益率'+P(r.ann)+'，年化波动率'+P(r.vol))+'"><title>'+esc(r.name+' '+r.code)+'</title></circle>';
+  svg+='<circle data-selection-code="'+esc(r.code)+'" data-sector="'+r.sector+'" cx="'+X(r.ann).toFixed(2)+'" cy="'+Y(r.vol).toFixed(2)+'" r="'+(highlight?6:3.4)+'" fill="'+SELECTION_COLORS[r.sector]+'" fill-opacity="'+(highlight?1:.6)+'" stroke="'+(highlight?(selected?'#a43d30':'var(--navy)'):'none')+'" stroke-width="2" tabindex="'+(r.code===tabCode?'0':'-1')+'" role="button" aria-label="'+esc(r.name+' '+r.code+'，年化收益率'+P(r.ann)+'，年化波动率'+P(r.vol))+'"><title>'+esc(r.name+' '+r.code)+'</title></circle>';
  }
  svg+='</svg>';
  setTimeout(()=>{
@@ -86,11 +91,15 @@ function selectionScatter(rows){
   root.addEventListener('mousemove',e=>{const node=e.target.closest('[data-selection-code]');if(node)showTT(selectionPointNote(lookup.get(node.dataset.selectionCode)),e);else hideTT();});
   root.addEventListener('mouseleave',hideTT);
   root.addEventListener('click',e=>{const node=e.target.closest('[data-selection-code]');if(node)pick(node.dataset.selectionCode);});
-  root.addEventListener('keydown',e=>{const node=e.target.closest('[data-selection-code]');if(node&&['Enter',' '].includes(e.key)){e.preventDefault();pick(node.dataset.selectionCode);}});
+  root.addEventListener('keydown',e=>{const node=e.target.closest('[data-selection-code]');if(node&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)){
+    e.preventDefault();const points=[...root.querySelectorAll('[data-selection-code]')],i=points.indexOf(node);
+    const next=e.key==='Home'?0:e.key==='End'?points.length-1:i+(['ArrowLeft','ArrowUp'].includes(e.key)?-1:1);
+    node.setAttribute('tabindex','-1');const target=points[Math.max(0,Math.min(next,points.length-1))];target.setAttribute('tabindex','0');target.focus();return;
+  }if(node&&['Enter',' '].includes(e.key)){e.preventDefault();pick(node.dataset.selectionCode);}});
   root.addEventListener('focusin',e=>{const node=e.target.closest('[data-selection-code]');if(node){const rect=node.getBoundingClientRect();showTT(selectionPointNote(lookup.get(node.dataset.selectionCode)),{clientX:rect.left,clientY:rect.top});}});
   root.addEventListener('focusout',hideTT);
  },0);
- return '<div class="chart-wrap selection-scatter">'+svg+'</div><p class="method-note">金色虚线：夏普 = 1。Rf 为年化无风险利率，当前 '+P(selectionRiskFree,2)+'，只影响参考线。'+(sharpeVisible?'':'参考线超出当前坐标范围。')+'描边大点表示当前或选中的基金。</p>';
+ return '<div class="chart-wrap selection-scatter">'+svg+'</div><p class="method-note">金色虚线：夏普 = 1。Rf 为年化无风险利率，当前 '+P(selectionRiskFree,2)+'，只影响参考线。'+(sharpeVisible?'':'参考线超出当前坐标范围。')+'方向键切换基金，回车选定。描边大点表示当前或选中的基金。</p>';
 }
 function selectionBody(){
  const lib=library,p=lib.windows[selectionWindow],rows=selectionRows();
@@ -103,8 +112,8 @@ function selectionBody(){
  '<div class="selection-legends" role="group" aria-label="基金类型筛选">'+legends+'<span class="selection-zero-legend"><i></i>0%收益参考线／横轴圆点</span><button type="button" class="selection-legend" data-selection-reset>显示全部类别</button></div>'+
  '<div class="selection-search"><label>基金搜索 <input id="selectionSearch" type="search" placeholder="输入代码或名称" value="'+esc(selectionQuery)+'" data-selection-query></label><button type="button" data-selection-clear>清空搜索</button></div>'+
  '<div class="selection-sharpe-control"><label for="selectionRiskFree">年化无风险利率（Rf） <input id="selectionRiskFree" type="number" step="any" value="'+Number((selectionRiskFree*100).toPrecision(12))+'" data-selection-rf aria-describedby="selectionRiskFreeStatus"> %</label><span class="selection-sharpe-legend"><i aria-hidden="true"></i>夏普 = 1</span><span id="selectionRiskFreeStatus" role="status" aria-live="polite"></span></div>'+
- '<div id="selectionPlot">'+selectionScatter(rows)+selectionDetail(rows)+'</div>'+
- '<p class="method-note" id="selectionCurrentNote">'+esc(present)+'</p>'+
+ '<a href="#selectionCurrentNote">跳过散点图</a><div id="selectionPlot">'+selectionScatter(rows)+selectionDetail(rows)+'</div>'+
+ '<p class="method-note" id="selectionCurrentNote" tabindex="-1">'+esc(present)+'</p>'+
  '<p class="method-note">本窗口未纳入 '+p.excluded+' 只：区间净值不全或成立不足 '+p.exclusion_reasons["区间端点净值缺失／成立不足"]+' 只，日收益数据不足 '+p.exclusion_reasons["有效日收益覆盖不足95%"]+' 只。缺数不纳入。</p>';
 }
 function refreshSelectionPlot(){

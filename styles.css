@@ -2643,3 +2643,16 @@ body[data-list-view="portfolio"] .industry-filter-heading{min-width:210px}body[d
 @media(min-width:761px) and (max-width:999px) {
   .blue-workbench #panel-assets > .fund-page-metrics:has(> :nth-child(6)) { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
+
+.hint-mobile,.mobile-analysis-menu{display:none}
+#market-specialist>summary{cursor:pointer;font-weight:650;padding:12px 0}
+[data-comparison-metrics] table{width:100%;font-variant-numeric:tabular-nums}
+[data-comparison-metrics] :is(th,td):nth-child(n+2){text-align:right;white-space:nowrap}
+@media(max-width:760px){.hint-desktop{display:none}.hint-mobile,.mobile-analysis-menu{display:block}.mobile-analysis-menu{margin:6px 0 12px}.mobile-analysis-menu summary{cursor:pointer;font-weight:650}.mobile-analysis-menu button{margin:4px;padding:6px}.research-freshness span,.research-decision-metrics small,.method-note,.bap-note{font-size:13px;color:#47594f}}
+
+@media(max-width:760px){
+ body.workbench.warm-workbench .fund-compare-select{min-height:32px;width:max-content;gap:6px;align-items:center;font-size:13px}
+ body.workbench.warm-workbench .fund-compare-select::after{content:'加入比较'}
+ body.workbench.warm-workbench .fund-compare-select:has(input:checked)::after{content:'已选'}
+ body.workbench.warm-workbench .research-decision-metrics small,body.workbench.warm-workbench .research-freshness span{font-size:13px;color:#526158}
+}

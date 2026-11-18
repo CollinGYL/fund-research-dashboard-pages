@@ -36,7 +36,7 @@
   const related=x=>x===true?'是':x===false?'否':typeof x==='string'?esc(x):'—';
   const rows=selected.rows.map(r=>[esc(r.held_fund_code),esc(r.held_fund_name),num(r.quantity_shares),num(r.market_value_cny),pct(r.weight_nav),esc(r.held_fund_manager||'—'),esc(r.operation_type||'—'),related(r.related_party)]);
   const details=aggregateOnly?note('本期原报告只列出基金投资合计，未列逐只明细。'):selected.details_status==='confirmed_zero'?note('本期资产表可核对基金投资为零。'):table(['基金代码','名称','持有份额（份）','公允价值（元）','占净资产','管理人','运作方式','关联方基金'],rows);
-  return body+section('持有基金／ETF明细',content+details+(selected.source_pdf_url?`<p class="bap-note"><a href="${esc(selected.source_pdf_url)}" target="_blank" rel="noopener">查看本期原报告</a></p>`:''));
+  return body+section('持有基金／ETF明细 · '+(aggregateOnly?'仅汇总':scope+' '+selected.rows.length+'项 · 金额覆盖 '+pct(selected.coverage_of_asset_funds)),content+details+(selected.source_pdf_url?`<p class="bap-note"><a href="${esc(selected.source_pdf_url)}" target="_blank" rel="noopener">查看本期原报告</a></p>`:''));
  }
  const lockLabel=x=>({'explicit_no_lock':'原文明确无锁定','explicit_locked_percentage':'原文明确锁定比例','duration_only; colleague_assumes_all_locked':'仅有锁定期限；情景按全部锁定','missing_lock_text; explicit10pct_scenario_only':'锁定文本缺失；情景假设10%','unrecognized_text; explicit10pct_scenario_only':'锁定文本待核；情景假设10%'}[x]||x);
  function ipo(p,mode='strict',limit=50){
