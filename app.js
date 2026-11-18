@@ -1345,6 +1345,21 @@ async function optionalJson(url, fallback) {
   }
 }
 
+let lifecycleRequest = null;
+
+function loadCatalogLifecycle() {
+  const read = () => {
+    const value = window.FUND_LIFECYCLE_DATA;
+    return value?.schema_version === 1 && value.records && value.aliases ? value : null;
+  };
+  if (read()) return Promise.resolve(read());
+  if (!lifecycleRequest) {
+    lifecycleRequest = loadHomepageScript('https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_lifecycle_overlay.js?v=share-search-20261029', '基金存续状态', read)
+      .finally(() => { lifecycleRequest = null; });
+  }
+  return lifecycleRequest;
+}
+
 function loadCatalog() {
   const readPayload = () => {
     const value = window.FUND_DASHBOARD_CATALOG;
@@ -1377,14 +1392,16 @@ function renderCoverageDates(sourceFunds) {
 function initializeCatalog() {
   if (catalogPromise) return catalogPromise;
   resultCount.textContent = '正在加载基金目录…';
-  const catalogLoading = Promise.all([loadCatalog(), window.FundIntegrationReady, ensureHomepageHelpers()]).then(([value]) => value);
-  Promise.resolve(window.FundRankReady).then(()=>FundLifecycle.loadRanks()).then(()=>{
+  const lifecycle = loadCatalogLifecycle();
+  const catalogLoading = Promise.all([loadCatalog(), lifecycle, ensureHomepageHelpers()]).then(([value]) => value);
+  lifecycle.then(() => Promise.resolve(window.FundRankReady).then(()=>FundLifecycle.loadRanks()).then(()=>{
+    document.querySelector('#rank-load-state')?.remove?.();
     if(catalog && funds.length) renderFunds();
   }).catch(error=>{
     console.warn('同类排名暂未载入：'+error.message);
     const slot=document.querySelector('#rank-load-state')||document.createElement('p');slot.id='rank-load-state';slot.className='method-note';slot.textContent='同类排名暂未载入，净值与基金数据照常展示。 ';
     const retry=document.createElement('button');retry.type='button';retry.textContent='重试排名';retry.addEventListener('click',()=>FundLifecycle.loadRanks().then(()=>{slot.remove();renderFunds();}).catch(e=>{slot.firstChild.textContent='同类排名暂未载入：'+e.message+' ';}));slot.append(retry);document.querySelector('.list-toolbar')?.insertAdjacentElement('afterend',slot);
-  });
+  }), () => {}); // The catalog already handles a missing lifecycle file.
   requestClassificationSummary();
   catalogPromise = catalogLoading.then((catalogData) => {
     catalog = catalogData;

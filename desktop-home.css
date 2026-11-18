@@ -263,7 +263,7 @@ body.desktop-home #home-market-research .market-rate-facts span {font-size:11px;
 body.desktop-home #home-market-research .market-reading-guide {font-size:12px;color:#6e655b;line-height:1.8;margin:14px 0;max-width:1000px;}
 body.desktop-home #home-market-research .market-coverage {border-top:1px solid #e5dfd1;padding:12px 0;margin-bottom:14px;font-size:12px;}
 body.desktop-home #home-market-research .market-coverage summary {cursor:pointer;color:#634c35;}
-@media(max-width:760px){body.desktop-home #home-market-research{padding:16px 12px;margin-inline:16px}body.desktop-home .home-market-heading{align-items:flex-start;flex-wrap:wrap;gap:8px}body.desktop-home .home-market-heading h2{font-size:20px}body.desktop-home #home-market-research .market-rate-facts{grid-template-columns:1fr;gap:14px}body.desktop-home #home-market-research .market-rate-facts>div{border:0;padding:0}body.desktop-home #home-market-research .market-rate-facts strong{font-size:26px}}
+@media(max-width:760px){body.desktop-home #home-market-research{padding:16px 12px;margin-inline:0;width:100%}body.desktop-home .home-market-heading{align-items:flex-start;flex-wrap:wrap;gap:8px}body.desktop-home .home-market-heading h2{font-size:20px}body.desktop-home #home-market-research .market-rate-facts{grid-template-columns:1fr;gap:14px}body.desktop-home #home-market-research .market-rate-facts>div{border:0;padding:0}body.desktop-home #home-market-research .market-rate-facts strong{font-size:26px}}
 
 body.desktop-home #home-market-research>#bond-market-overview {padding:0;margin:0;}
 body.desktop-home #home-market-research .market-overview>[data-market-status] {display:none;}

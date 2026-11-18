@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-18T15:29:08+08:00",
+  "generatedAt": "2026-11-18T16:51:12+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "app.js": {
-      "size": 117853,
-      "sha256": "b7f708f95874fd04e29fc110cc7af636a69990802565a3ea94044ecca85f8d7b"
+      "size": 118626,
+      "sha256": "65ef6da34ee3ed4fa320561f49de21f8ea3db0dc86829a914d1af167fbd764f3"
     },
     "bond-cb-fusion.css": {
       "size": 3819,
@@ -121,8 +121,8 @@
       "sha256": "e411ae6613f96e6e81f4675c08cc7c1f98cfbfeeb97864dce1c05f7cbc8d9ae6"
     },
     "desktop-home.css": {
-      "size": 22676,
-      "sha256": "0842ee4862dbe80f89e335223a6a338a55c4058acb3289201a57522512aa6635"
+      "size": 22684,
+      "sha256": "761ec04a893cb7d3088f7bf3408add4dcce6314676152d695e4e4d59278c7042"
     },
     "desktop-home.js": {
       "size": 6139,
@@ -150,15 +150,15 @@
     },
     "index.html": {
       "size": 14806,
-      "sha256": "a8464acc95c326fdde221f223dd474f4cc92f5db51bf156887bfab11e79c3577"
+      "sha256": "4dd42c7acb0dcb7657f987a7975a9378843d2af76188986a5fc54492b90b8f5f"
     },
     "industry-bars.js": {
       "size": 7160,
       "sha256": "d7e2104c05da3ca1c47692af45f0c0d247e04b28948efabaa47de185967b3a6b"
     },
     "integration-bootstrap.js": {
-      "size": 1761,
-      "sha256": "6d7b58bcb0745e81cce6af06f441885f5043e6589bf7910c35a24e2773162b07"
+      "size": 1605,
+      "sha256": "86634e1e03bd6d4c0d5086f8c25d9202137d30445d8b58e1dd276bde7bddb096"
     },
     "profile-integration.js": {
       "size": 5959,
@@ -213,8 +213,8 @@
       "sha256": "d8ab36c33a2667ca1bac29d3183cbd3c01c91d0d7514090d1ba379f0eeaf7d8b"
     },
     "category-market.js": {
-      "size": 37786,
-      "sha256": "5ef09c1faf2040381e8fdca88322be9de2cfd31571d23e62c8b250866f3143d5"
+      "size": 39708,
+      "sha256": "365d48bea0ceb4d7815a492a6e890d718b2f12864ab8f3b48e368a3554901504"
     },
     "bond-advanced-pack.js": {
       "size": 29349,
@@ -250,7 +250,7 @@
     }
   },
   "pathReplacements": {
-    "app.js": 6,
+    "app.js": 7,
     "bond-cb-fusion.js": 1,
     "bond-complete.js": 1,
     "bond-visual-details.js": 0,
