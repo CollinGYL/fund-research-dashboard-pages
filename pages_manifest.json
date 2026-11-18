@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-18T20:46:35+08:00",
+  "generatedAt": "2026-11-18T21:10:38+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -90,7 +90,7 @@
     },
     "bond-original-single.html": {
       "size": 729791,
-      "sha256": "954fc88d2effb50bc7afeb5cad2664db4f9b7a853fd5fa4d2a96a5850aad47fa"
+      "sha256": "b926c9d0822efad54d2cffbba5cbf4d9a7ae4f04945e0242542e8b2a82dca436"
     },
     "bond-research.html": {
       "size": 6254,
@@ -102,15 +102,15 @@
     },
     "compare.html": {
       "size": 4904,
-      "sha256": "b918b33348901d6ef74d49e13eb9be621b7204fbf42cee49aa7f127b54e0dba7"
+      "sha256": "f7bf314cfaafe956a60c7a2e7ca8842032df86ff439802a4a28e03024eef6dc1"
     },
     "compare.js": {
       "size": 15349,
       "sha256": "683a4c1a3dc74daacd73d9930b4a0129cec0b0e299f56a321221faa2783bd2b6"
     },
     "demo-theme.css": {
-      "size": 8124,
-      "sha256": "b3fb7b507103bbd6ae21b97fcfcc44b6b6f0a9dd1c30d0f01ca7411044045210"
+      "size": 8708,
+      "sha256": "6d2c2429f46547bbb1899456afde5d782e7a7fa4030646ce312ca746237ef416"
     },
     "desktop-detail.css": {
       "size": 4510,
@@ -142,15 +142,15 @@
     },
     "fund.html": {
       "size": 5876,
-      "sha256": "1d027c955781315f02d9abaa7199492ddb37e3dc31121ccc4b83938b35809853"
+      "sha256": "6b1c6bde72d5e3fe3604d9f5888a9dfba44e11f112c7a00fa445eb1a1be4e0bd"
     },
     "fund.js": {
-      "size": 686914,
-      "sha256": "cbd8d47faf89cbf9fff02ee30ce937deb0709344ce235144bde3034b68f4d0dd"
+      "size": 687212,
+      "sha256": "3ed92e66e31e06fde0eb5679abe57da61d86979037e5bfce2ff2e109dead8d08"
     },
     "index.html": {
       "size": 14867,
-      "sha256": "fdf9b8872ea300c293e36d31a79e13b562074133e2467a144ca348679370b271"
+      "sha256": "c30c276f9ca3d405e727762b2bcd2406895dc134e37a0d09f995526b2f8f7c38"
     },
     "industry-bars.js": {
       "size": 7619,
@@ -209,8 +209,8 @@
       "sha256": "0f86403a4b81c4f699c4c9dcc3c80b1b724ab8b554a9b6bb1706730c5f92f5bb"
     },
     "warm-ui-repair.css": {
-      "size": 9835,
-      "sha256": "d8ab36c33a2667ca1bac29d3183cbd3c01c91d0d7514090d1ba379f0eeaf7d8b"
+      "size": 9903,
+      "sha256": "b79847a78436ee674750cc3989914b2d864d62f1734efb030e342594b4a5ef0a"
     },
     "category-market.js": {
       "size": 43326,

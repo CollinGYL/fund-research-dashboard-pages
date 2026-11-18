@@ -5,21 +5,28 @@ body.workbench.warm-workbench :is(.method-note,.simulation-chart-description,.ey
 body.workbench.warm-workbench .site-header {height:60px;min-height:60px;background:#fff;border-bottom:1px solid #e3dfd8;box-shadow:none;}
 body.workbench.warm-workbench .local-preview-tag {color:#9b2631;background:#f5e9ea;padding:3px 7px;border-radius:3px;}
 body.workbench.warm-workbench .research-sidebar {border:0;border-bottom:1px solid #e3dfd8;padding:0;}
-body.workbench.warm-workbench .category-tabs {gap:22px;align-items:stretch;min-height:43px;border:0;}
-body.workbench.warm-workbench .category-tabs button,
+body.workbench.warm-workbench .category-tabs {gap:22px;align-items:stretch;min-height:43px;border:0;border-radius:0;}
+body.workbench.warm-workbench .research-sidebar :is(.category-tabs button,.sidebar-links a),
 body.workbench.warm-workbench.decision-detail .fund-tab-nav.all-functions button {
  border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;box-shadow:none!important;
  background:transparent!important;color:#625b55!important;font:inherit!important;font-size:13px!important;
  padding:11px 1px 10px!important;min-height:42px;line-height:20px;font-weight:400!important;
 }
-body.workbench.warm-workbench .category-tabs button:is(.active,[aria-selected="true"]),
 body.workbench.warm-workbench.decision-detail .fund-tab-nav.all-functions button:is(.active,[aria-selected="true"]) {
  background:transparent!important;color:#b01625!important;border-bottom-color:#b01625!important;font-weight:600!important;
 }
-body.workbench.warm-workbench .category-tabs button:hover:not(:disabled),
 body.workbench.warm-workbench.decision-detail .fund-tab-nav.all-functions button:hover:not(:disabled) {
  background:transparent!important;color:#b01625!important;border-bottom-color:#cf9298!important;
 }
+/* All five category entries share the same hover and current-page states. */
+body.workbench.warm-workbench .research-sidebar :is(.category-tabs button,.sidebar-links a):hover {
+ color:#b01625!important;text-decoration:none;
+}
+body.workbench.warm-workbench .research-sidebar :is(.category-tabs button,.sidebar-links a):is(.active,[aria-selected="true"],[aria-current="page"]) {
+ color:#b01625!important;border-bottom-color:#b01625!important;font-weight:600!important;
+}
+body.workbench.warm-workbench .research-metric strong[data-return-direction="up"] {color:#b01625!important;}
+body.workbench.warm-workbench .research-metric strong[data-return-direction="down"] {color:#347466!important;}
 body.workbench.warm-workbench.decision-detail .fund-tab-nav.all-functions {top:60px;gap:23px;padding:0;margin:0 0 16px;border-bottom:1px solid #e3dfd8;background:#fff;}
 body.workbench.warm-workbench .workspace-intro {padding-top:17px;padding-bottom:16px;border:0;border-bottom:1px solid #e3dfd8;margin:0 0 16px;}
 body.workbench.warm-workbench .workspace-intro h1 {font-size:28px;}

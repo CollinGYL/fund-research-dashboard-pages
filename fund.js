@@ -212,8 +212,15 @@ function shares(value) {
   return `${Number(value).toFixed(0)}份`;
 }
 
-function metric(label, value, note = "") {
-  return `<div class="research-metric"><span>${escapeHTML(label)}</span><strong>${escapeHTML(value)}</strong>${note ? `<small>${escapeHTML(note)}</small>` : ""}</div>`;
+function metric(label, value, note = "", returnDirection = "") {
+  const direction = returnDirection ? ` data-return-direction="${returnDirection}"` : "";
+  return `<div class="research-metric"><span>${escapeHTML(label)}</span><strong${direction}>${escapeHTML(value)}</strong>${note ? `<small>${escapeHTML(note)}</small>` : ""}</div>`;
+}
+
+function returnMetric(label, value, digits = 2, note = "") {
+  const display = pct(value, digits, true);
+  const direction = display.startsWith("+") ? "up" : /^[−-]/.test(display) ? "down" : "";
+  return metric(label, display, note, direction);
 }
 
 function hasFullReturnPeriod(fund, key) {
@@ -874,7 +881,7 @@ function renderPerformanceMetricCards(range, points, includeRelative = false, re
     metric('年化波动', stats ? pct(stats.volatility, 2) : '—'),
   ];
   const auxiliary = [
-    metric('年化收益', stats ? pct(stats.annualizedReturn, 2, true) : '—'),
+    returnMetric('年化收益', stats?.annualizedReturn),
     metric('Sharpe', stats ? num(stats.sharpe, 2) : '—', 'Rf=0%/年'),
     metric('Calmar', stats ? num(stats.calmar, 2) : '—'),
   ];
@@ -3230,8 +3237,8 @@ function renderResearchOverview(fund, detail) {
   const annual = performanceStats(year);
   const returnValue = index ? relative.excess_returns?.['1y'] : annual?.cumulative;
   const windowNote = annual ? year[0].date+' 至 '+year.at(-1).date : '可得净值不足完整一年';
-  const tiles = [metric('近1年收益', pct(annual?.cumulative,2,true),windowNote),metric('近1年最大回撤',pct(annual?.maxDrawdown,2,false,{preserveSmall:true}),windowNote),metric('合计规模',money(a.net_asset),(a.report_date||'暂无披露')+' · 较上期'+pct(s?.size_change,1,true))];
-  if(index) tiles.push(metric('近1年超额收益',pct(relative.excess_returns?.['1y'],2,true),'相对跟踪指数'));
+  const tiles = [returnMetric('近1年收益', annual?.cumulative, 2, windowNote),metric('近1年最大回撤',pct(annual?.maxDrawdown,2,false,{preserveSmall:true}),windowNote),metric('合计规模',money(a.net_asset),(a.report_date||'暂无披露')+' · 较上期'+pct(s?.size_change,1,true))];
+  if(index) tiles.push(returnMetric('近1年超额收益', relative.excess_returns?.['1y'], 2, '相对跟踪指数'));
   if (index) tiles.push(metric('跟踪误差 / 信息比率', isFiniteValue(relative.tracking_error) && isFiniteValue(relative.information_ratio) ? `${pct(relative.tracking_error, 1)} / ${num(relative.information_ratio, 2)}` : '待计算', fund.tracking_index || '基准行情缺失'));
   else if (bond) tiles.push(metric('杠杆', isFiniteValue(a.leverage) ? num(a.leverage, 2) + 'x' : '—', `总资产 / 净资产 · ${a.report_date || '暂无披露'}`), metric('最近可得久期', isFiniteValue(fund.duration?.value) ? num(fund.duration.value, 2) + '年' : '—', durationNote));
   else tiles.push(metric('股票仓位', pct(a.stock_weight, 1), `${a.report_date || '暂无披露'} · 较上期${change(s?.stock_change)}`));
@@ -3408,7 +3415,7 @@ function renderFund(fund, summaryData, detailData, analysisData, analysis, fundD
       <dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML(managerNames)}</dd></div><div><dt>合计规模</dt><dd>${money(analysis.latest_net_asset)}</dd></div><div><dt>数据更新</dt><dd>${escapeHTML(analysisData.analysisDate)}</dd></div></dl>
     </section>
     <section class="fund-page-metrics" aria-label="核心指标">
-      ${metric("近1年收益", pct(analysis.period_returns["1y"], 1, true))}${metric("近5年收益", pct(analysis.period_returns["5y"], 1, true))}${metric("五年最大回撤", pct(analysis.performance.max_drawdown, 2, false, {preserveSmall:true}))}${metric("最新股票仓位", pct(analysis.assets.latest.stock_to_nav, 1))}${metric("最新前十大集中度", pct(analysis.latest_top10.summary.top10_weight, 1))}
+      ${returnMetric("近1年收益", analysis.period_returns["1y"], 1)}${returnMetric("近5年收益", analysis.period_returns["5y"], 1)}${metric("五年最大回撤", pct(analysis.performance.max_drawdown, 2, false, {preserveSmall:true}))}${metric("最新股票仓位", pct(analysis.assets.latest.stock_to_nav, 1))}${metric("最新前十大集中度", pct(analysis.latest_top10.summary.top10_weight, 1))}
     </section>
     <nav class="fund-tab-nav" aria-label="基金分析板块" role="tablist">${TAB_ITEMS.map(([id, label], index) => `<button class="${index === 0 ? "active" : ""}" data-tab="${id}" role="tab" aria-selected="${index === 0}">${label}</button>`).join("")}</nav>
     <div class="fund-tab-content">
@@ -7138,7 +7145,7 @@ function renderPureBondReferenceFund(fund, detail, currentDuration) {
   document.body.classList.remove("pure-bond-reference-page");
   const tabs = GENERIC_TABS["pure-bond"];
   const content = Object.fromEntries(tabs.map(([id, label]) => [id, genericTabLoadingPanel(label)]));
-  const overviewMetrics = `${metric("近1年收益", pct(fundPerformanceValue(fund, "1y", "returns"), 1, true))}${metric("近3年收益", pct(fundPerformanceValue(fund, "3y", "returns"), 1, true))}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 2, false, {preserveSmall:true}))}${metric("最新杠杆", isFiniteValue(fund.asset?.leverage) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—")}`;
+  const overviewMetrics = `${returnMetric("近1年收益", fundPerformanceValue(fund, "1y", "returns"), 1)}${returnMetric("近3年收益", fundPerformanceValue(fund, "3y", "returns"), 1)}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 2, false, {preserveSmall:true}))}${metric("最新杠杆", isFiniteValue(fund.asset?.leverage) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—")}`;
   page.innerHTML = `
     <a class="back-link" href="index.html#samples">← 返回基金列表</a>
     <section class="fund-page-hero"><div><p class="eyebrow">${escapeHTML(fund.code)} · ${escapeHTML(fund.category_label)}</p><h1>${escapeHTML(FundResearch.portfolioName?.(fund) || fund.name)}</h1>${sharePresentationNote(fund)}<p class="fund-page-summary">${escapeHTML(fund.subtype)} · ${escapeHTML(fund.fund_company || "")}</p><div class="tag-row"><span class="tag">全量基金目录</span></div></div><dl class="hero-facts"><div><dt>现任经理</dt><dd>${escapeHTML((fund.manager || []).join("、") || "—")}</dd></div><div><dt>合计规模</dt><dd>${money(fund.asset?.net_asset)}</dd></div><div><dt>净值截止</dt><dd>${escapeHTML(fund.performance?.latest_date || "—")}</dd></div></dl></section>
@@ -7403,9 +7410,9 @@ function renderGenericFund(fund, detail, pureBondDuration = null) {
   const relativeMetrics = window.INDEX_ENHANCED_METRICS?.funds?.[fund.code] || fund.relative_metrics || {};
   const overviewMetrics = (() => {
     if (fund.category === "index-enhanced") return `${metric("近1年超额", pct(relativeMetrics.excess_returns?.["1y"], 1, true))}${metric("近3年超额", pct(relativeMetrics.excess_returns?.["3y"], 1, true))}${metric("近1年超额回撤", pct(relativeMetrics.excess_drawdowns?.["1y"], 2, false, {preserveSmall:true}))}${metric("跟踪误差", pct(relativeMetrics.tracking_error, 1))}${metric("信息比率", num(relativeMetrics.information_ratio, 2))}`;
-    if (fund.category === "pure-bond") return `${metric("近1年收益", pct(fundPerformanceValue(fund, "1y", "returns"), 1, true))}${metric("近3年收益", pct(fundPerformanceValue(fund, "3y", "returns"), 1, true))}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 2, false, {preserveSmall:true}))}${metric("最新杠杆", isFiniteValue(fund.asset?.leverage) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—")}`;
-    if (["hybrid-bond", "convertible-bond"].includes(fund.category)) return `${metric("近1年收益", pct(fundPerformanceValue(fund, "1y", "returns"), 1, true))}${metric("近3年收益", pct(fundPerformanceValue(fund, "3y", "returns"), 1, true))}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 2, false, {preserveSmall:true}))}${metric("最新股票仓位", pct(fund.asset?.stock_weight, 1))}${metric("最新转债仓位", pct(fund.asset?.convertible_bond_weight, 1))}`;
-    return `${metric("近1年收益", pct(fundPerformanceValue(fund, "1y", "returns"), 1, true))}${metric("近3年收益", pct(fundPerformanceValue(fund, "3y", "returns"), 1, true))}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 2, false, {preserveSmall:true}))}${metric("最新股票仓位", pct(fund.asset?.stock_weight, 1))}${metric("持仓分析", "按需加载", tabLabels.holdings || "持股分析")}`;
+    if (fund.category === "pure-bond") return `${returnMetric("近1年收益", fundPerformanceValue(fund, "1y", "returns"), 1)}${returnMetric("近3年收益", fundPerformanceValue(fund, "3y", "returns"), 1)}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 2, false, {preserveSmall:true}))}${metric("最新杠杆", isFiniteValue(fund.asset?.leverage) ? `${num(fund.asset.leverage, 2)}x` : "—")}${metric("最新久期", isFiniteValue(fund.duration?.value) ? `${num(fund.duration.value, 2)}年` : "—")}`;
+    if (["hybrid-bond", "convertible-bond"].includes(fund.category)) return `${returnMetric("近1年收益", fundPerformanceValue(fund, "1y", "returns"), 1)}${returnMetric("近3年收益", fundPerformanceValue(fund, "3y", "returns"), 1)}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 2, false, {preserveSmall:true}))}${metric("最新股票仓位", pct(fund.asset?.stock_weight, 1))}${metric("最新转债仓位", pct(fund.asset?.convertible_bond_weight, 1))}`;
+    return `${returnMetric("近1年收益", fundPerformanceValue(fund, "1y", "returns"), 1)}${returnMetric("近3年收益", fundPerformanceValue(fund, "3y", "returns"), 1)}${metric("近1年最大回撤", pct(fundPerformanceValue(fund, "1y", "drawdowns"), 2, false, {preserveSmall:true}))}${metric("最新股票仓位", pct(fund.asset?.stock_weight, 1))}${metric("持仓分析", "按需加载", tabLabels.holdings || "持股分析")}`;
   })();
   const navSource = "基金净值历史基线来自WDS，最新区间由Choice复权净值增量补充";
   page.innerHTML = `
