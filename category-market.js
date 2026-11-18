@@ -133,11 +133,11 @@ function wireMarket(){
 function sectors(){
  const list=Object.entries(w().industries).sort((a,b)=>b[1].ret-a[1].ret),limit=Math.max(...list.map(a=>Math.abs(a[1].ret)))||1;
  const r=([n,o])=>`<button class="sectorrow" data-ind="${esc(n)}" aria-pressed="${industry===n}"><span>${esc(n)}</span><span class="track"><i class="${o.ret<0?'neg':'pos'}" style="width:${Math.abs(o.ret)/limit*49}%"></i></span><strong class="${tint(o.ret)}">${pc(o.ret)}</strong></button>`;
- return box('哪些行业领涨，哪些落后？',`30 个中信一级行业的 A 股等权样本 · ${list.filter(a=>a[1].ret>0).length} 个上涨`,list.slice(0,3).map(r).join('')+'<hr class="rule">'+list.slice(-3).map(r).join('')+`<details id="sectorMore"><summary>展开中间 24 个行业</summary>${list.slice(3,-3).map(r).join('')}</details>`+note('点行业可联动下方走势与基金持仓。行业涨跌按可得成分股等权计算。'));
+ return box('哪些行业收益靠前，哪些靠后？',`30 个中信一级行业的 A 股等权样本 · ${list.filter(a=>a[1].ret>0).length} 个上涨`,list.slice(0,3).map(r).join('')+'<hr class="rule">'+list.slice(-3).map(r).join('')+`<details id="sectorMore"><summary>展开中间 24 个行业</summary>${list.slice(3,-3).map(r).join('')}</details>`+note('点行业可联动下方走势与基金持仓。行业涨跌按可得成分股等权计算。'));
 }
 function equityEvidence(){
  const b=g().bins,n=industry,o=w().industries[n];
- return `<section class="box" id="evidence"><div class="fofhead"><div><div class="kicker">基金持仓</div><h2>涨得靠前和靠后的基金，买了什么？</h2></div><label>查看行业 <select id="chooseInd">${Object.keys(w().industries).sort((a,b)=>a.localeCompare(b,'zh')).map(s=>`<option ${s===n?'selected':''}>${esc(s)}</option>`).join('')}</select></label></div><div class="tip">${esc(n)}股票样本同期 ${pc(o.ret)}。收益前、后两组此前披露的${esc(n)}重仓分别占基金净资产 <b>${pc(b[0].industries[n],false)}</b> 和 <b>${pc(b[4].industries[n],false)}</b>。</div><p class="caption">按全部有效基金区间收益排序。行业占比取组内均值，集中度取组内中位数。持仓报告期 ${w().period}。</p><div class="tablewrap"><table class="smalltbl"><thead><tr><th>收益分组</th><th>收益中位数</th><th>${esc(n)}重仓占比</th><th>前十大集中度</th><th>持仓有效 / 组内只数</th></tr></thead><tbody>${b.map((v,i)=>`<tr><td>${groupLabels[i]}</td><td>${ink(v.mid)}</td><td>${pc(v.industries[n],false)}</td><td>${pc(v.metrics.conc.v,false)}</td><td>${T(v.known)} / ${T(v.n)}</td></tr>`).join('')}</tbody></table></div><details id="stockproof"><summary>两端组最常见的重仓股</summary><div class="two">${[0,4].map(i=>`<div><h3>${groupLabels[i]}</h3>${b[i].common.map(s=>row(esc(s.name),T(s.n)+' / '+T(b[i].known)+' 只持有')).join('')}</div>`).join('')}</div></details><details id="sectortrend"><summary>看${esc(n)}的逐日走势与样本覆盖</summary>${chart([{name:n+'等权样本',points:o.points},idx(large)])}<p class="endnote">各日可得成分股比例最低 ${pc(o.minCoverage,false,1)}。季报只列前十大，未列某行业时仅在披露重仓中计零；基金可能在报告期之后调仓。持仓差异提供核查线索，实际收益贡献还取决于区间持仓和交易。</p></details></section>`;
+ return `<section class="box" id="evidence"><div class="fofhead"><div><div class="kicker">基金持仓</div><h2>收益靠前和靠后的基金，此前重仓什么？</h2></div><label>查看行业 <select id="chooseInd">${Object.keys(w().industries).sort((a,b)=>a.localeCompare(b,'zh')).map(s=>`<option ${s===n?'selected':''}>${esc(s)}</option>`).join('')}</select></label></div><div class="tip">${esc(n)}股票样本同期 ${pc(o.ret)}。收益前、后两组此前披露的${esc(n)}重仓分别占基金净资产 <b>${pc(b[0].industries[n],false)}</b> 和 <b>${pc(b[4].industries[n],false)}</b>。</div><p class="caption">按全部有效基金区间收益排序。行业占比取组内均值，集中度取组内中位数。持仓报告期 ${w().period}。</p><div class="tablewrap"><table class="smalltbl"><thead><tr><th>收益分组</th><th>收益中位数</th><th>${esc(n)}重仓占比</th><th>前十大集中度</th><th>持仓有效 / 组内只数</th></tr></thead><tbody>${b.map((v,i)=>`<tr><td>${groupLabels[i]}</td><td>${ink(v.mid)}</td><td>${pc(v.industries[n],false)}</td><td>${pc(v.metrics.conc.v,false)}</td><td>${T(v.known)} / ${T(v.n)}</td></tr>`).join('')}</tbody></table></div><details id="stockproof"><summary>两端组最常见的重仓股</summary><div class="two">${[0,4].map(i=>`<div><h3>${groupLabels[i]}</h3>${b[i].common.map(s=>row(esc(s.name),T(s.n)+' / '+T(b[i].known)+' 只持有')).join('')}</div>`).join('')}</div></details><details id="sectortrend"><summary>看${esc(n)}的逐日走势与样本覆盖</summary>${chart([{name:n+'等权样本',points:o.points},idx(large)])}<p class="endnote">各日可得成分股比例最低 ${pc(o.minCoverage,false,1)}。季报只列前十大，未列某行业时仅在披露重仓中计零；基金可能在报告期之后调仓。持仓差异提供核查线索，实际收益贡献还取决于区间持仓和交易。</p></details></section>`;
 }
 function subtype(){
  const explain={first:'债券为主，先看普通债底仓与转债带来的波动。',second:'可直接配置股票，除了债券和转债，还要看股市波动。'};
@@ -154,20 +154,20 @@ function debtMarket(){
    if(!d.cbPrice?.every(Boolean)||!d.cbPremium?.every(Boolean))return box('转债价格与溢价','本窗口缺少可核对的期初或期末样本。','');const [p,q]=d.cbPrice,[u,v]=d.cbPremium;return box('转债价格和溢价怎么变？',`有连续行情的固定持券样本 ${v[2]} 只。`,row('价格中位数',p[1].toFixed(2)+' → '+q[1].toFixed(2)+' 元')+row('转股溢价率中位数',pc(u[1],false)+' → '+pc(v[1],false))+row('溢价率变化',pp(v[1]-u[1]))+note('转股溢价表示买入转债比按当日正股价值换股多付的比例。样本按全段行情可得性固定，覆盖范围小于全部上市转债。'));
  }
  const refs=k==='first'?[bonds,cb]:[bonds,cb,large];
- return box(k==='first'?'普通债走稳时，一级债基也稳吗？':'股票、转债的波动传到了基金吗？','对照同一窗口的基金收益分布和市场回报。',row('基金收益中位数',ink(a.mid))+row('中间六成基金的收益',pc(a.lo)+' 至 '+pc(a.hi))+row('获得正收益',T(a.up)+' / '+T(a.n)+' 只')+note(refs.map(c=>idx(c).name+' '+pc(idx(c).ret)).join('，')+'。各基金持有的资产比例会影响净值反应。'));
+ return box(k==='first'?'一级债基与普通债、转债表现如何？':'股票、转债的波动传到了基金吗？','对照同一窗口的基金收益分布和市场回报。',row('基金收益中位数',ink(a.mid))+row('中间六成基金的收益',pc(a.lo)+' 至 '+pc(a.hi))+row('获得正收益',T(a.up)+' / '+T(a.n)+' 只')+note(refs.map(c=>idx(c).name+' '+pc(idx(c).ret)).join('，')+'。各基金持有的资产比例会影响净值反应。'));
 }
 function debtEvidence(){
  const s=g(),b=s.bins;
  const spec=k==='pure'?[['duration','期初估计久期']]:k==='first'?[['conv','转债占净资产']]:[['conv','转债占净资产'],['stock','股票占净资产']];
  const cols=spec.filter(([key])=>b.some(v=>v.metrics[key].n));
- const title={pure:'收益靠前的纯债基金，期初久期有多长？',first:'哪些收益组在期初披露了更多转债？',second:'两端基金的股票和转债暴露差多少？',cb:'转债基金里的相对抗跌组，持仓有什么特点？'}[k];
+ const title={pure:'收益靠前的纯债基金，期初久期有多长？',first:'哪些收益组在期初披露了更多转债？',second:'两端基金的股票和转债暴露差多少？',cb:'不同收益组的转债基金，期初持仓有何差异？'}[k];
  const detail=cols.length?(k==='pure'?'久期为区间起点的净值模型估计，单位为年。':`仓位报告期 ${w().bondPeriod}，按期初可核对的披露统计。`)+' 每项显示组内中位数及有效只数。':`本窗口起点 ${w().start} 。当前样本缺少可核验的同期资产记录，以下展示净值分布。`;
  return box(title,detail,`<div class="tablewrap"><table><thead><tr><th>收益分组</th><th>组内只数</th><th>收益中位数</th>${cols.map(c=>`<th>${c[1]}</th>`).join('')}</tr></thead><tbody>${b.map((v,i)=>`<tr><td>${groupLabels[i]}</td><td>${v.n}</td><td>${ink(v.mid)}</td>${cols.map(([key])=>{const m=v.metrics[key];return `<td>${!m.n?'缺数据':(key==='duration'?m.v.toFixed(2)+' 年':pc(m.v,false))+' · '+m.n+' 只'}</td>`}).join('')}</tr>`).join('')}</tbody></table></div>`+note(k==='pure'?'净值对利率的敏感程度可用于解释不同基金为何涨跌有别。估计久期与实际持仓久期可能有差异。':'缺失仓位不按零处理。覆盖较少的组尤其需要回到单基金报告复核。'));
 }
 function top(){
  let line='',cards='';
   const a=g(),share=a.up/a.n,base=idx(k==='equity'?large:k==='cb'?cb:bonds);
-  line=k==='equity'?`沪深300 ${pc(base.ret)}，中证1000 ${pc(idx(small).ret)}。主动权益基金中，${share<.5?'只有':'有'} ${pc(share,false,1)} 取得正收益。`:k==='pure'?`普通债市场 ${pc(base.ret)}。${T(a.n)} 只可比纯债基金中，${T(a.up)} 只取得正收益。`:k==='cb'?`中证转债 ${pc(base.ret)}，同期中证800 ${pc(idx('000906.SH').ret)}。${T(a.n)} 只可比转债基金中，${T(a.up)} 只取得正收益。`:`普通债市场 ${pc(base.ret)}，转债市场 ${pc(idx(cb).ret)}。${funds[k]}的收益中位数为 ${pc(a.mid)}。`;
+  line=k==='equity'?`沪深300 ${pc(base.ret)}，中证1000 ${pc(idx(small).ret)}。同期 ${T(a.n)} 只可比主动权益基金中，${T(a.up)} 只取得正收益，占 ${pc(share,false,1)}。`:k==='pure'?`普通债市场 ${pc(base.ret)}。${T(a.n)} 只可比纯债基金中，${T(a.up)} 只取得正收益。`:k==='cb'?`中证转债 ${pc(base.ret)}，同期中证800 ${pc(idx('000906.SH').ret)}。${T(a.n)} 只可比转债基金中，${T(a.up)} 只取得正收益。`:`普通债市场 ${pc(base.ret)}，转债市场 ${pc(idx(cb).ret)}。${funds[k]}的收益中位数为 ${pc(a.mid)}。`;
   cards=card('同类基金收益中位数',pc(a.mid),`有效 ${T(a.n)} / ${T(a.total)} 只`,tint(a.mid))+card('正收益基金占比',pc(share,false,1),`${T(a.up)} 只取得正收益`)+card('中间六成基金的收益',`<span class="range">${pc(a.lo)} <em>至</em> ${pc(a.hi)}</span>`,'排除两端各 20% 后的范围');
  return `<p class="summary">${line}</p><div class="cards">${cards}</div>`;
 }
@@ -203,7 +203,8 @@ function draw(){
  $('#mixed-nav').hidden=!mixed();
  $('#mixed-nav').innerHTML=mixed()?['hybrid','first','second'].map(id=>`<button data-sub="${id}" aria-pressed="${k===id}">${id==='hybrid'?'两类总览':names[id]}</button>`).join(''):'';
  root.querySelector('.seg').innerHTML=Object.entries({'1w':'近一周','1m':'近一月','3m':'近三月'}).map(([id,label])=>`<button data-win="${id}" aria-pressed="${id===period}">${label}</button>`).join('');
- $('#title').textContent=k==='hybrid'?'混合债基 · 选择研究类别':funds[k]+'市场概览';$('#dates').textContent=d.start+' 至 '+data.end;
+ $('#title').textContent=k==='hybrid'?'混合债基 · 选择研究类别':funds[k]+'市场概览';const catalogDate=window.FUND_DASHBOARD_CATALOG?.as_of || data.asof;
+ $('#dates').textContent=d.start+' 至 '+data.end+(catalogDate>data.end?' · 目录截至 '+catalogDate+'，概览等待同期数据':'');
  if(k==='hybrid'){
    $('#body').innerHTML=searchBox()+subtype()+market()+methods();
  }else{
