@@ -195,6 +195,30 @@ function showSearch(query){
  const diff=r[2]-g().mid;
  out.innerHTML=`<strong>${esc(r[1])}</strong> · ${esc(r[0])}　区间收益 ${ink(r[2])}，位于<strong>${groupLabels[r[3]]}</strong>。比${funds[k]}中位数${diff>=0?'高':'低'} ${Math.abs(diff*100).toFixed(2)} 个百分点。${r[4]?.length?`<br>${w().period} 披露重仓中，占净资产较高的行业为 ${r[4].map(([n,v])=>esc(n)+' '+pc(v,false)).join('、')}。`:''} <a href="fund.html?code=${encodeURIComponent(r[0])}">查看基金详情 →</a>`;
 }
+function modelOverview(){
+ const equity=k==='equity', win=w();
+ if(!(equity?win.equityModels:win.bondModels))return '';
+ const e=win.equityModels, bond=win.bondModels;
+ const table=(headers,rows)=>`<div class="tablewrap" tabindex="0" aria-label="可横向滚动的数据表"><table><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(cells=>`<tr>${cells.map(cell=>`<td>${cell}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+ const unit=v=>valid(v)?v.toFixed(2)+' 年':'—';
+ const scope=(win.bondPeriod||'暂无')+' 报告期、期初已知净资产加权。当前目录回看，两端使用同一组基金。';
+ const periods=data.disclosureEvidence?.periods || [];
+ const backtest=periods.length?`<details><summary>估算与实际披露相差多少？（至 ${esc(periods.at(-1).date)}）</summary>${equity?
+  table(['报告期','配对基金','全市场配置偏差','单只平均偏差'],periods.slice().reverse().map(v=>[esc(v.date),T(v.equityN),v.totalVariation.toFixed(2)+' 个百分点',v.fundMean.toFixed(2)+' 个百分点'])):
+  table(['报告期','原报告复核只数','久期偏差','扩展字段只数','扩展字段偏差'],periods.slice().reverse().map(v=>[esc(v.date),T(v.bondN),unit(v.bondBias),T(v.extendedN),unit(v.extendedBias)]))}
+  ${note(equity?'30 个已映射 A 股行业权重归一后，与半年报或年报完整持仓比较。配置偏差为各行业权重差绝对值之和的一半。市场汇总会抵消不同基金的偏差。':'偏差为模型估算减披露参照，以年计。原报告组核过双向利率敏感性；扩展组含仅有披露参考字段的基金。样本较少时，市场代表性有限。')}${note('历史核验采用当期可配对样本及同一组规模权重，可能遗漏已退出目录的基金。')}</details>`:'';
+ if(equity){
+  const rows=e.rows.map(x=>[esc(x.name),pc(x.start,false),pc(x.end,false),pp(x.passive),pp(x.residual),pp(x.total)]);
+  const leaders=e.rows.slice(0,3).map(r=>esc(r.name)+' '+pc(r.end,false)).join('、');
+  return box('主动权益基金的行业配置怎样变化？',leaders?'期末模型估计占比前三为'+leaders+'。':'本窗口缺少两端均可核验的模型样本。',
+   row('两端模型及规模齐全',T(e.n)+' / '+T(e.pool)+' 只')+
+   (rows.length?`<details><summary>查看全部 ${rows.length} 个行业</summary>${table(['中信一级行业','期初','期末','价格推动','剩余变化','总变化'],rows)}</details>`:'')+
+   note(scope+' 占比以已映射的 A 股行业为分母。价格推动按期初持仓随行业行情漂移估算，剩余变化含模型误差，无法据此确认基金买卖。')+backtest);
+ }
+ return box('纯债基金的久期拉长还是缩短？',scope,
+   table(['基金范围','期初久期','期末久期','变化','有效 / 候选'],bond.map(r=>[esc(r.type),unit(r.start),unit(r.end),unit(valid(r.start)&&valid(r.end)?r.end-r.start:null),T(r.n)+' / '+T(r.pool)]))+
+   note('久期越长，利率变动对净值的影响通常越大。数值来自每日净值模型，缺少规模或任一端估算的基金不参与均值。')+backtest);
+}
 function methods(){
  return `<details><summary>数据来源、样本与计算方法</summary><p class="detailscopy">目录截至 ${data.asof}。使用正式站当前可见且有效的代表份额，按产品 ID 去重。区间首尾都要有本基金的有效复权净值，缺一天即排除，不按零收益补齐。各基金等权，当前名单回看，含存续偏差。分组按收益从高到低均分五组，同收益按代码排序；中间六成显示第20与第80百分位。</p><p class="detailscopy">市场使用本站行情缓存。股票指数为价格涨跌，普通债为财富回报；恒生指数按港元。行业按历史中信一级行业归属，逐日对有复权行情的 A 股等权后复利。季报行业统计仅覆盖披露重仓股，以基金净资产为分母；已披露组内按基金等权。本窗口权益重仓报告期 ${w().period}，债券基金仓位报告期 ${w().bondPeriod}。按期初已公告或已入库数据统计。持仓、市场行情与净值均来自本项目，股票仓位只在适用的分组研究中出现。</p></details>`;
 }
@@ -210,7 +234,7 @@ function draw(){
  }else{
    const companion=k==='equity'?sectors():debtMarket();
    const list='';
-   $('#body').innerHTML=top()+searchBox()+`<div class="grid">${market()}${companion}</div>`+(k==='equity'?equityEvidence():debtEvidence())+list+methods();
+   $('#body').innerHTML=top()+searchBox()+`<div class="grid">${market()}${companion}</div>`+(k==='equity'?equityEvidence():debtEvidence())+((k==='equity'||k==='pure')?modelOverview():'')+list+methods();
  }
  wireMarket();
  if(chosen){$('#lookup').value=chosen;showSearch(chosen);}

@@ -46,9 +46,11 @@
   let left=q.get('compareStart')?days.findIndex(d=>d>=q.get('compareStart')):0;
   let right=q.get('compareEnd')?days.findLastIndex(d=>d<=q.get('compareEnd')):last;
   if(left<0||right<=left){left=0;right=last;}
+  const fundTypes=new Map(current.map(d=>[d.fund?.code || d.code,d.fund?.subtype || d.fund?.category_label || '分类待核']));
+  const mixedTypes=new Set(fundTypes.values()).size>1;
   const notices=current.filter(d=>FundLifecycle.exitEvent(d.fund||d.code)).map(d=>FundLifecycle.notice(d.fund||d.code)).join('');
   output.innerHTML=notices+`<article class="subpanel comparison-summary"><h3>区间结果</h3>
-    <p data-common-dates></p><div class="table-scroll" data-comparison-metrics></div>
+    <p data-common-dates></p>${mixedTypes?'<p class="method-note">所选基金分类不同。比较收益和回撤时，请同时核对各自的投资范围。</p>':''}<div class="table-scroll" data-comparison-metrics></div>
     <p class="method-note">两端采用共同净值日。每只基金的收益和最大回撤使用这段时间内自身全部有效复权净值。峰谷为最大回撤对应的高点和低点。</p></article>
     <article class="subpanel unified-performance-chart"><div class="subpanel-heading"><h3>同区间净值表现</h3></div>
     <div class="performance-date-range">
@@ -82,7 +84,7 @@
     const first=days[left],end=days[right];
     const series=result.series.map(r=>({...r,...ReviewCore.navWindow(r.nav,first,end)}));
     $('[data-common-dates]').textContent=`${first}—${end} · ${right-left+1} 个共同净值日${cutoff()?' · 净值截止 '+cutoff():''}`;
-    $('[data-comparison-metrics]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th><th>区间收益</th><th>最大回撤</th><th>回撤峰谷日期</th><th>有效净值日</th></tr></thead><tbody>${series.map(r=>`<tr><td><a href="${esc(detailLink(r.code))}">${esc(r.name)} <small>${esc(r.code)}</small></a></td><td>${signedPercent(r.stats.return)}</td><td>${signedPercent(r.stats.drawdown,true)}</td><td>${r.peakDate?r.peakDate+' → '+r.troughDate:'区间内无回撤'}</td><td>${r.rows.length}</td></tr>`).join('')}</tbody></table>`;
+    $('[data-comparison-metrics]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th><th>区间收益</th><th>最大回撤</th><th>回撤峰谷日期</th><th>有效净值日</th></tr></thead><tbody>${series.map(r=>`<tr><td><a href="${esc(detailLink(r.code))}">${esc(r.name)} <small>${esc(r.code)} · ${esc(fundTypes.get(r.code))}</small></a></td><td>${signedPercent(r.stats.return)}</td><td>${signedPercent(r.stats.drawdown,true)}</td><td>${r.peakDate?r.peakDate+' → '+r.troughDate:'区间内无回撤'}</td><td>${r.rows.length}</td></tr>`).join('')}</tbody></table>`;
     FundMarket.chart($('[data-compare-chart]'),series.map((r,i)=>({label:r.name||r.code,unit:'%',color:colors[i],points:r.rows.map(([day,v])=>[day,(v/r.rows[0][1]-1)*100])})));
     const matrix=series.map(()=>[]);
     for(let i=0;i<series.length;i++)for(let j=i;j<series.length;j++){

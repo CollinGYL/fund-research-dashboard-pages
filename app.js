@@ -169,7 +169,7 @@ function renderHistoricalNote() {
   note.hidden = !isHistoricalDate();
   if (note.hidden) { note.textContent = ''; return; }
   if (hasJointPerformanceFilters()) {
-    note.textContent = `净值截止 ${navDateScope}已保留。收益/回撤联合条件在历史日尚未应用；清除这两项条件后，按页读取历史净值。规模、持仓和资产配置仍按各自披露日。`;
+    note.textContent = `净值截止 ${navDateScope}已保留。收益/回撤联合条件在历史日尚未应用；清除这两项条件后，按页读取历史净值。基金范围来自当前目录，规模和持仓沿用页面标注的披露日。`;
     return;
   }
   const results = historicalNavCache.get(navDateScope) || {};
@@ -1520,7 +1520,7 @@ function renderDecisionControls() {
     <label>收益与回撤区间<select id="joint-filter-period"${isHistoricalDate()?' disabled':''}>${[...PERIOD_SETS.short,...PERIOD_SETS.long.filter(([key])=>key!=='1y'),['ytd','今年以来']].map(([key,label])=>`<option value="${key}"${jointFilterPeriod===key?' selected':''}>${label}</option>`).join('')}</select></label>
     <label>收益至少（%）<input id="joint-min-return"${isHistoricalDate()?' disabled':''} type="number" step="any" inputmode="decimal" value="${escapeHtml(minimumReturnFilter)}" placeholder="不限"></label>
     <label>最大回撤不超过（%）<input id="joint-max-drawdown"${isHistoricalDate()?' disabled':''} type="number" step="any" min="0" inputmode="decimal" value="${escapeHtml(maximumDrawdownFilter)}" placeholder="不限"></label>
-    <label>合计规模<select id="joint-size-filter">${FUND_SIZE_FILTERS.map(([key,label])=>`<option value="${key}"${fundSizeFilterState===key?' selected':''}>${label}</option>`).join('')}</select></label>
+    <label>${isHistoricalDate()?'合计规模（最新披露）':'合计规模'}<select id="joint-size-filter">${FUND_SIZE_FILTERS.map(([key,label])=>`<option value="${key}"${fundSizeFilterState===key?' selected':''}>${label}</option>`).join('')}</select></label>
     <p>${isHistoricalDate()?'历史净值仅按页读取，收益/回撤条件暂不可用；请恢复最新日期后使用。':''}条件同时生效；回撤输入损失幅度（如5表示不超过5%）。缺失或区间不足不会当作0。收益与回撤采用净值截止日；规模采用各基金披露日。</p>
     <button type="button" data-clear-joint-performance>清除收益 / 回撤条件</button>
     </div></details>
