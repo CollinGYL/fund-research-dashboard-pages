@@ -219,20 +219,38 @@
     }).catch(e=>{promise=null;throw e;});
     return promise;
   }
-  function chart(host,series,{dual=false,rightUnit=null}={}){
+  const chartObservers=new WeakMap();
+  function chart(host,series,options={}){
+    chartObservers.get(host)?.disconnect();
+    let width=-1;
+    function draw(){
+      const next=Math.round(host.getBoundingClientRect().width);
+      if(next===width || (next===0 && width>0))return;
+      width=next;
+      drawChart(host,series,options,width||920);
+    }
+    draw();
+    if(typeof ResizeObserver==='function'){
+      const observer=new ResizeObserver(draw);
+      chartObservers.set(host,observer);
+      observer.observe(host);
+    }
+  }
+  function drawChart(host,series,{dual=false,rightUnit=null,comparison=false}={},width){
     series=series.map((s,i)=>({...s,axis:dual?(s.axis??Math.min(i,1)):0})).filter(s=>s.points.some(p=>Number.isFinite(p[1])));
     dual=dual&&series.some(s=>s.axis===0)&&series.some(s=>s.axis===1);
     if(!dual)series=series.map(s=>({...s,axis:0}));
     const points=series.flatMap(s=>s.points).filter(p=>Number.isFinite(p[1]));
     if(!points.length){host.innerHTML='<p class="method-note">暂无可用曲线。</p>';return;}
-    const W=Math.max(360,Math.min(920,Math.round(host.getBoundingClientRect().width||920))),H=235,L=54,R=dual?54:18,T=24,B=34;
+    const W=Math.max(180,Math.min(1200,width)), narrow=W<520;
+    const H=narrow?220:260,L=narrow&&!dual?42:54,R=dual?54:14,T=23,B=31;
     const days=[...new Set(points.map(p=>p[0]))].sort(),x0=Date.parse(days[0]),x1=Date.parse(days.at(-1));
     const X=d=>L+(Date.parse(d)-x0)/(x1-x0||1)*(W-L-R);
     const scales=(dual?[0,1]:[0]).map(axis=>{
       const v=series.filter(s=>s.axis===axis).flatMap(s=>s.points).map(p=>p[1]).filter(Number.isFinite);const a=root.ReviewCore.scale(v);return [a.min,a.max];
     });
     const tickDigits=scales.map(([min,max])=>Math.min(12,Math.max(2,Math.ceil(-Math.log10(Math.abs((max-min)/4)||1))+1)));
-    const tickLabel=(value,axis)=>{const rounded=Number(value.toFixed(tickDigits[axis]));return (rounded===0?0:rounded).toFixed(tickDigits[axis]);};
+    const tickLabel=(value,axis)=>{const rounded=Number(value.toFixed(tickDigits[axis]));return comparison?String(rounded===0?0:rounded):(rounded===0?0:rounded).toFixed(tickDigits[axis]);};
     const Y=(v,i)=>T+(1-(v-scales[i][0])/(scales[i][1]-scales[i][0]))*(H-T-B);
     let svg=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(series.map(s=>s.label).join('与'))}" tabindex="0">`;
     for(let i=0;i<=4;i++){
@@ -243,17 +261,25 @@
     svg+=`<text x="${L}" y="14">${esc(series[0].unit)}</text>${dual?`<text x="${W-R}" y="14" text-anchor="end">${esc(rightUnit||series.find(s=>s.axis===1).unit)}</text>`:''}`;
     const dateTicks=Math.min(days.length,W<600?3:5);
     const dateIndexes=[...new Set(Array.from({length:dateTicks},(_,i)=>Math.round((days.length-1)*i/Math.max(1,dateTicks-1))))];
-    dateIndexes.forEach((n,i)=>{const d=days[n];svg+=`<text x="${X(d)}" y="${H-9}" text-anchor="${i===0?'start':i===dateIndexes.length-1?'end':'middle'}">${esc(d)}</text>`;});
+    dateIndexes.forEach((n,i)=>{const d=days[n];svg+=`<text x="${X(d)}" y="${H-9}" text-anchor="${i===0?'start':i===dateIndexes.length-1?'end':'middle'}">${esc(narrow?d.slice(2).replaceAll('-','/'):d)}</text>`;});
     series.forEach((s,i)=>{let path='',last=null;s.points.forEach(([d,v])=>{
       if(!Number.isFinite(v)){last=null;return;}const gap=last&&(Date.parse(d)-Date.parse(last)>12*86400000);
       path+=`${last&&!gap?'L':'M'}${X(d).toFixed(2)},${Y(v,s.axis).toFixed(2)} `;last=d;
-    });svg+=`<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2"/>`;});
+    });svg+=`<path d="${path}" fill="none" stroke="${s.color}" stroke-width="2"${s.dashed?' stroke-dasharray="5 3"':''} vector-effect="non-scaling-stroke"/>`;});
     svg+=`<line data-cursor y1="${T}" y2="${H-B}" stroke="#8497a9" stroke-dasharray="3 3" visibility="hidden"/></svg>`;
-    host.innerHTML=`<div class="market-chart">${svg}<div class="market-tooltip" role="status"></div></div><div class="market-chart-legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.label)}${dual?' · '+esc(s.unit):''}</span>`).join('')}</div>`;
+    host.innerHTML=`<div class="market-chart">${svg}<div class="market-tooltip" role="status"></div></div>${comparison?'':`<div class="market-chart-legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.label)}${dual?' · '+esc(s.unit):''}</span>`).join('')}</div>`}`;
     const graphic=host.querySelector('svg'),tip=host.querySelector('.market-tooltip'),cursor=host.querySelector('[data-cursor]');
     const maps=series.map(s=>new Map(s.points.map(p=>[p[0],p])));let pos=days.length-1;
-    const show=i=>{pos=Math.max(0,Math.min(days.length-1,i));const day=days[pos];cursor.setAttribute('x1',X(day));cursor.setAttribute('x2',X(day));cursor.setAttribute('visibility','visible');tip.innerHTML=`<b>${esc(day)}</b> `+series.map((s,j)=>{const p=maps[j].get(day);return `<span>${esc(s.label)} ${fmt(Number.isFinite(p?.[1])?p[1]*(s.displayScale||1):null)}${esc(s.unit)}${p?.[2]!=null?' · '+p[2]+'只':''}</span>`;}).join('');};
-    graphic.addEventListener('pointermove',e=>{const r=graphic.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,time=x0+(x-L)/(W-L-R)*(x1-x0);let lo=0,hi=days.length-1;while(lo<hi){const m=(lo+hi)>>1;Date.parse(days[m])<time?lo=m+1:hi=m;}if(lo&&Math.abs(Date.parse(days[lo-1])-time)<Math.abs(Date.parse(days[lo])-time))lo--;show(lo);});
+    const show=i=>{pos=Math.max(0,Math.min(days.length-1,i));const day=days[pos];cursor.setAttribute('x1',X(day));cursor.setAttribute('x2',X(day));cursor.setAttribute('visibility','visible');tip.innerHTML=`<b>${esc(day)}</b> `+series.map((s,j)=>{const p=maps[j].get(day);
+      if(comparison){
+        const value=p?.[1], numeric=Number.isFinite(value);
+        const label=numeric?`${value>0?'+':''}${fmt(value)}${esc(s.unit)}`:'—';
+        return `<span class="compare-reading"><i aria-hidden="true" style="border-color:${s.color};border-top-style:${s.dashed?'dashed':'solid'}"></i><span>${esc(s.label)}</span><b>${label}</b></span>`;
+      }
+      return `<span>${esc(s.label)} ${fmt(Number.isFinite(p?.[1])?p[1]*(s.displayScale||1):null)}${esc(s.unit)}${p?.[2]!=null?' · '+p[2]+'只':''}</span>`;}).join('');};
+    const locate=e=>{const r=graphic.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*W,time=x0+(x-L)/(W-L-R)*(x1-x0);let lo=0,hi=days.length-1;while(lo<hi){const m=(lo+hi)>>1;Date.parse(days[m])<time?lo=m+1:hi=m;}if(lo&&Math.abs(Date.parse(days[lo-1])-time)<Math.abs(Date.parse(days[lo])-time))lo--;show(lo);};
+    graphic.addEventListener('pointermove',locate);
+    graphic.addEventListener('pointerdown',locate);
     graphic.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();show(e.key==='Home'?0:e.key==='End'?days.length-1:pos+(e.key==='ArrowLeft'?-1:1));}});
     show(pos);
   }

@@ -1,7 +1,7 @@
 (function(){
  'use strict';
  const $=s=>document.querySelector(s),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const codes=$('#compare-codes'),output=$('#comparison-result'),status=$('#compare-status'),colors=['#B01625','#B98B4F','#496675','#347466'];
+ const codes=$('#compare-codes'),output=$('#comparison-result'),status=$('#compare-status'),colors=['#436477','#966120','#755381','#347466'];
  const cache=new Map();let current=[],requestVersion=0,selectedCodes=[],selectedMode='current';
  const parameters=()=>new URL(location.href).searchParams;
  function cutoff(){const q=parameters(),value=q.get('navDate') || new URLSearchParams(q.get('list')||'').get('navDate');return FundLifecycle.validDate(value)?value:null;}
@@ -85,7 +85,7 @@
     const series=result.series.map(r=>({...r,...ReviewCore.navWindow(r.nav,first,end)}));
     $('[data-common-dates]').textContent=`${first}—${end} · ${right-left+1} 个共同净值日${cutoff()?' · 净值截止 '+cutoff():''}`;
     $('[data-comparison-metrics]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th><th>区间收益</th><th>最大回撤</th><th>回撤峰谷日期</th><th>有效净值日</th></tr></thead><tbody>${series.map(r=>`<tr><td><a href="${esc(detailLink(r.code))}">${esc(r.name)} <small>${esc(r.code)} · ${esc(fundTypes.get(r.code))}</small></a></td><td>${signedPercent(r.stats.return)}</td><td>${signedPercent(r.stats.drawdown,true)}</td><td>${r.peakDate?r.peakDate+' → '+r.troughDate:'区间内无回撤'}</td><td>${r.rows.length}</td></tr>`).join('')}</tbody></table>`;
-    FundMarket.chart($('[data-compare-chart]'),series.map((r,i)=>({label:r.name||r.code,unit:'%',color:colors[i],points:r.rows.map(([day,v])=>[day,(v/r.rows[0][1]-1)*100])})));
+    FundMarket.chart($('[data-compare-chart]'),series.map((r,i)=>({label:r.name||r.code,unit:'%',color:colors[i],dashed:i%2===1,points:r.rows.map(([day,v])=>[day,(v/r.rows[0][1]-1)*100])})),{comparison:true});
     const matrix=series.map(()=>[]);
     for(let i=0;i<series.length;i++)for(let j=i;j<series.length;j++){
       matrix[i][j]=matrix[j][i]=ReviewCore.pairedNavCorrelation(series[i].rows,series[j].rows,first,end);

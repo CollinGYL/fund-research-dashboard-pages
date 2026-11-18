@@ -1,0 +1,30 @@
+/* A named layer keeps the shared text rules above legacy unlayered !important declarations. */
+@layer dashboard-typography {
+  :root {
+    --dashboard-font: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    --dashboard-section-size: clamp(19px, 2vw, 22px);
+    --dashboard-card-size: 18px;
+  }
+  :where(html, body, body *) {
+    font-family: var(--dashboard-font) !important;
+  }
+  :where(input, button, select, textarea)::placeholder { font-family: inherit !important; }
+  :where(h1) {font-size:clamp(26px, 3.2vw, 34px) !important;font-weight:650 !important;line-height:1.25 !important;}
+  :where(h2) {font-size:var(--dashboard-section-size) !important;font-weight:650 !important;line-height:1.4 !important;}
+  :where(h3) {font-size:var(--dashboard-card-size) !important;font-weight:600 !important;line-height:1.45 !important;}
+  :where(table, time, input, svg text, .market-tooltip, .industry-key) {font-variant-numeric:tabular-nums;}
+}
+body .industry-segment.industry-other {background:#a8a097;}
+body .industry-stack .industry-remainder {background:repeating-linear-gradient(135deg,#f6f4f0 0 3px,#d7d2c9 3px 4px);}
+.industry-breakdown .industry-uncovered {display:block;margin:4px 0;color:#5d5750;font-size:12px;}
+body [data-compare-chart] .market-chart {min-width:0;}
+body [data-compare-chart] .market-chart svg {width:100%;height:auto;min-height:0;}
+body [data-compare-chart] .market-chart svg text {font-size:12px;fill:#52616a;}
+body [data-compare-chart] .market-tooltip {display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:4px 18px;padding:9px 0;color:#34434b;background:transparent;box-shadow:none;}
+body [data-compare-chart] .market-tooltip>b {grid-column:1/-1;font-size:12px;}
+body [data-compare-chart] .compare-reading {display:grid;align-items:baseline;grid-template-columns:18px minmax(0,1fr) auto;gap:6px;margin:0;font-size:13px;}
+.compare-reading i {align-self:center;height:0;border-top:2px solid;}
+.compare-reading b {text-align:right;font-variant-numeric:tabular-nums;}
+@media(max-width:600px) {
+  body [data-compare-chart] .market-tooltip {grid-template-columns:1fr;}
+}
