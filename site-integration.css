@@ -311,3 +311,9 @@ body.workbench.warm-workbench .fund-research-overview-four .research-decision-me
 @media(max-width:760px) {
  body.workbench.warm-workbench .fund-research-overview-four .research-decision-metrics>.research-metric:last-child {grid-column:auto;}
 }
+
+.comparison-page [data-comparison-metrics] table,.comparison-page [data-comparison-correlation] table {width:100%;font-variant-numeric:tabular-nums;}
+.comparison-page [data-comparison-metrics] :is(td,th),.comparison-page [data-comparison-correlation] :is(td,th) {padding:8px 10px;text-align:right;}
+.comparison-page [data-comparison-metrics] :is(td,th):first-child,.comparison-page [data-comparison-correlation] :is(td,th):first-child {text-align:left;}
+.comparison-page .dual-range-track span {touch-action:none;}
+@media(max-width:620px){.comparison-page [data-comparison-metrics] :is(td,th) {padding:6px;font-size:12px;} .comparison-page .table-scroll {max-width:100%;overflow-x:auto;}}

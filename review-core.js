@@ -111,10 +111,32 @@
     crossMonth:Boolean(i&&monthIndex(end[0])-monthIndex(base[0])>1)};
   });
  }
- function stats(values){
-  if(values.length<2)return null;
-  let peak=values[0],dd=0;for(const v of values){peak=Math.max(peak,v);dd=Math.min(dd,v/peak-1);}
-  return {return:values.at(-1)/values[0]-1,drawdown:dd};
+function sliderYearTicks(dates) {
+  if (dates.length < 2) return '';
+  const first = Number(dates[0].slice(0, 4)), last = Number(dates.at(-1).slice(0, 4)), years = [];
+  for (let year = first + 1; year <= last; year++) {
+    const index = dates.findIndex(day => day >= `${year}-01-01`);
+    if (index >= 0) years.push({year, position:index / (dates.length - 1) * 100});
+  }
+  const every = Math.max(1, Math.ceil(years.length / 7));
+  return `<div class="performance-slider-years" aria-hidden="true">${years.filter((p,i)=>i % every === 0 && p.position > 2 && p.position < 98).map(p=>`<span style="left:${p.position}%">${p.year}</span>`).join('')}${years.map(p=>`<i style="left:${p.position}%"></i>`).join('')}</div>`;
+}
+ function scanValues(values){
+   if(values.length<2)return null;
+   let high=0, peak=null, trough=null, drawdown=0;
+   for(let i=1;i<values.length;i++){
+     if(values[i]>values[high])high=i;
+     const loss=values[i]/values[high]-1;
+     if(loss<drawdown){drawdown=loss;peak=high;trough=i;}
+   }
+   return {stats:{return:values.at(-1)/values[0]-1,drawdown},peak,trough};
+ }
+ function stats(values){return scanValues(values)?.stats ?? null;}
+ // navSeries supplies the sorted, validated native NAVs. Only the two boundaries are shared.
+ function navWindow(nav,start,end){
+   const rows=nav.filter(([day])=>day>=start&&day<=end);
+   const result=scanValues(rows.map(([,value])=>value));
+   return {rows,stats:result?.stats ?? null,peakDate:rows[result?.peak]?.[0] ?? null,troughDate:rows[result?.trough]?.[0] ?? null};
  }
  function correlationSummary(a,b){
    if(a.length!==b.length)return {correlation:null,observations:0,invalidObservations:0,status:'unaligned',reason:'收益序列未按相同区间配对'};
@@ -149,9 +171,9 @@
   const common=[...maps[0].keys()].filter(day=>day<=end&&maps.every(m=>m.has(day))).sort();
   const i=common.findIndex(day=>day>=start);const dates=i<0?[]:common.slice(Math.max(0,i-1));
   if(dates.length<2)return {dates,series:[],correlations:[]};
-   const series=maps.map((m,i)=>{const values=dates.map(d=>m.get(d));return {code:details[i].fund?.code,name:details[i].fund?.name,nav:navs[i],stats:stats(values),points:dates.map((d,j)=>[d,values[j]/values[0]-1]),returns:values.slice(1).map((v,j)=>v/values[j]-1)};});
+   const series=maps.map((m,i)=>{const values=dates.map(d=>m.get(d));return {code:details[i].fund?.code,name:details[i].fund?.name,nav:navs[i],stats:navWindow(navs[i],dates[0],dates.at(-1)).stats,points:dates.map((d,j)=>[d,values[j]/values[0]-1]),returns:values.slice(1).map((v,j)=>v/values[j]-1)};});
    const correlationResults=series.map(a=>series.map(b=>pairedNavCorrelation(a.nav,b.nav,dates[0],dates.at(-1))));
    return {dates,series,correlationResults,correlations:correlationResults.map(row=>row.map(r=>r.correlation))};
  }
- Object.assign(root.ReviewCore,{compare,stats,correlation,correlationSummary,pairedNavCorrelation,MIN_CORRELATION_RETURNS,navSeries,monthlyReturns});
+ Object.assign(root.ReviewCore,{compare,stats,sliderYearTicks,navWindow,correlation,correlationSummary,pairedNavCorrelation,MIN_CORRELATION_RETURNS,navSeries,monthlyReturns});
 })(typeof window==='undefined'?globalThis:window);

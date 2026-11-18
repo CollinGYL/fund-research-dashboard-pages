@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-17T19:01:49+08:00",
+  "generatedAt": "2026-11-18T10:16:28+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
@@ -90,7 +90,7 @@
     },
     "bond-original-single.html": {
       "size": 729730,
-      "sha256": "7e88244361502c3180ba76ae6a72bcede544232a6ea3e117b1d23026a706d5a1"
+      "sha256": "e37c2cd06ae7cffe475b36a52082c7237d8fd8a2aefb06993b20a6a7706e17f1"
     },
     "bond-research.html": {
       "size": 6193,
@@ -101,12 +101,12 @@
       "sha256": "34ce06de229886cc8752e930cd197bb9db7cad4d4dc8766d872639264d26f8a9"
     },
     "compare.html": {
-      "size": 4798,
-      "sha256": "4b81911c53bb9ceac0b46c2a8214d645c2ec3385345d378f70377f38b0e8fbe4"
+      "size": 4843,
+      "sha256": "2458578b27ec14420eaee1e0e5b6513460c1a9a5d12ba6aa8a6921da3a806005"
     },
     "compare.js": {
-      "size": 9845,
-      "sha256": "3735a37aa39a52d3b90344559041927c7893a308627300c1a338d54255c41815"
+      "size": 13348,
+      "sha256": "a15c63388b3eaf7b26ff341a9b46716cd99fa71a2456ae505e3a6f0af5ef3a20"
     },
     "demo-theme.css": {
       "size": 8124,
@@ -142,15 +142,15 @@
     },
     "fund.html": {
       "size": 5815,
-      "sha256": "9a2ba984ecd8ef8d76101e7c5c813d4b3e98dde558dc64693f6eeb3fe34d705d"
+      "sha256": "5929836db0e42a1a80f4944c0ffc2faadc602b50fd531e070d3e62c717d9e5ac"
     },
     "fund.js": {
-      "size": 685665,
-      "sha256": "390d79714d328eebb562e6231ff5998a5ffdf54de9667ffcf2c69d12acacbffc"
+      "size": 685159,
+      "sha256": "a33339a34ed5fd41a5759c73a04d15ada51ccf04812752d471d7d57a3a28b41b"
     },
     "index.html": {
       "size": 14341,
-      "sha256": "56c5c72619719347fe974e950381c60401aa8448524a3f222ce6ee0bef6905c5"
+      "sha256": "5db88258e29dbe45f2c65037235ec56b4cd999a3233a3f2ebc18c26bd86b052c"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -177,8 +177,8 @@
       "sha256": "655e1a9d247c283d0aeaf3539a02ab2e177be6b36a9d3c2c4ca564f35efa1fda"
     },
     "review-core.js": {
-      "size": 10496,
-      "sha256": "4b3f9264673a86c7eb3ec0a83ab764a61077992f482ccbf718f00486b74c6aed"
+      "size": 11878,
+      "sha256": "eb92f645380f1ad82bf8a0c768742ecb7ab7ff7e0a5987b19ca37f0f7fe1dbdd"
     },
     "review.css": {
       "size": 30480,
@@ -189,8 +189,8 @@
       "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
     },
     "site-integration.css": {
-      "size": 46051,
-      "sha256": "3d6e640edf37bac3ddd28fd9b11a74f602ed685a3e571f735453d301a5e8c13d"
+      "size": 46741,
+      "sha256": "678400d16f42842bda5c5791668fefc05dcf9aa7ffaef16b05f9216c93cd235b"
     },
     "site-integration.js": {
       "size": 7811,

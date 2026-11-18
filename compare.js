@@ -27,27 +27,90 @@
   const latest=[...dates,...(limit?[limit]:[])].sort()[0],period=$('#compare-period').value;
   return ReviewCore.compare(details,period==='all'?'0000-01-01':FundResearch.monthStart(latest,Number(period)),latest);
  }
- function draw(){
+ function draw(result){
   if(current.length<2)return false;
-  const result=comparison(current);
+  result ??= comparison(current);
   if(result.dates.length<2){status.textContent='所选区间没有足够的共同净值日期；保留上次结果，可调整期间后重试。';return false;}
-  const q=parameters(),savedStart=q.get('compareStart'),savedEnd=q.get('compareEnd');
-  let left=savedStart?result.dates.findIndex(d=>d>=savedStart):0,right=savedEnd?result.dates.findLastIndex(d=>d<=savedEnd):result.dates.length-1;
-  if(left<0||right<0||left>=right){left=0;right=result.dates.length-1;}
-  output.innerHTML=current.filter(d=>FundLifecycle.exitEvent(d.fund||d.code)).map(d=>FundLifecycle.notice(d.fund||d.code)).join('')+`<article class="subpanel"><div class="subpanel-heading"><h3>同区间净值表现</h3><span data-common-dates></span></div><p data-selected-funds></p><div data-compare-chart></div><div class="compare-zoom"><label>起点<input id="comparison-start" aria-label="比较区间起点" type="range" min="0" max="${result.dates.length-2}" value="${left}"></label><label>终点<input id="comparison-end" aria-label="比较区间终点" type="range" min="1" max="${result.dates.length-1}" value="${right}"></label></div></article><article class="subpanel"><h3>区间结果</h3><div class="table-scroll" data-comparison-metrics></div></article><article class="subpanel"><h3>收益相关性</h3><div class="table-scroll" data-comparison-correlation></div><p class="method-note">按两只基金原始净值相邻日期形成收益，仅配对起止日期均相同的区间；至少${ReviewCore.MIN_CORRELATION_RETURNS}个有效配对收益观测。每格n为实际收益样本数，不是共同净值日数；不填缺值，恒定序列相关性无定义。</p></article>`;
-  $('[data-selected-funds]').textContent=`已选：${selectionLabel()}`;
-  const update=()=>{
-   let left=Number($('#comparison-start').value),right=Number($('#comparison-end').value);
-   if(left>=right){right=Math.min(result.dates.length-1,left+1);$('#comparison-end').value=right;}
-   const dates=result.dates.slice(left,right+1),s=result.series.map(r=>{const raw=r.points.slice(left,right+1).map(p=>p[1]+1),base=raw[0];return {...r,points:dates.map((d,j)=>[d,(raw[j]/base-1)*100]),stats:ReviewCore.stats(raw),returns:raw.slice(1).map((v,j)=>v/raw[j]-1)};});
-   $('[data-common-dates]').textContent=`${dates[0]}—${dates.at(-1)} · ${dates.length}个共同净值日${cutoff()?` · 净值截止 ${cutoff()}`:''}`;
-   FundMarket.chart($('[data-compare-chart]'),s.map((r,i)=>({label:r.name||r.code,unit:'%',color:colors[i],points:r.points})));
-   const detailLink=code=>{const p=new URLSearchParams({code});for(const key of ['navDate','list'])if(parameters().get(key))p.set(key,parameters().get(key));if(cutoff())p.set('navDate',cutoff());return `fund.html?${p}`;};
-   $('[data-comparison-metrics]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th><th>区间收益</th><th>最大回撤</th><th>所用净值末日</th></tr></thead><tbody>${s.map((r,i)=>`<tr><td><a href="${esc(detailLink(r.code))}">${esc(r.name)} <small>${esc(r.code)}</small></a></td><td>${signedPercent(r.stats.return)}</td><td>${signedPercent(r.stats.drawdown,true)}</td><td>${esc(dates.at(-1)||'—')}</td></tr>`).join('')}</tbody></table>`;
-   $('[data-comparison-correlation]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th>${s.map(r=>`<th>${esc(r.name)}</th>`).join('')}</tr></thead><tbody>${s.map(a=>`<tr><th>${esc(a.name)}</th>${s.map(b=>{const c=ReviewCore.pairedNavCorrelation(a.nav,b.nav,dates[0],dates.at(-1));const label=c.correlation!==null?c.correlation.toFixed(3):c.status==='insufficient'?'样本不足':c.status==='empty'?'无配对收益':c.status==='zero_variance'?'无变化':'暂不可算';return `<td title="${esc(c.reason||'相同起止日期的配对收益相关性')}">${label}<small> n=${c.observations}${c.invalidObservations?` · 排除${c.invalidObservations}个非有限区间`:''}</small></td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
-   save({codes:selectedCodes.join(','),mode:selectedMode,comparePeriod:$('#compare-period').value,compareStart:dates[0],compareEnd:dates.at(-1),...(cutoff()?{navDate:cutoff()}:{})});
-  };
-  $('#comparison-start').addEventListener('input',update);$('#comparison-end').addEventListener('input',update);update();return true;
+  const days=result.dates, last=days.length-1, q=parameters();
+  let left=q.get('compareStart')?days.findIndex(d=>d>=q.get('compareStart')):0;
+  let right=q.get('compareEnd')?days.findLastIndex(d=>d<=q.get('compareEnd')):last;
+  if(left<0||right<=left){left=0;right=last;}
+  const notices=current.filter(d=>FundLifecycle.exitEvent(d.fund||d.code)).map(d=>FundLifecycle.notice(d.fund||d.code)).join('');
+  output.innerHTML=notices+`<article class="subpanel comparison-summary"><h3>区间结果</h3>
+    <p data-common-dates></p><div class="table-scroll" data-comparison-metrics></div>
+    <p class="method-note">两端采用共同净值日。每只基金的收益和最大回撤使用这段时间内自身全部有效复权净值。峰谷为最大回撤对应的高点和低点。</p></article>
+    <article class="subpanel unified-performance-chart"><div class="subpanel-heading"><h3>同区间净值表现</h3></div>
+    <div class="performance-date-range">
+      <label>起始<input type="date" class="nav-window-start" aria-label="净值区间起始日期" min="${days[0]}" max="${days[last]}"></label><span>—</span>
+      <label>结束<input type="date" class="nav-window-end" aria-label="净值区间结束日期" min="${days[0]}" max="${days[last]}"></label>
+      <button type="button" class="nav-zoom-reset">全部区间</button></div>
+    <p class="method-note" data-range-message aria-live="polite" hidden></p><div data-compare-chart></div>
+    ${ReviewCore.sliderYearTicks(days)}
+    <div class="dual-range-control nav-dual-range" aria-label="净值图缩放区间">
+      <div class="dual-range-track"><span></span></div>
+      <input id="comparison-start" class="dual-range-start" type="range" min="0" max="${last}" step="1" aria-label="比较区间起点">
+      <input id="comparison-end" class="dual-range-end" type="range" min="0" max="${last}" step="1" aria-label="比较区间终点">
+      <div class="dual-range-labels"><span data-range-start></span><small>拖动横条中段可平移，拖动两端可缩放</small><span data-range-end></span></div>
+    </div></article><article class="subpanel"><h3>收益相关性</h3><div class="table-scroll" data-comparison-correlation></div>
+    <p class="method-note">按两只基金原始净值相邻日期形成收益，仅配对起止日期均相同的区间；至少${ReviewCore.MIN_CORRELATION_RETURNS}个有效配对收益观测。每格 n 为实际收益样本数。</p></article>`;
+  const dateStart=$('.nav-window-start'),dateEnd=$('.nav-window-end'),startInput=$('#comparison-start'),endInput=$('#comparison-end');
+  const range=$('.nav-dual-range'),track=range.querySelector('.dual-range-track'),handle=track.querySelector('span'),message=$('[data-range-message]');
+  function controls(){
+    startInput.value=left;endInput.value=right;
+    dateStart.value=days[left];dateEnd.value=days[right];
+    startInput.setAttribute('aria-valuetext',days[left]);endInput.setAttribute('aria-valuetext',days[right]);
+    range.style.setProperty('--range-start',100*left/last+'%');range.style.setProperty('--range-end',100*right/last+'%');
+    $('[data-range-start]').textContent=days[left];$('[data-range-end]').textContent=days[right];
+  }
+  function detailLink(code){
+    const p=new URLSearchParams({code});for(const key of ['navDate','list'])if(q.get(key))p.set(key,q.get(key));
+    if(cutoff())p.set('navDate',cutoff());return 'fund.html?'+p;
+  }
+  function render(){
+    if(!range.isConnected)return;
+    const first=days[left],end=days[right];
+    const series=result.series.map(r=>({...r,...ReviewCore.navWindow(r.nav,first,end)}));
+    $('[data-common-dates]').textContent=`${first}—${end} · ${right-left+1} 个共同净值日${cutoff()?' · 净值截止 '+cutoff():''}`;
+    $('[data-comparison-metrics]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th><th>区间收益</th><th>最大回撤</th><th>回撤峰谷日期</th><th>有效净值日</th></tr></thead><tbody>${series.map(r=>`<tr><td><a href="${esc(detailLink(r.code))}">${esc(r.name)} <small>${esc(r.code)}</small></a></td><td>${signedPercent(r.stats.return)}</td><td>${signedPercent(r.stats.drawdown,true)}</td><td>${r.peakDate?r.peakDate+' → '+r.troughDate:'区间内无回撤'}</td><td>${r.rows.length}</td></tr>`).join('')}</tbody></table>`;
+    FundMarket.chart($('[data-compare-chart]'),series.map((r,i)=>({label:r.name||r.code,unit:'%',color:colors[i],points:r.rows.map(([day,v])=>[day,(v/r.rows[0][1]-1)*100])})));
+    const matrix=series.map(()=>[]);
+    for(let i=0;i<series.length;i++)for(let j=i;j<series.length;j++){
+      matrix[i][j]=matrix[j][i]=ReviewCore.pairedNavCorrelation(series[i].rows,series[j].rows,first,end);
+    }
+    $('[data-comparison-correlation]').innerHTML=`<table class="data-table"><thead><tr><th>基金</th>${series.map(r=>`<th>${esc(r.name)}</th>`).join('')}</tr></thead><tbody>${series.map((a,i)=>`<tr><th>${esc(a.name)}</th>${matrix[i].map(c=>{const label=c.correlation!==null?c.correlation.toFixed(3):c.status==='insufficient'?'样本不足':c.status==='empty'?'无配对收益':c.status==='zero_variance'?'无变化':'暂不可算';return `<td title="${esc(c.reason||'相同起止日期的配对收益相关性')}">${label}<small> n=${c.observations}${c.invalidObservations?' · 排除'+c.invalidObservations+'个非有限区间':''}</small></td>`}).join('')}</tr>`).join('')}</tbody></table>`;
+
+  }
+  let frame=0;
+  function select(a,b,note=''){
+    left=a;right=b;controls();message.textContent=note;message.hidden=!note;
+    if(!frame)frame=requestAnimationFrame(()=>{frame=0;render()});
+  }
+  function commit(){
+    if(frame){cancelAnimationFrame(frame);frame=0;}
+    render();
+    save({codes:selectedCodes.join(','),mode:selectedMode,comparePeriod:$('#compare-period').value,compareStart:days[left],compareEnd:days[right],...(cutoff()?{navDate:cutoff()}:{})});
+  }
+  function fromDate(){
+    const a=days.findIndex(d=>d>=dateStart.value),b=days.findLastIndex(d=>d<=dateEnd.value);
+    if(!dateStart.value||!dateEnd.value||!dateStart.validity.valid||!dateEnd.validity.valid||a<0||b<=a){
+      select(left,right,'请选择范围内至少两个不同的共同净值日，已保留上次区间。');return;
+    }
+    const adjusted=dateStart.value!==days[a]||dateEnd.value!==days[b];
+    select(a,b,adjusted?'已对齐到共同净值日：'+days[a]+' 至 '+days[b]+'。':'');commit();
+  }
+  dateStart.addEventListener('change',fromDate);dateEnd.addEventListener('change',fromDate);
+  startInput.addEventListener('input',()=>select(Math.min(Number(startInput.value),right-1),right));
+  endInput.addEventListener('input',()=>select(left,Math.max(Number(endInput.value),left+1)));
+  startInput.addEventListener('change',commit);endInput.addEventListener('change',commit);
+  $('.nav-zoom-reset').addEventListener('click',()=>{select(0,last);commit()});
+  handle.addEventListener('pointerdown',event=>{
+    const initial=left,span=right-left,x=event.clientX,width=Math.max(1,track.getBoundingClientRect().width);
+    handle.setPointerCapture(event.pointerId);
+    const move=e=>{const a=Math.max(0,Math.min(last-span,initial+Math.round((e.clientX-x)*last/width)));select(a,a+span);};
+    const stop=()=>{commit();handle.removeEventListener('pointermove',move);handle.removeEventListener('lostpointercapture',stop);};
+    handle.addEventListener('pointermove',move);handle.addEventListener('lostpointercapture',stop);
+  });
+  controls();commit();return true;
  }
  async function submit(){
   const version=++requestVersion;$('#compare-run').disabled=false;
@@ -63,11 +126,13 @@
   const failures=settled.filter(s=>s.status==='rejected');
   if(failures.length){status.textContent=failures.map(s=>s.reason.message).join('；')+'。点击“开始比较”重试。'+(current.length?'已保留上次结果。':'');return;}
   const next=settled.map(s=>historical?FundLifecycle.historicalNav(s.value):s.value);
-  if(comparison(next).dates.length<2){status.textContent='所选基金在该区间没有足够的共同净值日期。'+(current.length?'已保留上次结果。':'');return;}
+  let result;
+  try{result=comparison(next);}catch(error){status.textContent=error.message+(current.length?'。已保留上次结果。':'');return;}
+  if(result.dates.length<2){status.textContent='所选基金在该区间没有足够的共同净值日期。'+(current.length?'已保留上次结果。':'');return;}
   const changed=selectedCodes.join(',')!==list.join(',')||selectedMode!==(historical?'history':'current');
   if(current.length&&changed)save({compareStart:null,compareEnd:null});
   current=next;selectedCodes=list;selectedMode=historical?'history':'current';
-  status.textContent=`已选：${selectionLabel()} · ${historical?'历史资料对比':'当前基金对比'}`;draw();
+  status.textContent=`已选：${selectionLabel()} · ${historical?'历史资料对比':'当前基金对比'}`;draw(result);
  }
  $('#compare-run').addEventListener('click',submit);
  $('#compare-period').addEventListener('change',()=>{save({comparePeriod:$('#compare-period').value,compareStart:null,compareEnd:null});draw();});

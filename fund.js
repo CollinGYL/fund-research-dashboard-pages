@@ -969,14 +969,7 @@ function performanceHalfYearTicks(first, last, width = 800) {
   return all.map((tick, i) => ({ ...tick, label: i % stride === 0 }));
 }
 function performanceSliderTicks(points) {
-  if (points.length < 2) return '';
-  const first = Number(points[0].date.slice(0, 4)), last = Number(points.at(-1).date.slice(0, 4)), years = [];
-  for (let year = first + 1; year <= last; year++) {
-    const index = points.findIndex(p => p.date >= `${year}-01-01`);
-    if (index >= 0) years.push({year, position:index / (points.length - 1) * 100});
-  }
-  const every = Math.max(1, Math.ceil(years.length / 7));
-  return `<div class="performance-slider-years" aria-hidden="true">${years.filter((p,i)=>i % every === 0 && p.position > 2 && p.position < 98).map(p=>`<span style="left:${p.position}%">${p.year}</span>`).join('')}${years.map(p=>`<i style="left:${p.position}%"></i>`).join('')}</div>`;
+  return ReviewCore.sliderYearTicks(points.map(point => point.date));
 }
 function performanceChartAxis(points, visible, offset = 0) {
   const raw = offset ? points.map(p=>({...p,fund:isFiniteValue(p.fund)?p.fund-offset:null,benchmark:isFiniteValue(p.benchmark)?p.benchmark-offset:null})) : points;
@@ -3225,7 +3218,7 @@ function renderResearchOverview(fund, detail) {
   const industryText = s?.industry ? `${s.industry} ${pct(s.industry_weight, 1)}（占净值）` : a.stock_weight === 0 ? '无股票持仓 / 不适用' : '无可用完整股票行业披露';
   const signals = [
     ['资产配置', `${a.report_date || '—'} 对比 ${s?.previous_asset_date || '—'}`, `股票 ${change(s?.stock_change)} · 债券 ${change(s?.bond_change)}${bond ? ` · 转债 ${change(s?.convertible_bond_change)}` : ''}`],
-    [bond ? '杠杆变化' : '主要A股行业', bond ? `较上期 ${change(s?.leverage_change, 'x')}` : industryText, bond ? durationNote : `${s?.full_date || '暂无披露'} · 同行业较前次完整披露 ${change(s?.industry_change)}`],
+    [bond ? '杠杆变化' : '主要A股行业', bond ? `较上期 ${change(s?.leverage_change, 'x')}` : industryText, bond ? `${s?.asset_date || a.report_date || '报告期待核'} · 对比 ${s?.previous_asset_date || '前期待核'} · 总资产 / 净资产` : `${s?.full_date || '暂无披露'} · 同行业较前次完整披露 ${change(s?.industry_change)}`],
     ['完整披露名单变化', s?.previous_full_date ? `新出现 ${s.entry_count}只 · 不再出现 ${s.exit_count}只` : '不足两个完整披露期', s?.previous_full_date ? `${s.previous_full_date} → ${s.full_date}` : '等待前一期完整披露'],
   ];
   if (fund.category === 'pure-bond') signals.splice(0, signals.length,
