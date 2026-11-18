@@ -7773,6 +7773,9 @@ function showError(message) {
 }
 
 async function ensureFundPresentationHelpers() {
+  if (!window.BondCBFusion?.adaptDetail) {
+    await loadDataScript('bond-cb-fusion.js', '基金详情组件', () => window.BondCBFusion?.adaptDetail ? window.BondCBFusion : null);
+  }
   if (!window.ReviewCore?.matches || !window.ReviewCore?.scale) {
     await loadDataScript('review-core.js', '图表与检索工具', () => window.ReviewCore?.matches && window.ReviewCore?.scale ? window.ReviewCore : null);
   }

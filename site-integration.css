@@ -100,6 +100,30 @@ body.compact-home.workbench.warm-workbench.desktop-home .all-fund-core-grid>span
  body.compact-home.workbench.warm-workbench.desktop-home .fund-list-table.active-equity-mode .industry-composition {min-width:0;width:100%;max-width:100%;}
 }
 
+/* Make the disclosed industry mix readable next to the fund identity at both widths. */
+body.workbench.warm-workbench .active-equity-mode .equity-sort-link {
+ display:block; width:fit-content; margin-top:4px; padding:0; border:0; background:transparent; box-shadow:none;
+ color:#665342; font:inherit; font-size:11px; text-decoration:underline; text-underline-offset:3px; cursor:pointer;
+}
+body.workbench.warm-workbench .active-equity-mode .equity-risk-cell small,
+body.workbench.warm-workbench .active-equity-mode .equity-stock-cell small {white-space:nowrap;}
+body.workbench.warm-workbench .active-equity-mode .equity-selected-weight {display:block;color:#574637;font-weight:600;}
+@media(min-width:761px) {
+ body.compact-home.workbench.warm-workbench.desktop-home .active-equity-mode :is(th,td) {vertical-align:top;}
+ body.workbench.warm-workbench .active-equity-mode .industry-stack {height:12px;margin:3px 0 5px;}
+ body.compact-home.workbench.warm-workbench.desktop-home .active-equity-mode .metric-sort-controls {
+  display:flex;flex-flow:row nowrap;align-items:center;justify-content:flex-start;gap:2px;margin-top:3px;
+ }
+ body.compact-home.workbench.warm-workbench.desktop-home .active-equity-mode .metric-sort-controls button {
+  flex:0 0 auto;width:auto;min-width:0;min-height:24px;padding:2px 1px;font-size:11px;white-space:nowrap;
+ }
+ body.compact-home.workbench.warm-workbench.desktop-home .active-equity-mode .sortable-period-heading>span {white-space:nowrap;}
+
+}
+@media(max-width:760px) {
+ body.workbench.warm-workbench .active-equity-mode td.equity-industry-cell {grid-column:1 / -1;}
+}
+
 /* Aggregated bond duration: independent units, complete history and accessible dual handles. */
 .market-history{min-width:0;margin-top:10px}.market-history svg{display:block;width:100%;height:auto}.market-history [data-history-plot] svg text{font-size:10px;fill:#81786b}.market-history-legend{display:flex;flex-wrap:wrap;gap:5px 18px;margin-bottom:10px}
 body.workbench.warm-workbench .market-history .market-history-legend button[aria-pressed]{display:inline-flex;align-items:center;gap:7px;background:transparent!important;border:0!important;box-shadow:none!important;color:#514a41!important;padding:3px 0;font-size:12px}

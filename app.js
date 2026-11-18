@@ -361,8 +361,8 @@ function classificationHeader(kind) {
     const label = kind === "sector" ? "板块权重" : "行业权重";
     const loading = Boolean(stockClassificationPromise);
     const action = loading ? "正在载入…" : stockClassificationError ? "重试载入排序" : "载入权重排序";
-    const note = stockClassificationError ? escapeHtml(stockClassificationError.message) : "需要时载入完整权重";
-    return `<th class="table-filter-heading"><span>${label}</span><button type="button" class="table-header-select" data-load-classification${loading ? " disabled" : ""}>${action}</button><small>${note}</small></th>`;
+    const note = stockClassificationError ? `<small>${escapeHtml(stockClassificationError.message)}</small>` : "";
+    return `<th class="table-filter-heading"><span>${label}</span><button type="button" class="table-header-select" data-load-classification${loading ? " disabled" : ""}>${action}</button>${note}</th>`;
   }
   if (kind === "sector") {
     const selectedName = classificationRankState.level === "sector" ? classificationRankState.name : "";
@@ -378,50 +378,6 @@ function classificationHeader(kind) {
 
 function activeEquityProfile(fund) {
   return window.FUND_ACTIVE_EQUITY_PROFILES?.funds?.[fund.code] || null;
-}
-
-function profilePercentile(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? `P${Math.round(number * 100)}` : "—";
-}
-
-function activeEquityProfileCell(fund) {
-  const profile = activeEquityProfile(fund);
-  if (!validHomepageFundMap(window.FUND_ACTIVE_EQUITY_PROFILES)) {
-    return activeEquityProfilesError
-      ? '<td class="fund-profile-cell pending-cell"><strong>画像暂不可用</strong><small>可在表头重试，其他数据仍可查看</small></td>'
-      : '<td class="fund-profile-cell pending-cell"><strong>画像加载中</strong><small>正在读取低频画像数据</small></td>';
-  }
-  const availability = FundResearch.profileAvailability(profile);
-  if (!profile) return `<td class="fund-profile-cell pending-cell"><strong>${escapeHtml(availability.label)}</strong><small>${escapeHtml(availability.reason)}</small></td>`;
-  const groups = profile.groups || {};
-  const percentiles = profile.percentiles || {};
-  const status = availability.label;
-  if (profile.status === "cold_start") {
-    return `<td class="fund-profile-cell pending-cell"><strong>${status}</strong><small>${escapeHtml(availability.reason)}</small></td>`;
-  }
-  return `<td class="fund-profile-cell"><div class="fund-profile-chip-grid">
-    <span title="相对不调仓情形的持仓变化幅度 · 同类分位 ${profilePercentile(percentiles.turnover_activity)}"><b>调仓</b>${escapeHtml(groups.turnover_activity || "—")}</span>
-    <span title="持仓集中度同类分位 ${profilePercentile(percentiles.concentration)}"><b>集中</b>${escapeHtml(groups.concentration || "—")}</span>
-    <span title="上期持股本期仍持有的比例 · 同类分位 ${profilePercentile(percentiles.holding_persistence)}"><b>延续</b>${escapeHtml(groups.holding_persistence || "—")}</span>
-    <span title="二级行业配置稳定程度 · 同类分位 ${profilePercentile(percentiles.industry_stability)}"><b>行业</b>${escapeHtml(groups.industry_stability || "—")}</span>
-  </div><small>${status} · ${profilePercentile(percentiles.turnover_activity)}调仓</small></td>`;
-}
-
-function activeEquityProfileHeader() {
-  const options = [
-    ["all", "全部画像"],
-    ["turnover:低调仓", "低调仓组"],
-    ["turnover:中等调仓", "中等调仓组"],
-    ["turnover:高调仓", "高调仓组"],
-    ["concentration:高集中", "高集中组"],
-    ["persistence:高延续", "高延续组"],
-    ["industry:高稳定", "行业高稳定组"],
-    ["status:cold_start", "画像待积累 / 资料待补"],
-  ].map(([value, label]) => `<option value="${value}"${activeEquityProfileFilter === value ? " selected" : ""}>${label}</option>`).join("");
-  const unavailable = !validHomepageFundMap(window.FUND_ACTIVE_EQUITY_PROFILES);
-  const retry = activeEquityProfilesError ? `<button type="button" class="table-header-select" data-retry-profiles>重试画像</button><small>${escapeHtml(activeEquityProfilesError.message)}</small>` : '';
-  return `<th class="table-filter-heading profile-filter-heading"><span>基金画像</span><select id="header-profile-group" class="table-header-select" aria-label="按基金画像分组筛选"${unavailable ? ' disabled' : ''}>${options}</select>${retry}</th>`;
 }
 
 function matchesActiveEquityProfile(fund) {
@@ -507,8 +463,11 @@ function commonCells(fund) {
 
 function activeEquityOverviewCells(fund) {
   const managers = (fund.manager || []).join('、') || '暂无经理信息';
+  const name = classificationRankState.name;
+  const weight = name ? selectedClassificationWeight(fund) : null;
+  const selected = name ? `<small class="equity-selected-weight">所选权重 · ${escapeHtml(name)} ${weight === null ? '未披露' : formatPercent(weight)}</small>` : '';
   return `<td class="fund-name-cell equity-overview-cell">
-    <a href="${fundHref(fund)}"><strong>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</strong>${FundLifecycle.badge(fund)}<small title="${escapeHtml(fund.name)}">${escapeHtml(fund.subtype)} · 净值及收益：${escapeHtml(FundResearch.representativeShare?.(fund) || fund.code)}</small>${shareAliasNotice(fund)}</a>
+    <a href="${fundHref(fund)}"><strong>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</strong>${FundLifecycle.badge(fund)}<small title="${escapeHtml(fund.name)} · 净值与收益按下列份额计算">${escapeHtml(fund.subtype)} · ${escapeHtml(FundResearch.representativeShare?.(fund) || fund.code)}</small>${shareAliasNotice(fund)}</a>
     ${managerDates(fund)}
     <details class="fund-row-details"><summary>资料与基准</summary><dl>
       <dt>基金名称</dt><dd>${escapeHtml(FundResearch.portfolioName?.(fund) || fund.name)}</dd>
@@ -518,7 +477,8 @@ function activeEquityOverviewCells(fund) {
       <dt>业绩基准</dt><dd>${escapeHtml(fund.benchmark || '—')}</dd>
       <dt>净值截至</dt><dd>${escapeHtml(performanceFor(fund)?.latest_date || '—')}</dd>
     </dl></details>
-  </td><td><strong>${formatMoney(fund.asset?.net_asset)}</strong><small>${escapeHtml(fund.asset?.report_date || '无配置披露')}</small></td>`;
+  </td><td class="equity-industry-cell">${selected}${IndustryBars.placeholder(fund)}</td>
+  <td><strong>${formatMoney(fund.asset?.net_asset)}</strong><small>${escapeHtml(fund.asset?.report_date || '无配置披露')}</small></td>`;
 }
 
 function equityPeriodHeader(key, label) {
@@ -627,18 +587,10 @@ function fundRow(fund) {
   const relative = activeCategory === "index-enhanced";
   let extras = "";
   if (activeCategory === "active-equity") {
-    const classification = classificationSummary(fund);
-    const selectedLevel = classificationRankState.level;
-    const selectedName = classificationRankState.name;
-    const selectedWeight = selectedClassificationWeight(fund, selectedLevel, selectedName);
-    const selectedWeightText = Number.isFinite(selectedWeight) ? formatPercent(selectedWeight) : "—";
-    const sectorDisplay = selectedName && selectedLevel === "sector" ? `${selectedName} ${selectedWeightText}` : classification.sector;
-    const industryDisplay = selectedName && selectedLevel !== "sector" ? `${selectedName} ${selectedWeightText}` : classification.industry;
-    extras = `
-      <td><strong>${formatPercent(fund.asset?.stock_weight)}</strong><small>${escapeHtml(fund.asset?.report_date || "—")}</small></td>
-      ${activeEquityProfileCell(fund)}
-      <td><strong>${escapeHtml(sectorDisplay)}</strong><small>${selectedName && selectedLevel === "sector" ? "所选板块" : escapeHtml(classification.date || "完整持仓")}</small></td>
-      <td>${IndustryBars.placeholder(fund)}</td>`;
+    const metric = viewMetric(fund);
+    const rank = Number.isFinite(metric?.return_top_pct) ? `同类前${Math.ceil(metric.return_top_pct * 100)}%` : '样本不足';
+    extras = `<td class="equity-risk-cell"><strong>${formatPercent(metric?.current_drawdown, 2, false, {preserveSmall:true})}</strong><small>近1年收益 · ${rank}</small></td>
+      <td class="equity-stock-cell"><strong>${formatPercent(fund.asset?.stock_weight)}</strong><small>${escapeHtml(fund.asset?.report_date || "—")}</small></td>`;
   } else if (activeCategory === "index-enhanced") {
     extras = `
       <td><strong>${escapeHtml(fund.tracking_index || "—")}</strong><small>跟踪指数</small></td>
@@ -670,12 +622,11 @@ function fundRow(fund) {
   } else {
     extras = `<td><strong>${escapeHtml(displayCategoryLabel(fund))}</strong><small>${escapeHtml(fund.subtype)}</small></td><td><strong>${performanceFor(fund)?.latest_date || "—"}</strong></td>`;
   }
-  if(activeCategory==='active-equity'){const m=viewMetric(fund);extras=`<td><strong>${formatPercent(m?.current_drawdown, 2, false, {preserveSmall:true})}</strong><small>近1年收益同类${Number.isFinite(m?.return_top_pct)?"前"+Math.ceil(m.return_top_pct*100)+"%":"样本不足"}</small></td>`+extras;}
   return `<tr data-fund-code="${escapeHtml(fund.code)}">${activeCategory === 'active-equity' ? activeEquityOverviewCells(fund) : commonCells(fund)}${periods.map(([key]) => periodCell(fund, key, relative)).join("")}<td class="period-cell"><strong class="${returnClass(annual?.return)}">${formatPercent(annual?.return, 1, true)}</strong><small class="${returnClass(annual?.drawdown, 2, {preserveSmall:true})}">年度回撤 ${formatPercent(annual?.drawdown, 2, false, {preserveSmall:true})}</small></td>${extras}</tr>`;
 }
 
 function extraHeaders() {
-  if (activeCategory === "active-equity") return `<th class="equity-stock-heading">股票仓位</th>${activeEquityProfileHeader()}${classificationHeader("sector")}${classificationHeader("industry")}`;
+  if (activeCategory === "active-equity") return `<th class="equity-stock-heading">股票仓位</th>`;
   if (activeCategory === "index-enhanced") return "<th>跟踪指数</th><th>跟踪误差</th><th>信息比率</th>";
   if (activeCategory === "pure-bond") return "<th>杠杆</th><th>久期</th><th>券种结构</th>";
   if (activeCategory === "hybrid-bond") return "<th>杠杆</th><th>久期</th><th>券种结构</th><th>股票仓位</th><th>转债仓位</th><th>板块权重</th><th>行业权重</th>";
@@ -699,13 +650,13 @@ function renderListHead() {
   const table = listHead.closest("table");
   table?.classList.toggle("all-fund-mode", activeCategory === "all");
   if (activeCategory === 'active-equity') {
-    const widths = [240,100,...periods.map(()=>92),92,112,90,176,132,300];
+    const widths = [240,300,100,...periods.map(([key])=>key === 'tenure' ? 110 : 92),92,138,100];
     const columns = document.createElement('colgroup');
     columns.dataset.completeWidths = 'true';
     columns.innerHTML = widths.map(width=>`<col style="width:${width}px">`).join('');
     table.prepend(columns);
     table.style.setProperty('--complete-table-width',`${widths.reduce((sum,width)=>sum+width,0)}px`);
-    listHead.innerHTML = `<tr><th>基金 / 经理</th>${fundSizeHeader()}${periods.map(([key, label]) => equityPeriodHeader(key, label)).join('')}${equityPeriodHeader('ytd', '今年以来')}<th>当前回撤 / 同类位置</th>${extraHeaders()}</tr>`;
+    listHead.innerHTML = `<tr><th>基金 / 经理</th><th class="table-filter-heading equity-industry-heading${classificationRankState.name ? ' is-active' : ''}"><span>行业权重</span><button type="button" class="equity-sort-link" data-open-weight-sort>按权重排序</button></th>${fundSizeHeader()}${periods.map(([key, label]) => equityPeriodHeader(key, label)).join('')}${equityPeriodHeader('ytd', '今年以来')}<th>当前回撤<small>近1年收益排名</small></th>${extraHeaders()}</tr>`;
     return;
   }
   if (activeCategory === "all") {
@@ -801,7 +752,7 @@ function prepareMobileFundCards() {
   const primaryLabels = listView !== 'complete' ? ['近1年', '当前回撤', '股票 / 转债', '主要行业', '规模变化', '仓位变化'] : listPeriodMode === "long"
     ? ["合计规模", "近1年", "近3年", "近5年"]
     : ["合计规模", "近1月", "近1年", "今年以来"];
-  if (activeCategory === "active-equity" && listView === 'complete') primaryLabels.push("基金画像");
+  if (activeCategory === "active-equity" && listView === 'complete') primaryLabels.push("行业权重");
   grid.querySelectorAll("tr[data-fund-code]").forEach((row) => {
     const cells = [...row.children];
     cells.forEach((cell, index) => {
@@ -1219,8 +1170,7 @@ document.addEventListener("change", (event) => {
       classificationRankState.direction = 'desc';
     }
     sortState = { key: null, metric: "return", direction: "desc" };
-  } else if (target.id === "header-profile-group") {
-    activeEquityProfileFilter = target.value;
+
   } else {
     return;
   }
@@ -1331,9 +1281,6 @@ document.querySelectorAll("[data-category]").forEach((button) => button.addEvent
 
   const marketOverview = document.querySelector('#home-market-research');
   if (marketOverview && !marketOverview.hidden) requestAnimationFrame(() => marketOverview.scrollIntoView({block:'start'}));
-  if (activeCategory === "active-equity") {
-    requestActiveEquityProfiles();
-  }
 }));
 
 async function optionalJson(url, fallback) {
@@ -1429,7 +1376,6 @@ function initializeCatalog() {
     renderFunds();
     if (document.activeElement?.matches('#fund-search, #header-fund-search')) renderSuggestions();
     requestAnimationFrame(() => window.scrollTo({top:Math.max(0, Math.min(20000, Number(initialListQuery.get('scroll'))||0)), behavior:'instant'}));
-    if (activeCategory === 'active-equity') requestActiveEquityProfiles();
   }).catch((error) => {
     resultCount.textContent = '基金目录暂不可用';
     grid.innerHTML = `<tr><td class="empty-state fund-search-empty">${escapeHtml(error.message)} <button type="button" id="retry-fund-catalog">重试目录</button></td></tr>`;
@@ -1529,7 +1475,7 @@ function renderDecisionControls() {
     <label>基金范围<select id="decision-pool"><option value="current"${lifecyclePoolScope === "current" ? " selected" : ""}>当前基金</option><option value="history"${lifecyclePoolScope === "history" ? " selected" : ""}>含已退出 · 历史资料</option></select></label>
     <label>成立年限<select id="decision-age"><option value="all">不限</option>${[1,3,5].map(n => `<option value="${n}"${ageFilter === String(n) ? ' selected' : ''}>满${n}年</option>`).join('')}</select></label>
     <label>数据范围<select id="decision-data"><option value="all">不限</option><option value="summary"${dataFilter === 'summary' ? ' selected' : ''}>有可用摘要</option><option value="holdings"${dataFilter === 'holdings' ? ' selected' : ''}>完整持仓与配置同期</option></select></label>
-    ${activeCategory === 'active-equity' && listView !== 'complete' ? `<div class="compact-profile-filters">${convert(activeEquityProfileHeader())}${convert(classificationHeader('sector'))}${listView === 'portfolio' ? '' : convert(classificationHeader('industry'))}</div>` : ''}
+    ${activeCategory === 'active-equity' ? `<div class="compact-profile-filters">${convert(classificationHeader('sector'))}${listView === 'portfolio' || !validHomepageFundMap(window.FUND_STOCK_CLASSIFICATION) ? '' : convert(classificationHeader('industry'))}</div>` : ''}
     </div></details>`;
   document.querySelector('#page-size').value = String(PAGE_SIZE);
   document.querySelector('#mobile-category').value = activeCategory;
@@ -1610,6 +1556,19 @@ document.addEventListener('click', event => {
   if (event.target.closest('#reset-nav-date')) { resetFilter('date'); renderFunds(); return; }
   if (event.target.closest('#reset-display-settings')) { resetDisplaySettings(); renderFunds(); return; }
   if (event.target.closest('#retry-historical-nav')) { historicalNavErrors.delete(navDateScope); const cache = historicalNavCache.get(navDateScope); if (cache) for (const [code, item] of Object.entries(cache)) if (item.error) delete cache[code]; window.DesktopNav.clearFailures(); renderFunds(); return; }
+  if (event.target.closest('[data-open-weight-sort]')) {
+    const panel = document.querySelector('#decision-filters .compact-more-filters');
+    if (!panel.getClientRects().length) document.querySelector('#mobile-filter-toggle')?.click();
+    panel.open = true;
+    if (validHomepageFundMap(window.FUND_STOCK_CLASSIFICATION)) {
+      panel.querySelector('#header-industry-name')?.focus();
+    } else {
+      requestStockClassification();
+      renderDecisionControls();
+      document.querySelector('#decision-filters .compact-more-filters summary')?.focus();
+    }
+    return;
+  }
   const classificationLoad = event.target.closest('[data-load-classification]');
   if (classificationLoad && !classificationLoad.disabled) { requestStockClassification(); renderFunds(); return; }
   if (event.target.closest('[data-retry-profiles]')) { requestActiveEquityProfiles(); renderFunds(); return; }

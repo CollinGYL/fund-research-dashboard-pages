@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-18T18:16:39+08:00",
+  "generatedAt": "2026-11-18T19:45:45+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "app.js": {
-      "size": 118710,
-      "sha256": "5edd8ccc092f93e76635c7b07511924e1a435ba20d9d1466e13bf9a87dbe3dd8"
+      "size": 115481,
+      "sha256": "5fdfbb356f0cf1cad4741fc17929f1b29bf80b579e808993eff1c9e9b0ddc937"
     },
     "bond-cb-fusion.css": {
       "size": 3819,
@@ -90,7 +90,7 @@
     },
     "bond-original-single.html": {
       "size": 729730,
-      "sha256": "b64f4e4b1ab2ddd1bd8838e7129ceaf7c5433f5ee0f9f37ac3253049b37ada1e"
+      "sha256": "bc35e842bd7cd0b43c94f076439ab48089fc545b65023cbfcfd1b5b428af0498"
     },
     "bond-research.html": {
       "size": 6193,
@@ -102,7 +102,7 @@
     },
     "compare.html": {
       "size": 4843,
-      "sha256": "4ec25e3e1bb356a57fea3a6af8e99c9d502b405c70b33fc29fef50ad0f33214b"
+      "sha256": "d10f75124317011f60bffa8c4b99bf8bfb3f00d38b857ccc56abe6f1d3ee4728"
     },
     "compare.js": {
       "size": 15316,
@@ -142,15 +142,15 @@
     },
     "fund.html": {
       "size": 5815,
-      "sha256": "bcfe9b96c06b140a8745be923a01cf3f77da0331f03656430b588c41c13ce9f6"
+      "sha256": "70c1481de38d7872e823d0fb670902c06d1203a4d57819dda64e255874f8be9b"
     },
     "fund.js": {
-      "size": 686729,
-      "sha256": "50ddacb6ab5c60e28903ae9cf3c5684f968765ef85aa98eec2e7fbdbe6d32aaf"
+      "size": 686914,
+      "sha256": "cbd8d47faf89cbf9fff02ee30ce937deb0709344ce235144bde3034b68f4d0dd"
     },
     "index.html": {
       "size": 14806,
-      "sha256": "b4a170f60cb5a1e7680318d175ed7485a65291b789922499c0bd2b244a9fa3c9"
+      "sha256": "935d19d74f6d472be664a6856eeeefe3a7e62a08cd75f06078df79215cd20c3b"
     },
     "industry-bars.js": {
       "size": 7160,
@@ -189,8 +189,8 @@
       "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1"
     },
     "site-integration.css": {
-      "size": 46741,
-      "sha256": "678400d16f42842bda5c5791668fefc05dcf9aa7ffaef16b05f9216c93cd235b"
+      "size": 48344,
+      "sha256": "47a40998bb797c592bdbb9660d80fa714ac6541205cb3710b3e66bd8c7b40878"
     },
     "site-integration.js": {
       "size": 7811,
