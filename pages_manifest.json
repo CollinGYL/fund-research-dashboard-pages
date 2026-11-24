@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-11-18T21:10:38+08:00",
+  "generatedAt": "2026-11-24T12:41:42+08:00",
   "source": "dist/web_release/frontend",
   "dataOrigin": "https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com",
   "frontendFiles": {
     "app.js": {
-      "size": 115481,
-      "sha256": "5fdfbb356f0cf1cad4741fc17929f1b29bf80b579e808993eff1c9e9b0ddc937"
+      "size": 116795,
+      "sha256": "02889d98424333161f8809e3617ae7e1a02eb3574667c5095bab0281da54cda1"
     },
     "bond-cb-fusion.css": {
       "size": 3819,
@@ -149,8 +149,8 @@
       "sha256": "3ed92e66e31e06fde0eb5679abe57da61d86979037e5bfce2ff2e109dead8d08"
     },
     "index.html": {
-      "size": 14867,
-      "sha256": "c30c276f9ca3d405e727762b2bcd2406895dc134e37a0d09f995526b2f8f7c38"
+      "size": 15212,
+      "sha256": "c6fa92fef722c571d312508053f9dc07106c0a50b2f30b2ba85c78b1dba43d66"
     },
     "industry-bars.js": {
       "size": 7619,
@@ -282,7 +282,7 @@
     "fund-lifecycle.js": 1,
     "fund.html": 4,
     "fund.js": 22,
-    "index.html": 0,
+    "index.html": 2,
     "industry-bars.js": 1,
     "integration-bootstrap.js": 1,
     "profile-integration.js": 1,

@@ -89,6 +89,8 @@ let researchSummaryError = null;
 let listRenderRequest = 0;
 const initialListQuery = new URLSearchParams(window.location.search);
 const searchTextByCode = new Map();
+let searchLifecycleData = null;
+const searchAliasesByCode = new Map();
 const historicalNavCache = new Map();
 const historicalNavPending = new Map();
 const historicalNavErrors = new Map();
@@ -163,7 +165,7 @@ function historicalSortReady(items) {
   }
   return items.length > 0 && dates.size === 1;
 }
-function renderHistoricalNote() {
+function renderHistoricalNote(visible) {
   const note = document.querySelector('#historical-date-note');
   if (!note) return;
   note.hidden = !isHistoricalDate();
@@ -173,7 +175,6 @@ function renderHistoricalNote() {
     return;
   }
   const results = historicalNavCache.get(navDateScope) || {};
-  const visible = filteredFunds();
   const covered = visible.filter(fund => results[fund.code]?.actualDate && !results[fund.code]?.error).length;
   const failures = visible.filter(fund => results[fund.code]?.error).length;
   note.textContent = `净值截至 ${navDateScope}，历史净值已载入 ${covered}/${visible.length} 只；按页读取。非净值日使用此前最近有效净值，表内标注实际日期。区间不足显示“—”。历史同类排名显示“—”；覆盖不全或实际日期不一致时，历史业绩排序暂不可用。规模、持仓和资产配置使用各自披露日。`;
@@ -231,9 +232,13 @@ function matchesJointPerformance(fund) {
   const minReturn = numericFilterValue(minimumReturnFilter);
   const maxDrawdown = numericFilterValue(maximumDrawdownFilter);
   const value = metric => numericFilterValue(performanceMetric(fund, jointFilterPeriod, metric));
-  const result = value('return'), drawdown = value('drawdown');
-  return (minReturn === null || result !== null && result >= minReturn / 100)
-    && (maxDrawdown === null || drawdown !== null && Math.abs(drawdown) <= maxDrawdown / 100);
+  if (minReturn !== null) {
+    const result = value('return');
+    if (result === null || result < minReturn / 100) return false;
+  }
+  if (maxDrawdown === null) return true;
+  const drawdown = value('drawdown');
+  return drawdown !== null && Math.abs(drawdown) <= maxDrawdown / 100;
 }
 function matchesNavDate(fund) {
   return isHistoricalDate()
@@ -261,13 +266,24 @@ function categoryFunds() {
 }
 
 function searchableText(fund) {
+  const lifecycle = FundLifecycle.data();
+  if (searchLifecycleData !== lifecycle) {
+    searchTextByCode.clear();
+    searchAliasesByCode.clear();
+    for (const alias of Object.keys(lifecycle.aliases)) {
+      const code = FundLifecycle.canonicalCode(alias);
+      if (!searchAliasesByCode.has(code)) searchAliasesByCode.set(code, []);
+      searchAliasesByCode.get(code).push(alias);
+    }
+    searchLifecycleData = lifecycle;
+  }
   if (searchTextByCode.has(fund.code)) return searchTextByCode.get(fund.code);
   const value = [
     fund.name,
     FundResearch.portfolioName?.(fund) || fund.name,
     FundResearch.shareSearchText?.(fund) || '',
     fund.code,
-    ...Object.keys(FundLifecycle.data().aliases).filter(code => FundLifecycle.canonicalCode(code) === fund.code),
+    ...(searchAliasesByCode.get(fund.code) || []),
     displayCategoryLabel(fund),
     fund.subtype,
     fund.broad_type,
@@ -676,48 +692,44 @@ function renderListHead() {
 function filteredFunds() {
   const keyword = search.value.trim().toLowerCase();
   const subtype = filter.value;
-  const visible = categoryFunds().filter((fund) => {
-    const matchesKeyword = !keyword || ReviewCore.matches(searchableText(fund), keyword);
-    const matchesSubtype = subtype === "all" || fund.internal_category === subtype;
-    const s = decisionSummary(fund);
-    const years = fund.inception_date && chosenNavDate() ? (new Date(chosenNavDate()) - new Date(fund.inception_date)) / (365.25 * 86400000) : null;
-    const matchesAge = ageFilter === 'all' || years !== null && years >= Number(ageFilter);
-    const matchesData = dataFilter === 'all' || (dataFilter === 'summary' ? Boolean(s) : Boolean(fund.asset?.report_date && s?.full_date && s.full_date >= fund.asset.report_date));
-    const matchesDate = matchesNavDate(fund);
-    const rankedPeriod = !isHistoricalDate() && ["ytd","1m","3m","6m","1y","3y","5y"].includes(sortState.key);
-    const matchesRankWindow = !rankedPeriod || !["return","drawdown"].includes(sortState.metric) || FundLifecycle.ranks(fund).some(row => row.key === sortState.key);
-    return matchesDate && matchesRankWindow && matchesKeyword && matchesSubtype && matchesFundSize(fund) && matchesJointPerformance(fund) && matchesActiveEquityProfile(fund) && matchesAge && matchesData;
+  const rankedPeriod = !isHistoricalDate() && ["ytd","1m","3m","6m","1y","3y","5y"].includes(sortState.key)
+    && ["return","drawdown"].includes(sortState.metric);
+  const cutoff = ageFilter !== 'all' && chosenNavDate() ? new Date(chosenNavDate()) : null;
+  const visible = categoryFunds().filter(fund => {
+    if (!matchesNavDate(fund) || (subtype !== 'all' && fund.internal_category !== subtype)
+        || !matchesFundSize(fund) || !matchesActiveEquityProfile(fund)) return false;
+    if (keyword && !ReviewCore.matches(searchableText(fund), keyword)) return false;
+    if (ageFilter !== 'all') {
+      const years = cutoff && fund.inception_date ? (cutoff - new Date(fund.inception_date)) / (365.25 * 86400000) : null;
+      if (years === null || !(years >= Number(ageFilter))) return false;
+    }
+    if (dataFilter !== 'all') {
+      const summary = decisionSummary(fund);
+      if (dataFilter === 'summary' ? !summary : !(fund.asset?.report_date && summary?.full_date && summary.full_date >= fund.asset.report_date)) return false;
+    }
+    return matchesJointPerformance(fund) && (!rankedPeriod || FundLifecycle.ranks(fund).some(row => row.key === sortState.key));
   });
-  if (activeCategory === "active-equity" && classificationRankState.name) {
-    return [...visible].sort((left, right) => {
-      const leftValue = selectedClassificationWeight(left);
-      const rightValue = selectedClassificationWeight(right);
-      if (!Number.isFinite(leftValue) && !Number.isFinite(rightValue)) return 0;
-      if (!Number.isFinite(leftValue)) return 1;
-      if (!Number.isFinite(rightValue)) return -1;
-      return (leftValue - rightValue) * (classificationRankState.direction === "asc" ? 1 : -1);
-    });
-  }
-  if (!sortState.key || isHistoricalDate() && navSortKey() && !historicalSortReady(visible)) return visible;
-  if (sortState.metric === 'decision') return [...visible].sort((left, right) => {
-    const a = decisionSortValue(left, sortState.key), b = decisionSortValue(right, sortState.key);
-    if (!FundResearch.finite(a)) return FundResearch.finite(b) ? 1 : 0;
-    if (!FundResearch.finite(b)) return -1;
-    return (a - b) * (sortState.direction === 'asc' ? 1 : -1);
-  });
-  return [...visible].sort((left, right) => {
-    const numeric = value => value === null || value === undefined || value === "" ? NaN : Number(value);
-    const leftValue = numeric(activeCategory === "index-enhanced"
-      ? relativeMetrics(left)[sortState.metric === 'drawdown' ? 'excess_drawdowns' : 'excess_returns']?.[sortState.key]
-      : performanceMetric(left, sortState.key, sortState.metric));
-    const rightValue = numeric(activeCategory === "index-enhanced"
-      ? relativeMetrics(right)[sortState.metric === 'drawdown' ? 'excess_drawdowns' : 'excess_returns']?.[sortState.key]
-      : performanceMetric(right, sortState.key, sortState.metric));
-    if (!Number.isFinite(leftValue) && !Number.isFinite(rightValue)) return 0;
-    if (!Number.isFinite(leftValue)) return 1;
-    if (!Number.isFinite(rightValue)) return -1;
-    return (leftValue - rightValue) * (sortState.direction === "asc" ? 1 : -1);
-  });
+  const classificationSort = activeCategory === 'active-equity' && classificationRankState.name;
+  if (!classificationSort && (!sortState.key || isHistoricalDate() && navSortKey() && !historicalSortReady(visible))) return visible;
+
+  // Compute each fund's metric once, including its period-coverage check.
+  const sortValue = fund => {
+    if (classificationSort) return selectedClassificationWeight(fund);
+    if (sortState.metric === 'decision') return decisionSortValue(fund, sortState.key);
+    if (activeCategory === 'index-enhanced') {
+      return relativeMetrics(fund)[sortState.metric === 'drawdown' ? 'excess_drawdowns' : 'excess_returns']?.[sortState.key];
+    }
+    return performanceMetric(fund, sortState.key, sortState.metric);
+  };
+  const direction = (classificationSort ? classificationRankState.direction : sortState.direction) === 'asc' ? 1 : -1;
+  return visible.map(fund => {
+    const value = sortValue(fund);
+    return {fund, value: FundResearch.finite(value) ? Number(value) : null};
+  }).sort((left, right) => {
+    if (left.value === null) return right.value === null ? 0 : 1;
+    if (right.value === null) return -1;
+    return (left.value - right.value) * direction;
+  }).map(item => item.fund);
 }
 
 function updateClassificationRankControl(resetName = false) {
@@ -929,10 +941,11 @@ function renderFunds() {
   resultCount.textContent = listResultCountText(visible);
   renderListHead();
   listHead.querySelectorAll('th').forEach(header => header.setAttribute('aria-sort', 'none'));
+  const historicalSortUnavailable = isHistoricalDate() && !historicalSortReady(visible);
   listHead.querySelectorAll('[data-sort-key]').forEach(button => {
     const selected = button.dataset.sortKey === sortState.key && button.dataset.sortMetric === sortState.metric && !classificationRankState.name;
     if (selected) button.closest('th').setAttribute('aria-sort', sortState.direction === 'asc' ? 'ascending' : 'descending');
-    const unavailable = isHistoricalDate() && navSortKey(button.dataset.sortKey, button.dataset.sortMetric) && !historicalSortReady(visible);
+    const unavailable = historicalSortUnavailable && navSortKey(button.dataset.sortKey, button.dataset.sortMetric);
     button.disabled = unavailable;
     if (unavailable) button.title = '历史净值覆盖全部当前筛选基金且实际日期一致后可排序';
     button.setAttribute('aria-pressed', String(selected));
@@ -947,7 +960,7 @@ function renderFunds() {
     : `<tr><td colspan="${columnCount}" class="empty-state fund-search-empty">没有找到匹配的基金。${lifecyclePoolScope === "current" ? `<a href="index.html?pool=history&navDate=latest&q=${encodeURIComponent(search.value.trim())}">查看含已退出基金的历史目录</a>` : ""}</td></tr>`;
   prepareMobileFundCards();
   renderPagination(visible.length);
-  renderDecisionControls();
+  renderDecisionControls(visible);
   requestAnimationFrame(syncTopScrollbar);
 }
 
@@ -1339,6 +1352,7 @@ function renderCoverageDates(sourceFunds) {
 function initializeCatalog() {
   if (catalogPromise) return catalogPromise;
   resultCount.textContent = '正在加载基金目录…';
+  grid.innerHTML = '<tr><td class="empty-state fund-search-empty">正在加载基金目录…</td></tr>';
   const lifecycle = loadCatalogLifecycle();
   const catalogLoading = Promise.all([loadCatalog(), lifecycle, ensureHomepageHelpers()]).then(([value]) => value);
   lifecycle.then(() => Promise.resolve(window.FundRankReady).then(()=>FundLifecycle.loadRanks()).then(()=>{
@@ -1354,7 +1368,6 @@ function initializeCatalog() {
     catalog = catalogData;
     funds = (catalogData.funds || []).map(fund => BondCBFusion.adaptFund(fund)).filter(isVisibleWebsiteFund);
     searchTextByCode.clear();
-    funds.forEach((fund) => { searchableText(fund); });
     classificationNameCache = {};
     legacyFunds = [];
     analysisFunds = {};
@@ -1454,7 +1467,7 @@ function sortSummaryText() {
   return `${label} · ${direction} · 缺失置后`;
 }
 
-function renderDecisionControls() {
+function renderDecisionControls(visible) {
   updateViewPanels();
   const target = document.querySelector('#decision-filters');
   const convert = html => html.replace(/^<th[^>]*>/, '<label>').replace(/<\/th>$/, '</label>');
@@ -1481,10 +1494,12 @@ function renderDecisionControls() {
   document.querySelector('#mobile-category').value = activeCategory;
   const sortColumns = listView === 'complete' ? [...visiblePeriods(), ['ytd', '今年以来']].flatMap(([key,label]) => [[key, `${label}收益`, 'return'], [key, `${label}回撤`, 'drawdown']]) : decisionColumns().filter(c=>c[2]);
   const classificationSorted = activeCategory === 'active-equity' && Boolean(classificationRankState.name);
-  document.querySelector('#mobile-sort').innerHTML = (classificationSorted ? `<option value="classification" disabled selected>${escapeHtml(sortSummaryText())}</option>` : '') + '<option value="">默认排序</option>' + sortColumns.flatMap(([key,label,metric])=>['desc','asc'].map(dir=>`<option${isHistoricalDate() && navSortKey(key,metric) && !historicalSortReady(filteredFunds()) ? ' disabled' : ''} value="${key}:${metric}:${dir}"${!classificationSorted&&sortState.key===key&&sortState.metric===metric&&sortState.direction===dir?' selected':''}>${escapeHtml(label.split(' / ')[0])} ${metric==='drawdown'||['risk1y','current_drawdown'].includes(key) ? (dir==='desc'?'损失较小优先':'损失较大优先') : (dir==='desc'?'高→低':'低→高')}</option>`)).join('');
+  const historicalFunds = isHistoricalDate() ? (visible ?? filteredFunds()) : [];
+  const historicalSortUnavailable = isHistoricalDate() && !historicalSortReady(historicalFunds);
+  document.querySelector('#mobile-sort').innerHTML = (classificationSorted ? `<option value="classification" disabled selected>${escapeHtml(sortSummaryText())}</option>` : '') + '<option value="">默认排序</option>' + sortColumns.flatMap(([key,label,metric])=>['desc','asc'].map(dir=>`<option${historicalSortUnavailable && navSortKey(key,metric) ? ' disabled' : ''} value="${key}:${metric}:${dir}"${!classificationSorted&&sortState.key===key&&sortState.metric===metric&&sortState.direction===dir?' selected':''}>${escapeHtml(label.split(' / ')[0])} ${metric==='drawdown'||['risk1y','current_drawdown'].includes(key) ? (dir==='desc'?'损失较小优先':'损失较大优先') : (dir==='desc'?'高→低':'低→高')}</option>`)).join('');
   const sortLabel = document.querySelector('#list-sort-state');
   if (sortLabel) sortLabel.textContent = sortSummaryText() + ` · 净值截止日 ${chosenNavDate()}`;
-  renderHistoricalNote();
+  renderHistoricalNote(historicalFunds);
   document.querySelectorAll('[data-view]').forEach(b => { const active = b.dataset.view === listView; b.classList.toggle('active', active); b.setAttribute('aria-pressed', String(active)); });
   document.querySelector('#decision-columns').innerHTML = categoryDecisionColumns().map(([key,label]) => `<label><input type="checkbox" data-column="${key}"${hiddenDecisionColumns.has(key) ? '' : ' checked'}>${label}</label>`).join('');
   document.querySelectorAll('[data-list-period]').forEach(button => {
@@ -1624,6 +1639,47 @@ function managerDates(fund){
   return t?.managers?.length ? `<small class="manager-tenure-dates">${t.managers.map(m=>`${escapeHtml(m.name)} ${escapeHtml(m.start||'暂无任职日期')}`).join('<br>')}</small>` : `<small class="manager-tenure-dates">${escapeHtml((fund.manager || []).join('、') || '暂无经理信息')} · 任职日期待加载</small>`;
 }
 let viewMetricsPromise=null,viewMetricsError=null;
+// Supplementary charts have their own downloads and only start when expanded.
+function updateMarketSpecialist(more, marketKey) {
+  const expanded = more.open && !more.hidden;
+  const pure = document.querySelector('#bond-market-overview');
+  if (pure) pure.hidden = more.hidden || activeCategory !== 'pure-bond';
+  const advanced = document.querySelector('#applicable-market-overview');
+  if (advanced) advanced.hidden = more.hidden || activeCategory === 'pure-bond';
+  const selection = activeCategory + ':' + filter.value;
+  let panel = advanced?.firstElementChild;
+  if (panel && (advanced.hidden || panel.dataset.selection !== selection)) {
+    // A late response belongs to the previous panel, including its retry button.
+    panel.hidden = true;
+    panel.remove();
+    panel = null;
+  }
+  if (!expanded) return;
+  if (more.dataset.statusCategory !== marketKey) {
+    more.dataset.statusCategory = marketKey;
+    const oldStatus = document.querySelector('#home-market-date');
+    if (oldStatus) {
+      // A pending date request only writes to its still-connected target.
+      const status = oldStatus.cloneNode(false);
+      oldStatus.replaceWith(status);
+      if (window.FundMarketStatus) void FundMarketStatus.mount(status, marketKey);
+    }
+  }
+  if (pure && !pure.hidden) void FundMarket.mount(pure);
+  if (advanced && !advanced.hidden && window.BondAdvancedUI) {
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.dataset.selection = selection;
+      advanced.append(panel);
+    }
+    void BondAdvancedUI.mountMarket(panel, activeCategory, filter.value);
+  }
+}
+
+document.querySelector('#market-specialist')?.addEventListener('toggle', event => {
+  if (event.currentTarget.open && catalog) updateViewPanels();
+});
+
 function updateViewPanels(){
   const marketKey = activeCategory === 'hybrid-bond' ? (filter.value === 'primary_bond' ? 'primary-bond' : filter.value === 'secondary_bond' ? 'secondary-bond' : 'hybrid-bond') : activeCategory;
   const disclosure = document.querySelector('#home-market-research');
@@ -1635,19 +1691,16 @@ function updateViewPanels(){
       filter.dispatchEvent(new Event('change', {bubbles:true}));
     });
     const more = document.querySelector('#market-specialist');
-    if(more) more.hidden = marketKey === 'hybrid-bond' || isHistoricalDate();
+    if (more) {
+      more.hidden = disclosure.hidden || marketKey === 'hybrid-bond' || isHistoricalDate();
+      updateMarketSpecialist(more, marketKey);
+    }
     if (!disclosure.hidden && disclosure.dataset.category !== marketKey) {
       disclosure.dataset.category = marketKey;
       const title = activeCategory === 'hybrid-bond' && filter.value === 'all' ? '混合债基市场（一级 / 二级）' : marketKey === 'primary-bond' ? '一级债基市场' : marketKey === 'secondary-bond' ? '二级债基市场' : `${CATEGORY_LABELS[activeCategory]}市场`;
       document.querySelector('#home-market-summary').textContent = `${title}概览`;
-      const status = document.querySelector('#home-market-date');
-      status.replaceChildren(document.createElement('span'));
-      if (window.FundMarketStatus) void FundMarketStatus.mount(status.firstChild, marketKey);
     }
   }
-  const host=document.querySelector('#bond-market-overview');
-  if(host){host.hidden=activeCategory!=='pure-bond';if(!host.hidden)void FundMarket.mount(host);}
-  if(window.BondAdvancedUI)void BondAdvancedUI.mountMarket(document.querySelector('#applicable-market-overview'),activeCategory,filter.value);
   if(viewMetricsPromise||viewMetricsError||window.FUND_VIEW_METRICS?.catalog_generated_at===catalog?.generated_at)return;
   viewMetricsPromise=loadHomepageScript(`https://fund-research-dashboard-gy-2026.oss-cn-hongkong.aliyuncs.com/data/fund_dashboard/fund_view_metrics.js?v=${encodeURIComponent(catalog?.generated_at||'')}`,'任期与披露变化',()=>window.FUND_VIEW_METRICS?.catalog_generated_at===catalog?.generated_at?window.FUND_VIEW_METRICS:null)
     .then(()=>renderFunds()).catch(e=>{viewMetricsError=e;const status=document.querySelector('#view-metrics-status');if(status){status.hidden=false;status.innerHTML=`${escapeHtml(e.message)} <button type="button" data-view-metrics-retry>重试</button>`;status.querySelector('button').addEventListener('click',()=>{viewMetricsError=null;viewMetricsPromise=null;status.hidden=true;updateViewPanels();});}});
