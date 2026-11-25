@@ -1040,7 +1040,7 @@ function renderNavChart(points, fundName, benchmarkName, visible = { fund: true,
     <div class="chart-legend performance-legend"><button type="button" class="legend-fund" data-nav-series="fund" aria-pressed="${visible.fund !== false}">${escapeHTML(fundName)}</button>${hasBenchmark?`<button type="button" class="legend-benchmark" data-nav-series="benchmark" aria-pressed="${visible.benchmark !== false}">${escapeHTML(benchmarkName)}</button>`:""}</div>
     <p class="method-note nav-display-range">实际绘图区间 ${escapeHTML(points[0].date)} — ${escapeHTML(points.at(-1).date)} · 基金净值以区间首日为1，回撤从该日起算。${hasBenchmark ? "基准缺失日断线。" : ""}${visible.benchmark !== false && points[0].benchmarkBaseDate && points[0].benchmarkBaseDate !== points[0].date ? ` 基准自 ${escapeHTML(points[0].benchmarkBaseDate)} 归一为1；两条曲线起点不同，不作同起点收益比较。` : ""}</p>
     <div class="nav-chart-wrap performance-chart-wrap">
-      <svg class="nav-chart" data-nav-min="${min}" data-nav-max="${max}" data-nav-width="${width}" data-nav-height="${height}" viewBox="0 0 ${width} ${height}" role="slider" tabindex="0" aria-valuemin="1" aria-valuemax="${points.length}" aria-valuenow="${points.length}" aria-valuetext="${escapeHTML(points.at(-1).date)}" aria-label="${escapeHTML(fundName)}${hasBenchmark ? "与"+escapeHTML(benchmarkName) : ""}净值及回撤，按左右方向键依次查看图中日期">
+      <svg class="nav-chart" data-nav-min="${min}" data-nav-max="${max}" data-nav-width="${width}" data-nav-height="${height}" viewBox="0 0 ${width} ${height}" role="slider" tabindex="0" aria-valuemin="1" aria-valuemax="${points.length}" aria-valuenow="${points.length}" aria-valuetext="${escapeHTML(points.at(-1).date)}" aria-label="净值与区间回撤，${escapeHTML(fundName)}${hasBenchmark ? "与"+escapeHTML(benchmarkName) : ""}，按左右方向键选择日期">
         <text x="2" y="14" class="nav-panel-title">净值（起点 = 1）</text>
         ${ticks.map(tick => `<line x1="${left}" y1="${y(tick)}" x2="${right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${left-7}" y="${y(tick)+4}" class="chart-axis-label" text-anchor="end">${performanceTickLabel(tick)}</text>`).join("")}
         ${visible.benchmark !== false ? lines("benchmark", "chart-line chart-line-benchmark") : ""}
@@ -3249,7 +3249,7 @@ function bindResearchOverview(detail) {
   draw('12');
 }
 
-function renderResearchOverview(fund, detail) {
+function renderResearchOverview(fund, detail, includeChart = true) {
   const previous = new URLSearchParams(location.search).get('returnNavDate');
   const returnLink = FundLifecycle.validDate(previous) ? '<p><a href="'+escapeHTML(detailRoute(fund.code,{navDate:previous,returnNavDate:null}))+'">返回 '+escapeHTML(previous)+' 的观察页</a></p>' : '';
   const s = researchSummary(fund, detail);
@@ -3292,10 +3292,23 @@ function renderResearchOverview(fund, detail) {
   else if (['hybrid-bond','convertible-bond'].includes(fund.category)) signals[0] = ['已披露股票与转债仓位', `股票 ${pct(a.stock_weight, 1)} / 转债 ${pct(a.convertible_bond_weight, 1)}`, `${a.report_date || '—'} · 较上期 股票${change(s?.stock_change)} / 转债${change(s?.convertible_bond_change)}`];
   const risks = [index && !isFiniteValue(relative.tracking_error) ? '跟踪指数行情未补齐，超额、跟踪误差和信息比率待计算。' : '', bond && lag ? `久期比最新资产配置滞后${lag}个季度，采用原报告日期展示。` : '', !recentStock && fund.category !== 'pure-bond' ? '股票披露与配置日期不齐，集中度使用各自披露日期。' : '', '持仓与画像来自公开披露，不是每日真实持仓；规模变化包含市场涨跌，不等于资金净流入。'].filter(Boolean);
   const conclusion = `${fund.subtype || fund.category_label || '基金'}；${isFiniteValue(returnValue) ? `近一年${index ? '超额' : ''}收益${pct(returnValue, 1, true)}` : '完整一年收益或基准数据尚不足'}。${s ? `目前${s.current_drawdown < -1e-8 ? `距可得净值历史高点回撤${pct(s.current_drawdown, 2, false, {preserveSmall:true})}` : '处于可得净值历史高点'}。` : detail.nav_scope?.requested ? '该历史截止日未生成概览摘要。' : '正在核对决策摘要。'}`;
-  const content = returnLink+`<div class="research-conclusion"><span>基金概览</span><p>${escapeHTML(conclusion)}</p></div><div class="research-freshness" aria-label="各项数据对应日期">${dates.map(([label, date]) => `<span>${label} <b>${escapeHTML(date || (s ? '缓存未记录' : detail.nav_scope?.requested ? '历史摘要未生成' : '摘要同步中'))}</b></span>`).join('')}</div><section class="research-decision-metrics">${tiles.join('')}</section><div class="research-overview-grid"><article class="subpanel research-chart"><div class="subpanel-heading"><h3>净值与回撤</h3><span>区间起点归一 · 悬停查看日期与回撤</span></div>${researchNavPreview(detail)}<p class="method-note">曲线按区间起点归一；完整基准对比见“业绩与风险”。历史最大回撤 ${pct(historyStats?.maxDrawdown,2,false,{preserveSmall:true})}（${ddNote}）。近一年同类位置：${escapeHTML(rank)}。</p></article><article class="subpanel research-changes"><h3>最近发生了什么</h3>${signals.map(([title, text, note]) => `<div class="research-signal"><span>${title}</span><strong>${escapeHTML(text)}</strong><small>${escapeHTML(note)}</small></div>`).join('')}${s?.entry_names?.length ? `<p class="method-note">新增重仓：${escapeHTML(s.entry_names.join('、'))}${s.entry_count>s.entry_names.length?`等${s.entry_count}只`:''}。比较相邻两次完整披露名单，不代表实际买入。</p>` : ''}</article></div><details class="research-risk"><summary>数据日期与计算口径</summary><ul>${risks.map(t => `<li>${escapeHTML(t)}</li>`).join('')}</ul><p>同类位置：按内部基金类别、相同净值截止日、满一年净值历史的至少30个当前产品计算；并列取中秩。仅当前存续截面，不是历史回测。历史画像应在新披露后更新，模型识别须先冻结留档、再用新披露验真。</p></details>`;
+  const content = returnLink+`<div class="research-conclusion"><span>基金概览</span><p>${escapeHTML(conclusion)}</p></div><div class="research-freshness" aria-label="各项数据对应日期">${dates.map(([label, date]) => `<span>${label} <b>${escapeHTML(date || (s ? '缓存未记录' : detail.nav_scope?.requested ? '历史摘要未生成' : '摘要同步中'))}</b></span>`).join('')}</div><section class="research-decision-metrics">${tiles.join('')}</section><div class="research-overview-grid"><article class="subpanel research-chart"><div class="subpanel-heading"><h3>净值与回撤</h3><span>区间起点归一 · 悬停查看日期与回撤</span></div>${includeChart ? researchNavPreview(detail) : ""}<p class="method-note">曲线按区间起点归一；完整基准对比见“业绩与风险”。历史最大回撤 ${pct(historyStats?.maxDrawdown,2,false,{preserveSmall:true})}（${ddNote}）。近一年同类位置：${escapeHTML(rank)}。</p></article><article class="subpanel research-changes"><h3>最近发生了什么</h3>${signals.map(([title, text, note]) => `<div class="research-signal"><span>${title}</span><strong>${escapeHTML(text)}</strong><small>${escapeHTML(note)}</small></div>`).join('')}${s?.entry_names?.length ? `<p class="method-note">新增重仓：${escapeHTML(s.entry_names.join('、'))}${s.entry_count>s.entry_names.length?`等${s.entry_count}只`:''}。比较相邻两次完整披露名单，不代表实际买入。</p>` : ''}</article></div><details class="research-risk"><summary>数据日期与计算口径</summary><ul>${risks.map(t => `<li>${escapeHTML(t)}</li>`).join('')}</ul><p>同类位置：按内部基金类别、相同净值截止日、满一年净值历史的至少30个当前产品计算；并列取中秩。仅当前存续截面，不是历史回测。历史画像应在新披露后更新，模型识别须先冻结留档、再用新披露验真。</p></details>`;
   if (convertible) return `<div class="cb-research-overview">${content}</div>`;
   if (['active-equity', 'pure-bond', 'hybrid-bond'].includes(fund.category)) return `<div class="fund-research-overview${bond ? '' : ' fund-research-overview-four'}">${content}</div>`;
   return content;
+}
+
+function refreshResearchOverviewSummary(overview, fund, detail) {
+  const template = document.createElement("template");
+  template.innerHTML = renderResearchOverview(fund, detail, false);
+  // The chart holds the active range, keyboard focus and pointer selection.
+  const sections = [".research-conclusion", ".research-freshness", ".research-decision-metrics",
+    ".research-chart > .method-note", ".research-changes", ".research-risk ul"];
+  for (const selector of sections) {
+    const current = overview.querySelector(selector);
+    const next = template.content.querySelector(selector);
+    if (current && next) current.replaceChildren(...next.childNodes);
+  }
 }
 
 function foldResearchHistory() {
@@ -3329,13 +3342,14 @@ function prepareResearchOverview(fund, detail) {
   // One navigation keeps every available analysis directly accessible.
   nav.classList.add('all-functions');
   nav.setAttribute('aria-label', '基金分析功能');
+  const overview = page.querySelector('[data-panel="overview"]');
   const refreshSummary = () => loadResearchSummary(fund.code).then(() => {
-    page.querySelector('[data-panel="overview"]').innerHTML = renderResearchOverview(fund, detail);
-    bindResearchOverview(detail);
+    if (overview.isConnected) refreshResearchOverviewSummary(overview, fund, detail);
   }).catch(error => {
-    page.querySelector('[data-summary-error]')?.remove();
-    page.querySelector('.research-conclusion')?.insertAdjacentHTML('beforeend', `<div data-summary-error><p class="empty-copy">概览补充信息未能加载：${escapeHTML(error.message)}。净值和其他分析仍可查看。</p><button type="button" class="text-button" data-summary-retry>重新加载概览</button></div>`);
-    page.querySelector('[data-summary-retry]')?.addEventListener('click', refreshSummary);
+    if (!overview.isConnected) return;
+    overview.querySelector('[data-summary-error]')?.remove();
+    overview.querySelector('.research-conclusion')?.insertAdjacentHTML('beforeend', `<div data-summary-error><p class="empty-copy">概览补充信息未能加载：${escapeHTML(error.message)}。净值和其他分析仍可查看。</p><button type="button" class="text-button" data-summary-retry>重新加载概览</button></div>`);
+    overview.querySelector('[data-summary-retry]')?.addEventListener('click', refreshSummary);
   });
   void refreshSummary();
   foldResearchHistory();
@@ -5588,7 +5602,7 @@ function genericPerformancePanel(fund, detail, brinson) {
     ${WarmPerformance.controls(fund, navPoints)}
     <p id="warm-range-note" class="warm-range-note" aria-live="polite"></p>
     <div class="research-metric-grid metric-six" id="generic-performance-range-metrics" aria-live="polite">${renderPerformanceMetricCards("all", navPoints)}</div>
-    <div id="generic-nav-chart-output">${chartPoints.length ? renderZoomableNavChart(chartPoints, fund.name, benchmark.name) : '<p class="empty-copy">比较基准序列不足，暂显示下方收益回撤表。</p>'}</div><details class="warm-method"><summary>基准与图表口径</summary><p>合同基准：${escapeHTML(contractBenchmark)}。${benchmark.role === "contract" ? "已核验合同基准行情。" : "暂缺可靠合同基准行情；图中为研究参照，不能代表合同基准。"}图中比较：${escapeHTML(benchmark.name)}。基金从所选区间首日归一，基准从区间首个有效日归一；如首日基准缺失，图上标明起点不同，不作同起点收益比较。基准线截至自身最新日期，缺失日断线。右轴显示完整所选区间的基金回撤。</p></details></article>
+    <div id="generic-nav-chart-output">${chartPoints.length ? renderZoomableNavChart(chartPoints, fund.name, benchmark.name) : '<p class="empty-copy">比较基准序列不足，暂显示下方收益回撤表。</p>'}</div><details class="warm-method"><summary>基准与图表口径</summary><p>合同基准：${escapeHTML(contractBenchmark)}。${benchmark.role === "contract" ? "已核验合同基准行情。" : "暂缺可靠合同基准行情；图中为研究参照，不能代表合同基准。"}图中比较：${escapeHTML(benchmark.name)}。基金从所选区间首日归一，基准从区间首个有效日归一；如首日基准缺失，图上标明起点不同，不作同起点收益比较。基准线截至自身最新日期，缺失日断线。下图显示基金自区间起点的回撤，两图共用日期。</p></details></article>
     ${WarmPerformance.summary(fund, navPoints, calendarRows)}
     <article class="subpanel performance-table-panel"><div class="subpanel-heading"><div><p class="eyebrow">04 / PERIOD RETURNS</p><h3>阶段表现</h3></div><span>累计收益 · 波动 · 回撤</span></div>${horizonRows.length ? renderTable(["阶段", "累计收益", "年化收益", "年化波动", "最大回撤", "Sharpe", "Calmar"], horizonRows) : '<p class="empty-copy">净值历史不足。</p>'}</article>
     ${WarmPerformance.tenureTable(fund, navPoints)}
