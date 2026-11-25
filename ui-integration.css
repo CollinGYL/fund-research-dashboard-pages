@@ -20,7 +20,7 @@ body.desktop-detail #fund-page > :is(.back-link,.data-boundary) {display:none;}
  body.desktop-home .compact-filter-panel>label {display:flex;justify-content:space-between;gap:10px;}
  body.desktop-home .nav-date-inputs {display:flex;gap:6px;align-items:center;}
  body.desktop-home .nav-date-inputs input {width:144px;min-width:0;}
- body.desktop-home .desktop-pagination-bar {position:relative;padding:12px 0;border-top:1px solid #e3dfd8;background:#fff;}
+ body.desktop-home .desktop-pagination-bar {position:static;padding:10px 8px;border:1px solid #e3dfd8;background:#fff;}
  body.desktop-home .desktop-pagination-inner,body.desktop-home .pagination-controls {display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
  body.desktop-home #pagination-comparison-slot:empty {display:none;}
  body.desktop-home .page-density {display:flex;align-items:center;gap:6px;}
@@ -64,8 +64,29 @@ body.workbench.warm-workbench .all-fund-core-grid>div {background:#f5f2ed;}
  body.compact-home.workbench.warm-workbench.desktop-home .research-sidebar {position:sticky!important;top:var(--desktop-header-height,56px);z-index:40;margin:0!important;padding:0 16px!important;width:100%!important;background:#f7f6f2;}
  body.workbench.warm-workbench.desktop-home .site-header nav>a {display:inline-flex;font-size:11px;}
  body.workbench.warm-workbench.desktop-home .site-header nav {gap:12px;}
- body.workbench.warm-workbench.desktop-home .desktop-pagination-bar {position:sticky;bottom:0;z-index:30;padding:10px 8px;border:1px solid #e3dfd8;}
  body.workbench.warm-workbench.desktop-home :is(#top,#samples,#fund-categories,#bond-market-overview) {scroll-margin-top:calc(var(--desktop-header-height,56px) + var(--desktop-category-height,45px) + 10px);}
+}
+
+/* Card layout keeps sorting and size filters in a single scrollable header row. */
+@media (max-width:620px) {
+ body.desktop-home #samples .list-toolbar {padding:8px;row-gap:6px;}
+ body.desktop-home #samples .decision-view-switch {gap:2px;padding:0;border:0;background:none;box-shadow:none;}
+ body.desktop-home #samples .decision-view-switch button {
+   min-height:42px;border:0;border-bottom:1px solid #d5cec4;border-radius:0;box-shadow:none;
+ }
+ body.desktop-home #samples .list-status-row {margin:10px 0 3px;padding:0;}
+ body.desktop-home #samples .search-result-count {margin:0;padding:0;}
+ body.desktop-home #samples .table-scroll-hint {display:block;margin:0 0 8px;padding:0;color:#605c56;font-size:12px;line-height:1.5;}
+ body.desktop-home #samples .table-scroll-hint [aria-hidden] {display:none;}
+ body.desktop-home #samples .fund-list-table thead th.mobile-control-heading {
+   padding:0 6px;border:0;border-radius:0;background:#eeeae2;
+ }
+ body.desktop-home #samples .fund-list-table thead th.mobile-control-heading.size-filter-heading {
+   display:inline-flex;align-items:center;gap:4px;
+ }
+ body.desktop-home #samples .size-filter-heading > span {margin:0;font-size:12px;}
+ body.desktop-home #samples .mobile-control-heading :is(select,button),
+ body.desktop-home #samples .pagination-controls :is(select,input,button) {min-height:42px;}
 }
 
 body.workbench.warm-workbench .disclosure-status {margin:10px 0;padding:10px 12px;border-left:3px solid #b98b4f;background:#faf6ee;color:#625b55;font-size:12px;line-height:1.7;}

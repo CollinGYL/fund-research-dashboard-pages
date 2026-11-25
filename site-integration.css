@@ -391,3 +391,44 @@ body.desktop-home .fund-list-table .mobile-bond-leading {display:none;}
     width:100%;min-width:0;min-height:42px;white-space:normal;line-height:1.4;
   }
 }
+
+/* Comparable values share a right edge on desktop; each fund gets a labelled group on mobile. */
+.comparison-page .comparison-disclosure .data-table {
+  width:100%;table-layout:fixed;border-collapse:collapse;font-variant-numeric:tabular-nums;
+}
+.comparison-disclosure .data-table :is(th,td) {
+  padding:9px 12px;border:0;border-bottom:1px solid #e3dfd7;text-align:right;vertical-align:middle;
+  line-height:1.4;overflow-wrap:anywhere;font-size:14px;
+}
+.comparison-disclosure .data-table thead th {font-size:12px;color:#584e45;background:#f3f1ec;font-weight:600;}
+.comparison-disclosure .data-table tr > :nth-child(-n+2) {text-align:left;}
+.comparison-disclosure thead th:first-child {width:22%;}
+.comparison-disclosure thead th:nth-child(2) {width:17%;}
+.comparison-disclosure thead th:last-child {width:24%;}
+.comparison-disclosure .data-table tbody th {font-weight:650;background:transparent;}
+.comparison-disclosure .data-table small {display:block;font-size:12px;line-height:1.45;color:#635b52;margin-top:3px;}
+.comparison-disclosure .disclosure-label {display:none;}
+@media (max-width:680px) {
+  .comparison-page .comparison-disclosure .data-table {display:block;}
+  .comparison-page .comparison-disclosure .data-table > thead {
+    display:block;position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);
+  }
+  .comparison-disclosure tbody {display:block;}
+  .comparison-disclosure tbody tr {
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 14px;
+    border-top:1px solid #dcd6cc;padding:12px 0;
+  }
+  .comparison-disclosure .data-table tbody tr > * {padding:0;border:0;text-align:left;}
+  .comparison-disclosure tbody th,
+  .comparison-disclosure tbody td:nth-child(2) {grid-column:1 / -1;}
+  .comparison-disclosure tbody td:nth-child(2) small {display:inline-block;margin:0 0 0 8px;}
+  .comparison-disclosure .disclosure-label {display:block;color:#635b52;font-size:12px;line-height:1.5;}
+}
+
+/* A shared time axis keeps the NAV and drawdown panels aligned on every viewport. */
+.unified-performance-chart .nav-panel-title {fill:#364657;font-family:inherit;font-size:12px;font-weight:650;}
+.unified-performance-chart .nav-drawdown-fill {fill:#52758a;fill-opacity:.16;stroke:none;}
+.unified-performance-chart .nav-drawdown-line {fill:none;stroke:#52758a;stroke-width:1.5;vector-effect:non-scaling-stroke;}
+body.workbench.warm-workbench .unified-performance-chart .performance-hover-drawdown {fill:#fff;stroke:#52758a;}
+.unified-performance-chart .performance-hover-target {touch-action:pan-y;}
+.unified-performance-chart .performance-hover-card {max-width:95%;min-width:min(220px,95%);overflow-wrap:anywhere;}

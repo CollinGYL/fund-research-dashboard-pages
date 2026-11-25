@@ -61,13 +61,25 @@
   const limit=disclosureCutoff();
   const scope=limit?'截至 '+esc(limit)+' 已知的披露。':'最近公开披露。';
   const value=(n,unit)=>Number.isFinite(n)?(unit==='%'?(100*n).toFixed(2):n.toFixed(2))+unit:'—';
+  const labels=['资产报告期','股票','转债','杠杆','披露久期'];
   const rows=current.map(detail=>{
     const f=detail.fund, a=(detail.asset_history||[]).filter(row=>!limit || (row.announcement_date && row.announcement_date<=limit && (row.available_at||row.announcement_date).slice(0,10)<=limit)).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
     const d=disclosedDurationAt(detail,limit);
     const durationNote=d ? d.report_date+(d.announcement_date?' · 公告 '+d.announcement_date:'') : limit?'截至该日无已核实公告':'—';
-    return '<tr><td>'+esc(f.name)+'</td><td>'+esc(a?.date||'—')+'<br><small>公告 '+esc(a?.announcement_date||'—')+'</small></td><td>'+value(a?.stock,'%')+'</td><td>'+value(a?.convertible_bond,'%')+'</td><td>'+value(a?.leverage,' 倍')+'</td><td>'+value(d?.value,' 年')+'<br><small>'+esc(durationNote)+'</small></td></tr>';
+    const fields=[
+      [a?.date||'—','公告 '+(a?.announcement_date||'—')],
+      [value(a?.stock,'%')], [value(a?.convertible_bond,'%')], [value(a?.leverage,' 倍')],
+      [value(d?.value,' 年'),durationNote],
+    ];
+    const cells=fields.map(([text,note],index)=>
+      `<td><span class="disclosure-label" aria-hidden="true">${labels[index]}</span>${esc(text)}${note ? `<small>${esc(note)}</small>` : ''}</td>`
+    ).join('');
+    return `<tr><th scope="row">${esc(f.name)}</th>${cells}</tr>`;
   });
-  return '<article class="subpanel"><h3>持仓与杠杆披露</h3><p class="method-note">'+scope+'股票和转债占基金净资产。配置与久期分别标明报告期；滑动净值区间只改变收益和回撤。</p><div class="table-scroll"><table class="data-table"><thead><tr><th>基金</th><th>资产报告期</th><th>股票</th><th>转债</th><th>杠杆</th><th>披露久期</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div></article>';
+  const columns=['基金',...labels].map(label=>`<th scope="col">${label}</th>`).join('');
+  return `<article class="subpanel comparison-disclosure"><h3 id="comparison-disclosure-title">持仓与杠杆披露</h3>
+    <p class="method-note">${scope}股票和转债占基金净资产。配置与久期分别标明报告期；滑动净值区间只改变收益和回撤。</p>
+    <table class="data-table" aria-labelledby="comparison-disclosure-title"><thead><tr>${columns}</tr></thead><tbody>${rows.join('')}</tbody></table></article>`;
  }
  function draw(result){
   if(current.length<2)return false;

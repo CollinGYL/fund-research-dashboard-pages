@@ -984,17 +984,33 @@ function performanceChartAxis(points, visible, offset = 0) {
   return {...axis,min:axis.min+offset,max:axis.max+offset};
 }
 
+// Both panels use the exact same dated observations and horizontal scale.
+function performanceNavPlot(points, width, height, min, max) {
+  const left = width < 400 ? 51 : 56, right = width - 12;
+  const navTop = 29, navBottom = Math.round(height * .52);
+  const drawdownTop = navBottom + 44, bottom = height - 31;
+  const dates = points.map(point => Date.parse(point.date));
+  const firstTime = dates[0], lastTime = dates.at(-1);
+  const xTime = time => left + (time - firstTime) / Math.max(1, lastTime - firstTime) * (right - left);
+  const x = index => xTime(dates[index]);
+  const y = value => navTop + (max - value) / (max - min) * (navBottom - navTop);
+  let peak = -Infinity;
+  const drawdowns = points.map(point => {
+    peak = Math.max(peak, point.fund);
+    return point.fund / peak - 1;
+  });
+  const minDrawdown = Math.min(...drawdowns);
+  const drawdownY = value => drawdownTop + (minDrawdown < 0 ? value / minDrawdown : 0) * (bottom - drawdownTop);
+  return {left, right, navTop, navBottom, drawdownTop, bottom, dates, firstTime, lastTime, xTime, x, y, drawdowns, minDrawdown, drawdownY};
+}
+
 function renderNavChart(points, fundName, benchmarkName, visible = { fund: true, benchmark: true }, display = {}) {
   if (!points || points.length < 2) return '<p class="empty-copy">净值序列不足。</p>';
   const width = Math.max(240, Number(display.width) || 920);
   const height = width < 560 ? 280 : 326;
-  const margin = { top: 12, right: width < 400 ? 43 : 52, bottom: 36, left: width < 400 ? 43 : 48 };
-  const axis = performanceChartAxis(points, visible, Number(display.axisOffset) || 0);
-  const {min,max} = axis;
-  const firstTime = Date.parse(points[0].date), lastTime = Date.parse(points.at(-1).date);
-  const xTime = time => margin.left + (time-firstTime) / Math.max(1,lastTime-firstTime) * (width-margin.left-margin.right);
-  const x = index => xTime(Date.parse(points[index].date));
-  const y = (value) => margin.top + ((max - value) / (max - min)) * (height - margin.top - margin.bottom);
+  const {min,max} = performanceChartAxis(points, visible, Number(display.axisOffset) || 0);
+  const {left, right, navTop, navBottom, drawdownTop, bottom, xTime, x, y, drawdowns, minDrawdown, drawdownY} = performanceNavPlot(points, width, height, min, max);
+  const hasBenchmark = points.some(point => isFiniteValue(point.benchmark));
   const lines = (key, className) => {
     const segments = [];
     let current = [];
@@ -1011,36 +1027,35 @@ function renderNavChart(points, fundName, benchmarkName, visible = { fund: true,
     return segments.filter((segment) => segment.length >= 2).map((segment) => `<polyline points="${segment.join(" ")}" class="${className}"/>`).join("");
   };
   const ticks = performanceNeatTicks(min, max, width < 420 ? 4 : 5).ticks.slice().reverse();
-  let peak = -Infinity;
-  const drawdowns = points.map((point) => {
-    peak = Math.max(peak, point.fund);
-    return point.fund / peak - 1;
-  });
-  const minDrawdown = Math.min(...drawdowns, -0.000001);
-  const shadowY = (value) => margin.top + (Math.abs(value) / Math.abs(minDrawdown)) * (height - margin.top - margin.bottom);
-  const drawdownTicks = performanceNeatTicks(minDrawdown, 0).ticks.slice().reverse();
-  const shadow = [
-    `${x(0).toFixed(1)},${margin.top}`,
-    ...drawdowns.map((value, index) => `${x(index).toFixed(1)},${shadowY(value).toFixed(1)}`),
-    `${x(points.length - 1).toFixed(1)},${margin.top}`,
-  ].join(" ");
-  const dateTicks = performanceHalfYearTicks(points[0].date, points.at(-1).date, width-margin.left-margin.right);
+  const drawdownTicks = minDrawdown < 0 ? performanceNeatTicks(minDrawdown, 0, 3).ticks.slice().reverse() : [0];
+  const drawdownLine = drawdowns.map((value, i) => `${x(i).toFixed(1)},${drawdownY(value).toFixed(1)}`).join(" ");
+  const dateTicks = performanceHalfYearTicks(points[0].date, points.at(-1).date, right-left)
+    .filter(tick => tick.label && xTime(tick.time) > left + 118 && xTime(tick.time) < right - 118);
+  const dateLabels = [
+    {date:points[0].date, position:left, anchor:'start'},
+    ...dateTicks.map(tick => ({date:tick.date, position:xTime(tick.time), anchor:'middle'})),
+    {date:points.at(-1).date, position:right, anchor:'end'},
+  ];
   return `
-    <div class="chart-legend performance-legend"><button type="button" class="legend-fund" data-nav-series="fund" aria-pressed="${visible.fund !== false}">${escapeHTML(fundName)}</button>${points.some(p=>isFiniteValue(p.benchmark))?`<button type="button" class="legend-benchmark" data-nav-series="benchmark" aria-pressed="${visible.benchmark !== false}">${escapeHTML(benchmarkName)}</button>`:""}<span class="legend-drawdown">基金回撤阴影（独立右轴）</span></div>
-    <p class="method-note nav-display-range">实际绘图区间 ${escapeHTML(points[0].date)} — ${escapeHTML(points.at(-1).date)}；基金以区间首日归一为1，回撤从该日起算；基准缺失日断线，基金净值保留。${visible.benchmark !== false && points[0].benchmarkBaseDate && points[0].benchmarkBaseDate !== points[0].date ? ` 基准自 ${escapeHTML(points[0].benchmarkBaseDate)} 归一为1；两条曲线起点不同，不作同起点收益比较。` : ""}</p>
+    <div class="chart-legend performance-legend"><button type="button" class="legend-fund" data-nav-series="fund" aria-pressed="${visible.fund !== false}">${escapeHTML(fundName)}</button>${hasBenchmark?`<button type="button" class="legend-benchmark" data-nav-series="benchmark" aria-pressed="${visible.benchmark !== false}">${escapeHTML(benchmarkName)}</button>`:""}</div>
+    <p class="method-note nav-display-range">实际绘图区间 ${escapeHTML(points[0].date)} — ${escapeHTML(points.at(-1).date)} · 基金净值以区间首日为1，回撤从该日起算。${hasBenchmark ? "基准缺失日断线。" : ""}${visible.benchmark !== false && points[0].benchmarkBaseDate && points[0].benchmarkBaseDate !== points[0].date ? ` 基准自 ${escapeHTML(points[0].benchmarkBaseDate)} 归一为1；两条曲线起点不同，不作同起点收益比较。` : ""}</p>
     <div class="nav-chart-wrap performance-chart-wrap">
-      <svg class="nav-chart" data-nav-min="${min}" data-nav-max="${max}" data-nav-width="${width}" data-nav-height="${height}" data-nav-left="${margin.left}" data-nav-right="${margin.right}" viewBox="0 0 ${width} ${height}" role="slider" tabindex="0" aria-valuemin="1" aria-valuemax="${points.length}" aria-valuenow="${points.length}" aria-valuetext="${escapeHTML(points.at(-1).date)}" aria-label="${escapeHTML(fundName)}与${escapeHTML(benchmarkName)}净值及回撤，按左右方向键依次查看图中日期">
-        ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 10}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${performanceTickLabel(tick)}</text>`).join("")}
-        ${drawdownTicks.map((tick) => `<text x="${width - margin.right + 9}" y="${shadowY(tick) + 4}" class="chart-axis-label">${performanceTickLabel(tick * 100)}%</text>`).join("")}
-        ${dateTicks.map(tick => `<line x1="${xTime(tick.time)}" x2="${xTime(tick.time)}" y1="${height-margin.bottom}" y2="${height-margin.bottom+4}" class="chart-grid-line"/>${tick.label?`<text x="${xTime(tick.time)}" y="${height-10}" class="chart-axis-label performance-date-tick" data-date="${tick.date}" text-anchor="middle">${tick.date}</text>`:""}`).join("")}
-        <polygon points="${shadow}" class="drawdown-shadow"/>
+      <svg class="nav-chart" data-nav-min="${min}" data-nav-max="${max}" data-nav-width="${width}" data-nav-height="${height}" viewBox="0 0 ${width} ${height}" role="slider" tabindex="0" aria-valuemin="1" aria-valuemax="${points.length}" aria-valuenow="${points.length}" aria-valuetext="${escapeHTML(points.at(-1).date)}" aria-label="${escapeHTML(fundName)}${hasBenchmark ? "与"+escapeHTML(benchmarkName) : ""}净值及回撤，按左右方向键依次查看图中日期">
+        <text x="2" y="14" class="nav-panel-title">净值（起点 = 1）</text>
+        ${ticks.map(tick => `<line x1="${left}" y1="${y(tick)}" x2="${right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${left-7}" y="${y(tick)+4}" class="chart-axis-label" text-anchor="end">${performanceTickLabel(tick)}</text>`).join("")}
         ${visible.benchmark !== false ? lines("benchmark", "chart-line chart-line-benchmark") : ""}
         ${visible.fund !== false ? lines("fund", "chart-line chart-line-fund") : ""}
-        <line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${height - margin.bottom}" class="performance-crosshair" hidden/>
+        <text x="2" y="${drawdownTop-15}" class="nav-panel-title">基金区间回撤</text>
+        ${drawdownTicks.map(tick => `<line x1="${left}" x2="${right}" y1="${drawdownY(tick)}" y2="${drawdownY(tick)}" class="chart-grid-line"/><text x="${left-7}" y="${drawdownY(tick)+4}" class="chart-axis-label" text-anchor="end">${performanceTickLabel(tick*100)}%</text>`).join("")}
+        <polygon points="${left},${drawdownTop} ${drawdownLine} ${right},${drawdownTop}" class="nav-drawdown-fill"/>
+        <polyline points="${drawdownLine}" class="nav-drawdown-line"/>
+        ${dateLabels.map(tick=>`<line x1="${tick.position}" x2="${tick.position}" y1="${bottom}" y2="${bottom+4}" class="chart-grid-line"/><text x="${tick.position}" y="${height-7}" class="chart-axis-label performance-date-tick" data-date="${tick.date}" text-anchor="${tick.anchor}">${tick.date}</text>`).join("")}
+        <line y1="${navTop}" y2="${navBottom}" class="performance-crosshair" hidden/>
+        <line y1="${drawdownTop}" y2="${bottom}" class="performance-crosshair performance-dd-crosshair" hidden/>
         <circle r="4.5" class="performance-hover-dot performance-hover-fund" hidden/>
         <circle r="4.5" class="performance-hover-dot performance-hover-benchmark" hidden/>
         <circle r="4" class="performance-hover-dot performance-hover-drawdown" hidden/>
-        <rect x="${margin.left}" y="${margin.top}" width="${width - margin.left - margin.right}" height="${height - margin.top - margin.bottom}" class="performance-hover-target"/>
+        <rect x="${left}" y="${navTop}" width="${right-left}" height="${bottom-navTop}" class="performance-hover-target"/>
       </svg>
       <div class="performance-hover-card" hidden></div>
     </div>
@@ -1187,28 +1202,19 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
   const svg = wrap?.querySelector(".nav-chart");
   const target = svg?.querySelector(".performance-hover-target");
   const crosshair = svg?.querySelector(".performance-crosshair");
+  const drawdownCrosshair = svg?.querySelector(".performance-dd-crosshair");
   const fundDot = svg?.querySelector(".performance-hover-fund");
   const benchmarkDot = svg?.querySelector(".performance-hover-benchmark");
   const drawdownDot = svg?.querySelector(".performance-hover-drawdown");
   const card = wrap?.querySelector(".performance-hover-card");
-  if (!svg || !target || !crosshair || !fundDot || !benchmarkDot || !drawdownDot || !card || points.length < 2) return;
+  if (!svg || !target || !crosshair || !drawdownCrosshair || !fundDot || !benchmarkDot || !drawdownDot || !card || points.length < 2) return;
   const width=Number(svg.dataset.navWidth)||920;
   const height=Number(svg.dataset.navHeight)||330;
-  const margin={top:12,right:Number(svg.dataset.navRight)||52,bottom:36,left:Number(svg.dataset.navLeft)||48};
-  // Read the rendered domain once; pointer movement must never change the axis.
-  const min = Number(svg.dataset.navMin), max = Number(svg.dataset.navMax);
-  const firstTime=Date.parse(points[0].date),lastTime=Date.parse(points.at(-1).date);
-  const x=index=>margin.left+(Date.parse(points[index].date)-firstTime)/Math.max(1,lastTime-firstTime)*(width-margin.left-margin.right);
-  const y = (value) => margin.top + ((max - value) / (max - min)) * (height - margin.top - margin.bottom);
-  let peak = -Infinity;
-  const drawdowns = points.map((point) => {
-    peak = Math.max(peak, point.fund);
-    return point.fund / peak - 1;
-  });
-  const minDrawdown = Math.min(...drawdowns, -0.000001);
-  const shadowY = (value) => margin.top + (Math.abs(value) / Math.abs(minDrawdown)) * (height - margin.top - margin.bottom);
+  const {left, right, navTop, x, y, dates, firstTime, lastTime, drawdowns, drawdownY, minDrawdown} =
+    performanceNavPlot(points, width, height, Number(svg.dataset.navMin), Number(svg.dataset.navMax));
+  const showBenchmark = visible.benchmark !== false && points.some(point => isFiniteValue(point.benchmark));
   const setVisible = (visible) => {
-    [crosshair, fundDot, benchmarkDot, drawdownDot, card].forEach((item) => {
+    [crosshair, drawdownCrosshair, fundDot, benchmarkDot, drawdownDot, card].forEach((item) => {
       if (visible) item.removeAttribute("hidden");
       else item.setAttribute("hidden", "");
     });
@@ -1220,8 +1226,10 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
     const point = points[index];
     const exactX = x(index);
     setVisible(true);
-    crosshair.setAttribute("x1", exactX);
-    crosshair.setAttribute("x2", exactX);
+    for (const guide of [crosshair, drawdownCrosshair]) {
+      guide.setAttribute("x1", exactX);
+      guide.setAttribute("x2", exactX);
+    }
     fundDot.setAttribute("cx", exactX);
     fundDot.setAttribute("cy", y(point.fund));
     if (visible.fund === false) fundDot.setAttribute("hidden", "");
@@ -1232,11 +1240,11 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
       benchmarkDot.setAttribute("cy", y(Number(point.benchmark)));
     } else benchmarkDot.setAttribute("hidden", "");
     drawdownDot.setAttribute("cx", exactX);
-    drawdownDot.setAttribute("cy", shadowY(drawdowns[index]));
-    card.innerHTML = `<strong>${escapeHTML(point.date)}</strong>${visible.fund !== false ? `<span>${escapeHTML(fundName)}：${Number(point.fund).toFixed(4)}</span>` : ""}${visible.benchmark !== false ? `<span>${escapeHTML(benchmarkName)}：${hasBenchmark ? Number(point.benchmark).toFixed(4) : "—（该日无基准数据）"}</span>` : ""}<span>基金回撤：${navPercentLabel(drawdowns[index], navPercentDigits(minDrawdown / 4))}</span>`;
+    drawdownDot.setAttribute("cy", drawdownY(drawdowns[index]));
+    card.innerHTML = `<strong>${escapeHTML(point.date)}</strong>${visible.fund !== false ? `<span>${escapeHTML(fundName)}：${Number(point.fund).toFixed(4)}</span>` : ""}${showBenchmark ? `<span>${escapeHTML(benchmarkName)}：${hasBenchmark ? Number(point.benchmark).toFixed(4) : "—（该日无基准数据）"}</span>` : ""}<span>基金回撤：${navPercentLabel(drawdowns[index], navPercentDigits(minDrawdown / 4))}</span>`;
     svg.setAttribute("aria-valuenow", String(index + 1));
     svg.setAttribute("aria-valuetext", Array.from(card.children, item => item.textContent).join("，"));
-    const anchor = svg.createSVGPoint(); anchor.x = exactX; anchor.y = margin.top;
+    const anchor = svg.createSVGPoint(); anchor.x = exactX; anchor.y = navTop;
     const bounds = wrap.getBoundingClientRect();
     if (bounds.width > 0 && wrap.clientWidth > 0) {
       const localX = (anchor.matrixTransform(matrix).x - bounds.left) * wrap.offsetWidth / bounds.width - wrap.clientLeft;
@@ -1253,10 +1261,10 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
     let local;
     try { local = cursor.matrixTransform(matrix.inverse()); } catch { return; }
     if (!Number.isFinite(local.x)) return;
-    const rawX = Math.min(width - margin.right, Math.max(margin.left, local.x));
-    const time=firstTime+(rawX-margin.left)/(width-margin.left-margin.right)*(lastTime-firstTime);
-    let index=points.findIndex(p=>Date.parse(p.date)>=time);if(index<0)index=points.length-1;
-    if(index>0&&Math.abs(Date.parse(points[index-1].date)-time)<Math.abs(Date.parse(points[index].date)-time))index--;
+    const rawX = Math.min(right, Math.max(left, local.x));
+    const time=firstTime+(rawX-left)/(right-left)*(lastTime-firstTime);
+    let index=dates.findIndex(t=>t>=time);if(index<0)index=points.length-1;
+    if(index>0&&Math.abs(dates[index-1]-time)<Math.abs(dates[index]-time))index--;
     show(index, matrix);
   };
   svg.addEventListener("focus", () => show(selectedIndex, svg.getScreenCTM()));
@@ -1276,7 +1284,11 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
   });
   wrap.addEventListener("scroll", () => setVisible(false), { passive: true });
   target.addEventListener("pointermove", update);
-  target.addEventListener("pointerdown", update);
+  target.addEventListener("pointerdown", event => {
+    if (event.pointerType === "touch") target.setPointerCapture(event.pointerId);
+    update(event);
+  });
+  target.addEventListener("pointercancel", () => setVisible(false));
   target.addEventListener("pointerleave", () => setVisible(false));
 }
 
@@ -1773,7 +1785,7 @@ function renderPerformance(fund, analysis, detailData) {
   return `
     <div class="panel-intro"><div><p class="eyebrow">PERFORMANCE & DRAWDOWN</p><h2>业绩、超额与回撤</h2></div><div class="chart-controls" aria-label="净值区间"><button data-nav-range="ytd">今年以来</button><button data-nav-range="12">1年</button><button data-nav-range="36">3年</button><button data-nav-range="60">5年</button>${managerStart ? `<button data-nav-range="manager" data-range-start="${escapeHTML(managerStart)}" title="现任团队自${escapeHTML(managerStart)}形成">现任经理</button>` : ""}<button data-nav-range="all" class="active">可得历史</button></div></div>
     <div class="research-metric-grid metric-four" id="performance-range-metrics" aria-live="polite">${renderPerformanceMetricCards("all", nav, true, comparisonNav)}</div>
-    <article class="subpanel chart-subpanel"><div class="subpanel-heading"><h3>日频归一化净值与回撤阴影</h3><span>${escapeHTML(comparisonNote)}</span></div><div id="nav-chart-output"></div><p class="method-note">回撤阴影叠加在上半区净值绘图区内；切换区间后，基金与中证800在首个共同观察日重新归一化为1.00，回撤同步重算。合同业绩比较基准：${escapeHTML(contractBenchmark)}；图中用中证800作为统一研究基准。</p></article>
+    <article class="subpanel chart-subpanel"><div class="subpanel-heading"><h3>日频归一化净值与区间回撤</h3><span>${escapeHTML(comparisonNote)}</span></div><div id="nav-chart-output"></div><p class="method-note">上下图共用日期。切换区间后，净值按可用起点归一化，回撤也从区间起点重新计算。合同业绩比较基准：${escapeHTML(contractBenchmark)}；图中用中证800作为统一研究基准。</p></article>
     <div class="performance-table-stack">
       <article class="subpanel performance-table-panel"><h3>分期限风险收益</h3>${renderTable(["区间", "累计收益", "年化收益", "年化波动", "最大回撤", "Sharpe", "Calmar"], horizonRows)}</article>
       <article class="subpanel performance-table-panel"><h3>全部自然年度风险收益</h3>${renderTable(["年度", "年度收益", "年化收益", "年化波动", "最大回撤", "Sharpe", "Calmar"], calendarRows)}</article>
