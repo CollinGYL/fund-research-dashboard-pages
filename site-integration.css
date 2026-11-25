@@ -341,3 +341,53 @@ body.workbench.warm-workbench .fund-research-overview-four .research-decision-me
 .comparison-page [data-comparison-metrics] :is(td,th):first-child,.comparison-page [data-comparison-correlation] :is(td,th):first-child {text-align:left;}
 .comparison-page .dual-range-track span {touch-action:none;}
 @media(max-width:620px){.comparison-page [data-comparison-metrics] :is(td,th) {padding:6px;font-size:12px;} .comparison-page .table-scroll {max-width:100%;overflow-x:auto;}}
+
+/* Surface the monthly benchmark results before the supporting risk ratios. */
+body.workbench.warm-workbench.desktop-detail .equity-benchmark-summary .research-metric-grid {
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px;
+  margin:12px 0; padding:0;
+}
+body.workbench.warm-workbench.desktop-detail .equity-benchmark-summary .research-metric {
+  min-width:0; padding:6px 12px; border:0; border-inline-start:2px solid #ddd5c9;
+}
+.equity-benchmark-summary .research-metric small {display:block; white-space:normal}
+body.workbench.warm-workbench.desktop-detail .equity-benchmark-summary .research-metric small,
+body.workbench.warm-workbench.desktop-detail .equity-benchmark-summary .subpanel-heading span {font-size:12px;line-height:1.5;color:#63594e}
+.equity-benchmark-summary .benchmark-methods {margin-top:14px;border-top:1px solid #ded9ce}
+.equity-benchmark-summary .benchmark-methods summary {padding:12px 0;cursor:pointer;font-weight:650}
+.equity-benchmark-summary .benchmark-methods[open] summary {margin-bottom:6px}
+body.workbench.warm-workbench.desktop-detail .benchmark-extra .research-metric strong {font-size:1.25rem}
+svg.nav-chart[role=slider]:focus-visible {outline:2px solid #496d81;outline-offset:-2px}
+@media (max-width:620px) {
+  body.workbench.warm-workbench.desktop-detail .equity-benchmark-summary .research-metric-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+  }
+  .equity-benchmark-summary .benchmark-highlights .research-metric:first-child {grid-column:1 / -1}
+}
+
+body.desktop-home .fund-list-table .mobile-bond-leading {display:none;}
+@media (max-width:620px) {
+  body.desktop-home[data-list-view="portfolio"] #fund-grid td[data-column-key] {
+    overflow-wrap:anywhere;line-height:1.5;font-size:14px;font-variant-numeric:tabular-nums;
+  }
+  body.desktop-home[data-list-view="portfolio"] #fund-grid td[data-column-key]::before {
+    font-size:12px;line-height:1.4;color:#625b55;margin-bottom:4px;
+  }
+  body.desktop-home[data-list-view="portfolio"] #fund-grid td[data-column-key] > small {
+    font-size:11px;line-height:1.5;display:block;
+  }
+  body.desktop-home[data-list-view="portfolio"] #fund-grid td[data-column-key="industry"] {grid-column:1/-1;}
+  body.desktop-home[data-list-view="portfolio"] #fund-grid tr:not(.mobile-expanded) .fund-name-cell {order:-2;}
+  body.desktop-home[data-list-view="portfolio"] #fund-grid tr:not(.mobile-expanded) td[data-column-key="industry"] {order:-1;}
+  body.desktop-home[data-list-view="portfolio"] #fund-grid tr:not(.mobile-expanded) td[data-column-key="bond_structure"]::before {content:"已披露最大券种";}
+  body.desktop-home[data-list-view="portfolio"] #fund-grid tr:not(.mobile-expanded) .mobile-bond-leading {display:block;font-size:14px;}
+  body.desktop-home[data-list-view="portfolio"] #fund-grid tr:not(.mobile-expanded) .all-bond-weights {display:none;}
+}
+@media (max-width:620px) {
+  body.desktop-home .list-toolbar .decision-view-switch {
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1 0 100%;width:100%;min-width:0;gap:4px;
+  }
+  body.desktop-home .list-toolbar .decision-view-switch button {
+    width:100%;min-width:0;min-height:42px;white-space:normal;line-height:1.4;
+  }
+}

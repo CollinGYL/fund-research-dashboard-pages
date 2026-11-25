@@ -1029,7 +1029,7 @@ function renderNavChart(points, fundName, benchmarkName, visible = { fund: true,
     <div class="chart-legend performance-legend"><button type="button" class="legend-fund" data-nav-series="fund" aria-pressed="${visible.fund !== false}">${escapeHTML(fundName)}</button>${points.some(p=>isFiniteValue(p.benchmark))?`<button type="button" class="legend-benchmark" data-nav-series="benchmark" aria-pressed="${visible.benchmark !== false}">${escapeHTML(benchmarkName)}</button>`:""}<span class="legend-drawdown">基金回撤阴影（独立右轴）</span></div>
     <p class="method-note nav-display-range">实际绘图区间 ${escapeHTML(points[0].date)} — ${escapeHTML(points.at(-1).date)}；基金以区间首日归一为1，回撤从该日起算；基准缺失日断线，基金净值保留。${visible.benchmark !== false && points[0].benchmarkBaseDate && points[0].benchmarkBaseDate !== points[0].date ? ` 基准自 ${escapeHTML(points[0].benchmarkBaseDate)} 归一为1；两条曲线起点不同，不作同起点收益比较。` : ""}</p>
     <div class="nav-chart-wrap performance-chart-wrap">
-      <svg class="nav-chart" data-nav-min="${min}" data-nav-max="${max}" data-nav-width="${width}" data-nav-height="${height}" data-nav-left="${margin.left}" data-nav-right="${margin.right}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(fundName)}与${escapeHTML(benchmarkName)}日频归一化净值及回撤阴影">
+      <svg class="nav-chart" data-nav-min="${min}" data-nav-max="${max}" data-nav-width="${width}" data-nav-height="${height}" data-nav-left="${margin.left}" data-nav-right="${margin.right}" viewBox="0 0 ${width} ${height}" role="slider" tabindex="0" aria-valuemin="1" aria-valuemax="${points.length}" aria-valuenow="${points.length}" aria-valuetext="${escapeHTML(points.at(-1).date)}" aria-label="${escapeHTML(fundName)}与${escapeHTML(benchmarkName)}净值及回撤，按左右方向键依次查看图中日期">
         ${ticks.map((tick) => `<line x1="${margin.left}" y1="${y(tick)}" x2="${width - margin.right}" y2="${y(tick)}" class="chart-grid-line"/><text x="${margin.left - 10}" y="${y(tick) + 4}" class="chart-axis-label" text-anchor="end">${performanceTickLabel(tick)}</text>`).join("")}
         ${drawdownTicks.map((tick) => `<text x="${width - margin.right + 9}" y="${shadowY(tick) + 4}" class="chart-axis-label">${performanceTickLabel(tick * 100)}%</text>`).join("")}
         ${dateTicks.map(tick => `<line x1="${xTime(tick.time)}" x2="${xTime(tick.time)}" y1="${height-margin.bottom}" y2="${height-margin.bottom+4}" class="chart-grid-line"/>${tick.label?`<text x="${xTime(tick.time)}" y="${height-10}" class="chart-axis-label performance-date-tick" data-date="${tick.date}" text-anchor="middle">${tick.date}</text>`:""}`).join("")}
@@ -1213,19 +1213,10 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
       else item.setAttribute("hidden", "");
     });
   };
-  const update = (event) => {
-    // The SVG viewport may contain letterboxing when CSS limits its height.
-    // getScreenCTM includes preserveAspectRatio, CSS scaling, zoom and scrolling.
-    const matrix = svg.getScreenCTM();
+  let selectedIndex = points.length - 1;
+  const show = (index, matrix) => {
     if (!matrix) return;
-    const cursor = svg.createSVGPoint(); cursor.x = event.clientX; cursor.y = event.clientY;
-    let local;
-    try { local = cursor.matrixTransform(matrix.inverse()); } catch { return; }
-    if (!Number.isFinite(local.x)) return;
-    const rawX = Math.min(width - margin.right, Math.max(margin.left, local.x));
-    const time=firstTime+(rawX-margin.left)/(width-margin.left-margin.right)*(lastTime-firstTime);
-    let index=points.findIndex(p=>Date.parse(p.date)>=time);if(index<0)index=points.length-1;
-    if(index>0&&Math.abs(Date.parse(points[index-1].date)-time)<Math.abs(Date.parse(points[index].date)-time))index--;
+    selectedIndex = index;
     const point = points[index];
     const exactX = x(index);
     setVisible(true);
@@ -1243,6 +1234,8 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
     drawdownDot.setAttribute("cx", exactX);
     drawdownDot.setAttribute("cy", shadowY(drawdowns[index]));
     card.innerHTML = `<strong>${escapeHTML(point.date)}</strong>${visible.fund !== false ? `<span>${escapeHTML(fundName)}：${Number(point.fund).toFixed(4)}</span>` : ""}${visible.benchmark !== false ? `<span>${escapeHTML(benchmarkName)}：${hasBenchmark ? Number(point.benchmark).toFixed(4) : "—（该日无基准数据）"}</span>` : ""}<span>基金回撤：${navPercentLabel(drawdowns[index], navPercentDigits(minDrawdown / 4))}</span>`;
+    svg.setAttribute("aria-valuenow", String(index + 1));
+    svg.setAttribute("aria-valuetext", Array.from(card.children, item => item.textContent).join("，"));
     const anchor = svg.createSVGPoint(); anchor.x = exactX; anchor.y = margin.top;
     const bounds = wrap.getBoundingClientRect();
     if (bounds.width > 0 && wrap.clientWidth > 0) {
@@ -1251,6 +1244,36 @@ function bindPerformanceChartHover(points, fundName, benchmarkName, root = docum
       card.style.left = `${wrap.scrollLeft + Math.min(Math.max(localX, inset), wrap.clientWidth - inset)}px`;
     }
   };
+  const update = (event) => {
+    // The SVG viewport may contain letterboxing when CSS limits its height.
+    // getScreenCTM includes preserveAspectRatio, CSS scaling, zoom and scrolling.
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return;
+    const cursor = svg.createSVGPoint(); cursor.x = event.clientX; cursor.y = event.clientY;
+    let local;
+    try { local = cursor.matrixTransform(matrix.inverse()); } catch { return; }
+    if (!Number.isFinite(local.x)) return;
+    const rawX = Math.min(width - margin.right, Math.max(margin.left, local.x));
+    const time=firstTime+(rawX-margin.left)/(width-margin.left-margin.right)*(lastTime-firstTime);
+    let index=points.findIndex(p=>Date.parse(p.date)>=time);if(index<0)index=points.length-1;
+    if(index>0&&Math.abs(Date.parse(points[index-1].date)-time)<Math.abs(Date.parse(points[index].date)-time))index--;
+    show(index, matrix);
+  };
+  svg.addEventListener("focus", () => show(selectedIndex, svg.getScreenCTM()));
+  svg.addEventListener("blur", () => setVisible(false));
+  svg.addEventListener("keydown", (event) => {
+    let next = selectedIndex;
+    switch (event.key) {
+      case "ArrowLeft": next--; break;
+      case "ArrowRight": next++; break;
+      case "Home": next = 0; break;
+      case "End": next = points.length - 1; break;
+      case "Escape": setVisible(false); return;
+      default: return;
+    }
+    event.preventDefault();
+    show(Math.max(0, Math.min(next, points.length - 1)), svg.getScreenCTM());
+  });
   wrap.addEventListener("scroll", () => setVisible(false), { passive: true });
   target.addEventListener("pointermove", update);
   target.addEventListener("pointerdown", update);
@@ -4298,27 +4321,31 @@ function activeEquityPerformance(detail) {
   const fundPoints = genericFundNavPoints(detail);
   const benchmark = window.FUND_COMMON_BENCHMARKS?.benchmarks?.["000906.SH"];
   if (fundPoints.length < 2 || !benchmark?.series?.length) return null;
-  const monthlyLast = (points, valueKey) => {
-    const map = new Map();
-    points.forEach((item) => {
-      const date = Array.isArray(item) ? item[0] : item.date;
-      const value = Number(Array.isArray(item) ? item[1] : item[valueKey]);
-      if (date && Number.isFinite(value) && value > 0) map.set(date.slice(0, 7), { date, value });
-    });
-    return map;
-  };
-  const fundMonthly = monthlyLast(fundPoints, "fund");
-  const benchmarkMonthly = monthlyLast(benchmark.series);
-  const months = [...fundMonthly.keys()].filter((month) => benchmarkMonthly.has(month)).sort().slice(-61);
-  if (months.length < 13) return null;
-  const fundReturns = [];
-  const benchmarkReturns = [];
-  for (let index = 1; index < months.length; index += 1) {
-    const current = months[index];
-    const previous = months[index - 1];
-    fundReturns.push(fundMonthly.get(current).value / fundMonthly.get(previous).value - 1);
-    benchmarkReturns.push(benchmarkMonthly.get(current).value / benchmarkMonthly.get(previous).value - 1);
+  const indexByDay = new Map(benchmark.series);
+  const monthNumber = date => Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7)) - 1;
+  const endpoints = new Map();
+  for (const {date, fund} of fundPoints) {
+    const index = indexByDay.get(date);
+    if (!Number.isFinite(index) || index <= 0) continue;
+    const month = monthNumber(date);
+    if (!endpoints.has(month) || endpoints.get(month).date < date) {
+      endpoints.set(month, {date, fund, index});
+    }
   }
+  if (endpoints.size < 13) return null;
+  const latest = Math.max(...endpoints.keys());
+  const fundReturns = [], benchmarkReturns = [];
+  let firstDate = '', lastDate = '';
+  // A monthly return requires adjacent calendar months with the same two dates on both series.
+  for (let month = latest - 59; month <= latest; month++) {
+    const previous = endpoints.get(month - 1), current = endpoints.get(month);
+    if (!previous || !current) continue;
+    if (!firstDate) firstDate = previous.date;
+    lastDate = current.date;
+    fundReturns.push(current.fund / previous.fund - 1);
+    benchmarkReturns.push(current.index / previous.index - 1);
+  }
+  if (fundReturns.length < 12) return null;
   const mean = (values) => values.reduce((sum, value) => sum + value, 0) / Math.max(values.length, 1);
   const stdev = (values) => {
     if (values.length < 2) return null;
@@ -4350,6 +4377,8 @@ function activeEquityPerformance(detail) {
   });
   return {
     observations: fundReturns.length,
+    firstDate, lastDate,
+    skippedMonths: monthNumber(lastDate) - monthNumber(firstDate) - fundReturns.length,
     annualizedReturn,
     annualizedExcess: annualized(fundReturns) - annualized(benchmarkReturns),
     volatility,
@@ -4363,9 +4392,37 @@ function activeEquityPerformance(detail) {
     downCapture: mean(downBenchmark) ? mean(downFund) / mean(downBenchmark) : null,
     scenarios: scenarios.map(([label, fundValues, benchmarkValues]) => [
       label, `${fundValues.length}个月`, pct(mean(fundValues), 2, true), pct(mean(benchmarkValues), 2, true),
-      pct(fundValues.filter((value, index) => value > benchmarkValues[index]).length / Math.max(fundValues.length, 1), 1),
+      fundValues.length ? pct(fundValues.filter((value, index) => value > benchmarkValues[index]).length / fundValues.length, 1) : "—",
     ]),
   };
+}
+
+function renderEquityBenchmarkSummary(stats) {
+  const {observations, winRate} = stats;
+  const wins = Math.round(winRate * observations);
+  const annualGap = pct(stats.annualizedExcess, 1, true).replace(/%$/, " 个百分点");
+  return `<article class="subpanel equity-benchmark-summary">
+    <div class="subpanel-heading"><div><h3>与中证800相比的收益和风险</h3>
+      <span>${escapeHTML(stats.firstDate)} 至 ${escapeHTML(stats.lastDate)} · 每月最后共同有效日 · 中证800为统一研究基准${stats.skippedMonths ? ` · ${stats.skippedMonths} 段因缺相邻月数据未纳入` : ""}</span>
+    </div></div>
+    <div class="research-metric-grid benchmark-highlights">
+      ${metric("跑赢中证800的月份占比", pct(winRate, 1), `${observations} 个观察月中有 ${wins} 个月跑赢`)}
+      ${metric("年化收益差", annualGap, "基金年化收益减去指数年化收益", annualGap.startsWith("+") ? "up" : /^[−-]/.test(annualGap) ? "down" : "")}
+      ${metric("基金年化波动率", pct(stats.volatility, 1), "根据这些月份的基金收益计算")}
+    </div>
+    <details class="benchmark-methods"><summary>分市场表现与专业风险指标</summary>
+      ${renderTable(["市场情况", "月份数", "基金月均收益", "中证800月均收益", "跑赢指数的月份占比"], stats.scenarios)}
+      <div class="research-metric-grid benchmark-extra">
+        ${metric("上涨捕获率", pct(stats.upCapture, 1), "指数上涨月份，基金与指数月均收益之比")}
+        ${metric("下跌捕获率", pct(stats.downCapture, 1), "指数下跌月份，基金与指数月均收益之比")}
+        ${metric("跟踪误差", pct(stats.trackingError, 1), "基金与指数月收益差的年化波动")}
+        ${metric("信息比率", num(stats.informationRatio, 2), "年化收益差除以跟踪误差")}
+        ${metric("下行波动（年化）", pct(stats.downside, 1), "基于基金负收益月份")}
+        ${metric("夏普比率（Sharpe）", num(stats.sharpe, 2), "年化收益除以收益波动")}
+        ${metric("索提诺比率（Sortino）", num(stats.sortino, 2), "年化收益除以下行波动")}
+      </div>
+    </details>
+  </article>`;
 }
 
 function hybridBondEvaluationSeries(detail, years) {
@@ -5525,7 +5582,7 @@ function genericPerformancePanel(fund, detail, brinson) {
     ${WarmPerformance.tenureTable(fund, navPoints)}
     <p class="method-note">本表Sharpe：Rf=0%/年；纯债专页阶段表沿用Rf=1.5%/年，不能直接横比。短期年化收益与Calmar仅作辅助。</p>
     <article class="subpanel"><div class="subpanel-heading"><div><h3>月度收益、年度回撤与修复</h3><span>红色为上涨、绿色为下跌；当年合计按已有月份复合</span></div></div>${renderMonthlyReturnHeatmap(monthlyReturnsFromNav(navPoints), navPoints)}</article>
-    ${activeMetrics ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>与中证800相比的收益和风险</h3><span>近5年月度数据 · 统一与中证800比较</span></div></div><section class="research-metric-grid metric-six">${metric("年化收益差", pct(activeMetrics.annualizedExcess, 1, true), "基金年化收益 − 中证800年化收益")}${metric("收益差波动（年化）", pct(activeMetrics.trackingError, 1), "跟踪误差：基金与指数月收益差的波动")}${metric("超额收益效率", num(activeMetrics.informationRatio, 2), "信息比率：年化收益差 ÷ 收益差波动")}${metric("跑赢指数的月份占比", pct(activeMetrics.winRate, 1), "基金月收益高于中证800的月份")}${metric("指数上涨时的收益比", pct(activeMetrics.upCapture, 1), "基金月均收益 ÷ 指数月均收益")}${metric("指数下跌时的收益比", pct(activeMetrics.downCapture, 1), "基金月均收益 ÷ 指数月均收益")}${metric("收益波动（年化）", pct(activeMetrics.volatility, 1), "基金月收益的起伏幅度")}${metric("亏损月份波动（年化）", pct(activeMetrics.downside, 1), "只看基金月收益为负的月份")}${metric("夏普比率（Sharpe）", num(activeMetrics.sharpe, 2), "年化收益 ÷ 收益波动")}${metric("索提诺比率（Sortino）", num(activeMetrics.sortino, 2), "年化收益 ÷ 亏损月份波动")}</section>${renderTable(["市场情况", "月份数", "基金月均收益", "中证800月均收益", "跑赢指数的月份占比"], activeMetrics.scenarios)}</article><p class="method-note">这里统一与中证800比较，基金合同约定的业绩比较基准见上方。收益比按指数上涨或下跌的月份分别计算：100%表示与指数的平均月收益相同，大于100%表示涨得更多或跌得更多。</p>` : ""}
+    ${activeMetrics ? renderEquityBenchmarkSummary(activeMetrics) : ""}
     ${["pure-bond", "hybrid-bond"].includes(fund.category) ? genericPureBondIndexComparison(fund, detail) : ""}
     ${relative ? `<article class="subpanel"><div class="subpanel-heading"><div><h3>相对跟踪指数表现</h3><span>${escapeHTML(fund.tracking_index || "待确认")} · 对齐日收益</span></div></div><section class="research-metric-grid metric-four">${metric("跟踪误差", pct(relativeMetrics.tracking_error, 2), "近1年日频年化")}${metric("信息比率", isFiniteValue(relativeMetrics.information_ratio) ? num(relativeMetrics.information_ratio, 2) : "—")}${metric("共同样本", relativeMetrics.observations || "—")}${metric("数据状态", isFiniteValue(relativeMetrics.tracking_error) ? "已计算" : "待计算 · 基准行情缺失")}</section>${renderTable(["区间", "基金收益", "指数收益", "超额收益", "超额最大回撤"], relativeRows)}${excessCalendarRows.length ? `<div class="subpanel-heading relative-calendar-heading"><div><h3>自然年度超额风险</h3><span>基金/跟踪指数相对财富曲线</span></div></div>${renderTable(["年度", "超额收益", "年化超额", "相对波动", "超额最大回撤"], excessCalendarRows)}` : ""}</article><p class="method-note">超额收益为基金区间收益减跟踪指数区间收益；超额回撤为基金/指数相对财富曲线最大回撤。</p>` : ""}`;
 }

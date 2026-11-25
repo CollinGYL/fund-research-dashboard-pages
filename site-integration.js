@@ -1,4 +1,4 @@
-/* Shared review requirements: one search, overview positioning, explicit data sources. */
+/* Shared search popover, overview positioning, and data sources. */
 (function(){
  'use strict';
  if(!document.body.classList.contains('desktop-home'))return;
@@ -6,8 +6,8 @@
  if(!top||!original||!toolbar)return;
  const levels=document.querySelector('#industry-bar-controls');if(levels)toolbar.querySelector('.decision-view-switch')?.insertAdjacentElement('afterend',levels);
  const box=document.createElement('div');box.className='header-fund-search home-search-box';
- box.innerHTML='<label class="sr-only" for="header-fund-search">快速查找基金</label><input id="header-fund-search" type="search" placeholder="名称、代码、经理" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="fund-search-suggestions"><button type="button" aria-label="清空搜索关键词">×</button>';
- top.append(box);const quick=box.querySelector('input');quick.value=original.value;let anchor=original;
+ box.innerHTML='<label class="sr-only" for="header-fund-search">全站搜索基金，含历史基金</label><input id="header-fund-search" type="search" placeholder="全站搜索 · 含历史基金" aria-expanded="false" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="fund-search-suggestions"><button type="button" aria-label="清空搜索关键词">×</button>';
+ top.append(box);const quick=box.querySelector('input');let anchor=original;
  const list=document.querySelector('#fund-search-suggestions');
  if(list){document.body.append(list);list.classList.add('shared-search-suggestions','home-search-box');}
  function position(){
@@ -20,16 +20,32 @@
   list.style.visibility='';
   const width=Math.min(Math.max(r.width,340),innerWidth-24);
   Object.assign(list.style,{position:'fixed',zIndex:'1200',left:Math.min(Math.max(12,r.left),innerWidth-width-12)+'px',top:r.bottom+4+'px',width:width+'px',maxHeight:Math.max(90,innerHeight-r.bottom-20)+'px',overflow:'auto'});
-  quick.setAttribute('aria-expanded',String(!list.hidden));
  }
  const priorSuggestions=renderSuggestions;
- renderSuggestions=function(){priorSuggestions();position();};
- quick.addEventListener('input',()=>{anchor=quick;original.value=quick.value;original.dispatchEvent(new Event('input',{bubbles:true}));});
- quick.addEventListener('focus',()=>{anchor=quick;renderSuggestions();});
- quick.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();closeSuggestions();quick.setAttribute('aria-expanded','false');}else if(e.key==='Enter'){const item=list?.querySelector('.active')||list?.querySelector('[role=option]');if(item&&!list.hidden){e.preventDefault();item.click();}}else if(e.key==='Tab'){closeSuggestions();}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(list?.hidden)renderSuggestions();moveSuggestion(e.key==='ArrowDown'?1:-1);}});
- original.addEventListener('focus',()=>{anchor=original;position();});original.addEventListener('input',()=>{quick.value=original.value;});
- box.querySelector('button').addEventListener('click',()=>{quick.value=original.value='';original.dispatchEvent(new Event('input',{bubbles:true}));quick.focus();});
- original.addEventListener('keydown',e=>{if(e.key==='Enter'&&!list.hidden){const item=list.querySelector('.active')||list.querySelector('[role=option]');if(item){e.preventDefault();item.click();}}});
+ renderSuggestions=function(input=original){
+  anchor=input;
+  priorSuggestions(input);
+  position();
+ };
+ quick.addEventListener('input',()=>renderSuggestions(quick));
+ quick.addEventListener('focus',()=>renderSuggestions(quick));
+ function openHighlighted(e){
+  if(e.isComposing || e.keyCode===229 || e.key!=='Enter' || list.hidden) return;
+  const item=list.querySelector('.active') || list.querySelector('[role=option]');
+  if(item){e.preventDefault();item.click();}
+ }
+ quick.addEventListener('keydown',e=>{
+  if(e.isComposing || e.keyCode===229) return;
+  if(e.key==='Escape'){e.preventDefault();closeSuggestions();}
+  else if(e.key==='Tab') closeSuggestions();
+  else if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+   e.preventDefault();
+   if(list.hidden) renderSuggestions(quick);
+   moveSuggestion(e.key==='ArrowDown'?1:-1);
+  } else openHighlighted(e);
+ });
+ original.addEventListener('keydown',openHighlighted);
+ box.querySelector('button').addEventListener('click',()=>{quick.value='';closeSuggestions();quick.focus();});
  window.addEventListener('scroll',position,{passive:true,capture:true});window.addEventListener('resize',position,{passive:true});
  const snapshotKey='fund.overview.return.v2',routeKey='fund.overview.route.v2';
  const read=k=>{try{return JSON.parse(sessionStorage.getItem(k)||'null');}catch{return null;}};
@@ -50,7 +66,7 @@
  back.addEventListener('click',()=>{const saved=read(snapshotKey);if(!saved)return;store(routeKey,{action:'return',saved});window.location.assign('index.html'+saved.query);});
  let changing=false;
  function synchronize(){
-  quick.value=original.value;back.hidden=activeCategory==='all'||!read(snapshotKey);
+  back.hidden=activeCategory==='all'||!read(snapshotKey);
   if(changing||!funds.length)return;
   if(route?.action==='return'&&!restored){const saved=route.saved;restored=true;changing=true;currentPage=saved.page;renderFunds();changing=false;requestAnimationFrame(()=>{const wrap=document.querySelector('.fund-list-wrap');if(wrap)wrap.scrollLeft=saved.left;window.scrollTo(0,saved.scroll);});sessionStorage.removeItem(routeKey);sessionStorage.removeItem(snapshotKey);route=null;}
   if(highlight){

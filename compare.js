@@ -27,16 +27,47 @@
   const latest=[...dates,...(limit?[limit]:[])].sort()[0],period=$('#compare-period').value;
   return ReviewCore.compare(details,period==='all'?'0000-01-01':FundResearch.monthStart(latest,Number(period)),latest);
  }
+ function disclosureCutoff(){
+  const day=cutoff();
+  if(!day || selectedMode==='history')return day;
+  const q=parameters(),listDate=new URLSearchParams(q.get('list')||'').get('navDate');
+  // Older list links serialized "latest" with a concrete NAV day. A saved older day stays historical.
+  if(q.get('navDate')===day && (listDate==='latest'||listDate==='all') && day===FundLifecycle.data().as_of)return null;
+  return day;
+ }
+ function disclosedDurationAt(detail,limit){
+  const history=(detail.duration_history||[]).map(row=>({
+    report_date:row.date,value:row.duration,source_url:row.source_url,announcement_date:row.announcement_date,available_at:row.available_at
+  }));
+  const latest=detail.fund?.duration;
+  if(latest && Number.isFinite(latest.value)){
+    const match=history.find(row=>row.report_date===latest.report_date && row.value===latest.value && row.source_url===latest.source_url);
+    history.push({...match,...latest});
+  }
+  let selected=null;
+  for(const row of history){
+    if(!FundLifecycle.validDate(row.report_date)||!Number.isFinite(row.value))continue;
+    if(limit){
+      const announced=row.announcement_date,asOf=row.available_at||announced;
+      const available=typeof asOf==='string'?asOf.slice(0,10):'';
+      if(!FundLifecycle.validDate(announced)||!FundLifecycle.validDate(available)
+        ||announced<row.report_date||announced>limit||available>limit)continue;
+    }
+    if(!selected || row.report_date>=selected.report_date)selected=row;
+  }
+  return selected;
+ }
  function disclosureTable(){
-  const limit=cutoff();
+  const limit=disclosureCutoff();
+  const scope=limit?'截至 '+esc(limit)+' 已知的披露。':'最近公开披露。';
   const value=(n,unit)=>Number.isFinite(n)?(unit==='%'?(100*n).toFixed(2):n.toFixed(2))+unit:'—';
   const rows=current.map(detail=>{
     const f=detail.fund, a=(detail.asset_history||[]).filter(row=>!limit || (row.announcement_date && row.announcement_date<=limit && (row.available_at||row.announcement_date).slice(0,10)<=limit)).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
-    const d=f.duration;
-    const canShowDuration=!limit || (d?.report_date && d.report_date<=limit && (detail.asset_history||[]).some(row=>row.date===d.report_date && row.announcement_date && row.announcement_date<=limit && (row.available_at||row.announcement_date).slice(0,10)<=limit));
-    return '<tr><td>'+esc(f.name)+'</td><td>'+esc(a?.date||'—')+'<br><small>公告 '+esc(a?.announcement_date||'—')+'</small></td><td>'+value(a?.stock,'%')+'</td><td>'+value(a?.convertible_bond,'%')+'</td><td>'+value(a?.leverage,' 倍')+'</td><td>'+(canShowDuration?value(d?.value,' 年'):'—')+'<br><small>'+esc(canShowDuration?d?.report_date||'—':'历史可用日未核实')+'</small></td></tr>';
+    const d=disclosedDurationAt(detail,limit);
+    const durationNote=d ? d.report_date+(d.announcement_date?' · 公告 '+d.announcement_date:'') : limit?'截至该日无已核实公告':'—';
+    return '<tr><td>'+esc(f.name)+'</td><td>'+esc(a?.date||'—')+'<br><small>公告 '+esc(a?.announcement_date||'—')+'</small></td><td>'+value(a?.stock,'%')+'</td><td>'+value(a?.convertible_bond,'%')+'</td><td>'+value(a?.leverage,' 倍')+'</td><td>'+value(d?.value,' 年')+'<br><small>'+esc(durationNote)+'</small></td></tr>';
   });
-  return '<article class="subpanel"><h3>持仓与杠杆披露</h3><p class="method-note">股票和转债占基金净资产。配置与久期分别标明报告期；滑动净值区间只改变收益和回撤。</p><div class="table-scroll"><table class="data-table"><thead><tr><th>基金</th><th>资产报告期</th><th>股票</th><th>转债</th><th>杠杆</th><th>披露久期</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div></article>';
+  return '<article class="subpanel"><h3>持仓与杠杆披露</h3><p class="method-note">'+scope+'股票和转债占基金净资产。配置与久期分别标明报告期；滑动净值区间只改变收益和回撤。</p><div class="table-scroll"><table class="data-table"><thead><tr><th>基金</th><th>资产报告期</th><th>股票</th><th>转债</th><th>杠杆</th><th>披露久期</th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div></article>';
  }
  function draw(result){
   if(current.length<2)return false;
